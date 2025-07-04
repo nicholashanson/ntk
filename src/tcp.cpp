@@ -16,13 +16,21 @@ namespace ntk {
         return tcp_header;
     }
 
-    uint16_t read_uint16_be( const std::vector<uint8_t>& buffer, size_t offset ) {
+    uint16_t read_uint16_be( const unsigned char* buffer, size_t offset ) {
         return ( buffer[ offset ] << 8 ) | buffer[ offset + 1 ];
     }
 
-    uint32_t read_uint32_be( const std::vector<uint8_t>& buffer, size_t offset ) {
+    uint16_t read_uint16_be( const std::vector<uint8_t>& buffer, size_t offset ) {
+        return read_uint16_be( buffer.data(), offset );
+    }
+
+    uint32_t read_uint32_be( const unsigned char* buffer, size_t offset ) {
         return ( buffer[ offset ]     << 24 ) | ( buffer[ offset + 1 ] << 16 ) |
                ( buffer[ offset + 2 ] <<  8 ) |   buffer[ offset + 3 ];
+    }
+
+    uint32_t read_uint32_be( const std::vector<uint8_t>& buffer, size_t offset ) {
+        return read_uint32_be( buffer.data(), offset );
     }
 
     tcp_header parse_tcp_header( const std::vector<uint8_t>& raw_tcp_header ) {
@@ -43,11 +51,10 @@ namespace ntk {
         header.checksum = read_uint16_be( raw_tcp_header, 16 ); 
         header.urgent_pointer = read_uint16_be( raw_tcp_header, 18 );
 
-        if ( header.data_offset == 5 ) 
+        if ( header.data_offset == 5 ) // header doesn't have options
             return header;
         
         size_t index = 20;
-
         size_t header_byte_length = header.data_offset * 4;
 
         while ( index < header_byte_length ) {
@@ -190,16 +197,15 @@ namespace ntk {
         uint8_t ihl = ethernet_frame[ ethernet_header_len ] & 0x0F;
         size_t ipv4_header_len = ihl * 4;
 
-        uint16_t total_length = ( ethernet_frame[ ethernet_header_len + 2 ] << 8 ) |
-                                  ethernet_frame[ ethernet_header_len + 3 ];
+        uint16_t total_length = read_uint16_be( ethernet_frame, ethernet_header_len + 2 );
 
         size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
 
         uint8_t data_offset_byte = ethernet_frame[ tcp_header_offset + 12 ];
         size_t tcp_header_len = ( ( data_offset_byte >> 4 ) & 0x0F ) * 4;
 
-        uint16_t src_port = ( ethernet_frame[ tcp_header_offset ] << 8 ) | ethernet_frame[ tcp_header_offset + 1 ];
-        uint16_t dst_port = ( ethernet_frame[ tcp_header_offset + 2 ] << 8 ) | ethernet_frame[ tcp_header_offset + 3 ];
+        uint16_t src_port = read_uint16_be( ethernet_frame, tcp_header_offset );
+        uint16_t dst_port = read_uint16_be( ethernet_frame, tcp_header_offset + 2 );
 
         size_t payload_len = total_length - ipv4_header_len - tcp_header_len;
 
@@ -490,7 +496,7 @@ namespace ntk {
 
         std::vector<tcp_termination> terminations;
 
-         std::vector<std::vector<uint8_t>> connection_packets;
+        std::vector<std::vector<uint8_t>> connection_packets;
 
         for ( const auto& packet : packets ) {
             if ( is_same_connection( packet, four ) ) {
