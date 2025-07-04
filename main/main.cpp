@@ -35,16 +35,3 @@ int main() {
 
     return 0;
 }
-
-
-#include <packet_listener.hpp>
-#include <ring_buffer.hpp>
-
-int main() {
-
-    const std::string filename = "../packet_data/test.txt";
-
-    ntk::capture_packets( filename );
-
-    return 0;
-}

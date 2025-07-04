@@ -16,6 +16,14 @@ namespace ntk {
         return tcp_header;
     }
 
+    uint16_t read_uint16_be( const std::vector<uint8_t>& buffer, size_t offset ) {
+        return ( buffer[ offset ] << 8 ) | buffer[ offset + 1 ];
+    }
+
+    uint32_t read_uint32_be( const std::vector<uint8_t>& buffer, size_t offset ) {
+        return ( buffer[ offset ]     << 24 ) | ( buffer[ offset + 1 ] << 16 ) |
+               ( buffer[ offset + 2 ] <<  8 ) |   buffer[ offset + 3 ];
+    }
 
     tcp_header parse_tcp_header( const std::vector<uint8_t>& raw_tcp_header ) {
 
@@ -25,25 +33,15 @@ namespace ntk {
 
         tcp_header header;
 
-        header.source_port = ( raw_tcp_header[ 0 ] << 8 ) | raw_tcp_header[ 1 ];
-
-        header.destination_port = ( raw_tcp_header[ 2 ] << 8 ) | raw_tcp_header[ 3 ];
-
-        header.sequence_number = ( raw_tcp_header[ 4 ] << 24 ) | ( raw_tcp_header[ 5 ] << 16 ) |
-                                 ( raw_tcp_header[ 6 ] << 8 ) | raw_tcp_header[ 7 ];
-
-        header.acknowledgment_number = ( raw_tcp_header[ 8 ] << 24 ) | ( raw_tcp_header[ 9 ] << 16 ) |
-                                       ( raw_tcp_header[ 10 ] << 8 ) | raw_tcp_header[ 11 ];
-
+        header.source_port = read_uint16_be( raw_tcp_header, 0 ); 
+        header.destination_port = read_uint16_be( raw_tcp_header, 2 ); 
+        header.sequence_number = read_uint32_be( raw_tcp_header, 4 ); 
+        header.acknowledgment_number = read_uint32_be( raw_tcp_header, 8 );
         header.data_offset = ( raw_tcp_header[ 12 ] >> 4 ) & 0x0f;  
-
         header.flags = raw_tcp_header[ 13 ];
-
-        header.window_size = ( raw_tcp_header[ 14 ] << 8 ) | raw_tcp_header[ 15 ];
-
-        header.checksum = ( raw_tcp_header[ 16 ] << 8 ) | raw_tcp_header[ 17 ];
-
-        header.urgent_pointer = ( raw_tcp_header[ 18 ] << 8 ) | raw_tcp_header[ 19 ];
+        header.window_size = read_uint16_be( raw_tcp_header, 14 ); 
+        header.checksum = read_uint16_be( raw_tcp_header, 16 ); 
+        header.urgent_pointer = read_uint16_be( raw_tcp_header, 18 );
 
         if ( header.data_offset == 5 ) 
             return header;
