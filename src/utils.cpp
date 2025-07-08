@@ -229,7 +229,7 @@ namespace ntk {
         os << "===== CLIENT HELLO BEGIN =====\n";
 
         print_field( "Session ID:", session_id_to_hex( c_hello.session_id ) );
-        print_field( "Client Version:", c_hello.client_version );
+        print_field( "Client Version:", static_cast<uint16_t>( c_hello.client_version ) );
         print_field( "Client Random:", client_random_to_hex( c_hello.random ) );
 
         os << "===== CLIENT HELLO END =====\n\n";

@@ -48,6 +48,10 @@ namespace ntk {
         TLS_AES_256_GCM_SHA384 // 0x1302
     };
 
+    enum class tls_version : uint16_t {
+        TLS_1_2 = 0x0303
+    };
+
     static const std::unordered_map<tls_content_type,std::string> tls_content_type_names = {
         { tls_content_type::CHANGE_CIPHER_SEC, "ChangeCipherSpec" },
         { tls_content_type::ALERT, "Alert" },
@@ -72,7 +76,7 @@ namespace ntk {
     };
 
     struct client_hello {
-        uint16_t client_version;
+        tls_version client_version;
         std::array<uint8_t,32> random;
         std::vector<uint8_t> session_id;
         std::vector<uint8_t> cipher_suites;
@@ -90,7 +94,7 @@ namespace ntk {
     };
 
     struct server_hello {
-        uint16_t server_version;
+        tls_version server_version;
         std::array<uint8_t,32> random;
         std::vector<uint8_t> session_id;
         uint16_t cipher_suite;
@@ -130,7 +134,7 @@ namespace ntk {
     std::vector<tls_record> decrypt_tls_data(
         const std::array<uint8_t,32>& client_random,
         const std::array<uint8_t,32>& server_random,
-        const uint16_t tls_version,
+        const tls_version version,
         const uint16_t cipher_suite_id,
         const std::vector<tls_record>& encrypted_records,
         const secrets& session_keys,
@@ -138,7 +142,7 @@ namespace ntk {
 
     tls_record decrypt_record( const std::array<uint8_t,32>& client_random,
                                const std::array<uint8_t,32>& server_random,
-                               const uint16_t tls_version,
+                               const tls_version version,
                                const uint16_t cipher_suite_id,
                                const tls_record& record,
                                const secrets& session_keys,
@@ -151,7 +155,7 @@ namespace ntk {
                                              const std::array<uint8_t,32>& client_random,
                                              const std::string& label );
 
-    std::vector<uint8_t> build_tls13_aad( tls_content_type content_type, uint16_t version, uint16_t length );
+    std::vector<uint8_t> build_tls13_aad( tls_content_type content_type, tls_version version, uint16_t length );
 
     std::vector<uint8_t> extract_certificate( const std::vector<uint8_t>& handshake_payload );
 

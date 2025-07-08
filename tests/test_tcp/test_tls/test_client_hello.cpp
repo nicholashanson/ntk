@@ -28,7 +28,7 @@ TEST( PacketParsingTests, TLSClientHello ) {
     auto client_hello_span = tls_record_span.subspan( 9 );
     auto client_hello = ntk::parse_client_hello( client_hello_span );
 
-    ASSERT_EQ( client_hello.client_version, 0x0303 );
+    ASSERT_EQ( client_hello.client_version, ntk::tls_version::TLS_1_2 );
     ASSERT_EQ( client_hello.session_id.size(), 32 );
     ASSERT_EQ( ntk::session_id_to_hex( client_hello.session_id ), "73a6f6977049af5160801e6221d25c8e4a502f7edcddae5712b90cbcde75d09a" );
     ASSERT_EQ( ntk::client_random_to_hex( client_hello.random ), "7ba900c7057e9e5d0609c04b66f56e1b3003cd6906dea3cec057f8f733cc7102" );
@@ -41,7 +41,7 @@ TEST( PacketParsingTests, TLSClientHelloEthernetFrame ) {
     
     auto client_hello = ntk::get_client_hello_from_ethernet_frame( test_constants::tls_client_hello_packet );
 
-    ASSERT_EQ( client_hello.client_version, 0x0303 );
+    ASSERT_EQ( client_hello.client_version, ntk::tls_version::TLS_1_2 );
     ASSERT_EQ( client_hello.session_id.size(), 32 );
     ASSERT_EQ( ntk::session_id_to_hex( client_hello.session_id ), "73a6f6977049af5160801e6221d25c8e4a502f7edcddae5712b90cbcde75d09a" );
     ASSERT_EQ( ntk::client_random_to_hex( client_hello.random ), "7ba900c7057e9e5d0609c04b66f56e1b3003cd6906dea3cec057f8f733cc7102" );
@@ -65,7 +65,7 @@ TEST( PacketParsingTests, TLSClientHelloFromEthernetFrame ) {
     auto& tls_client_hello = packet_data[ 3 ];
     auto client_hello = ntk::get_client_hello_from_ethernet_frame( tls_client_hello );
 
-    ASSERT_EQ( client_hello.client_version, 0x0303 );
+    ASSERT_EQ( client_hello.client_version, ntk::tls_version::TLS_1_2 );
     ASSERT_EQ( client_hello.session_id.size(), 32 );
     ASSERT_EQ( ntk::session_id_to_hex( client_hello.session_id ), "363c4edf91f14d388547a75f371187ec468d84de548eecfa5dbb4a97390da0a4" );
     ASSERT_EQ( ntk::client_random_to_hex( client_hello.random ), "e7bb2bb068dcd517e4f4ba1475e9d936dded3c24627c1b80861f2ca24a645a37" );

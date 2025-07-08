@@ -10,7 +10,7 @@ namespace ntk {
 
         client_hello c_hello;
 
-        c_hello.client_version = ( client_hello_bytes[ 0 ] << 8 ) | client_hello_bytes[ 1 ];
+        c_hello.client_version = static_cast<tls_version>( ( client_hello_bytes[ 0 ] << 8 ) | client_hello_bytes[ 1 ] );
         std::memcpy( c_hello.random.data(), &client_hello_bytes[ client_version_len ], random_len );
 
         const size_t session_id_len = client_hello_bytes[ client_version_len + random_len ];
@@ -55,7 +55,7 @@ namespace ntk {
 
         server_hello s_hello;
 
-        s_hello.server_version = ( server_hello_bytes[ 0 ] << 8 ) | server_hello_bytes[ 1 ];
+        s_hello.server_version = static_cast<tls_version>( ( server_hello_bytes[ 0 ] << 8 ) | server_hello_bytes[ 1 ] );
 
         std::memcpy( s_hello.random.data(), &server_hello_bytes[version_len], random_len );
 
@@ -334,7 +334,7 @@ namespace ntk {
 
     std::vector<tls_record> decrypt_tls_data( const std::array<uint8_t,32>& client_random,
                                               const std::array<uint8_t,32>& server_random,
-                                              const uint16_t tls_version,
+                                              const tls_version version,
                                               const uint16_t cipher_suite_id,
                                               const std::vector<tls_record>& encrypted_records,
                                               const secrets& session_keys,
@@ -383,7 +383,7 @@ namespace ntk {
 
     tls_record decrypt_record( const std::array<uint8_t,32>& client_random,
                                const std::array<uint8_t,32>& server_random,
-                               const uint16_t tls_version,
+                               const tls_version version,
                                const uint16_t cipher_suite_id,
                                const tls_record& record,
                                const secrets& session_keys,
