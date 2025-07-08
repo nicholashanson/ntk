@@ -20,6 +20,10 @@
 
 namespace ntk {
 
+    // ==============================
+    //           TCP Flags
+    // ==============================
+
     enum class tcp_flags : uint8_t {
         FIN = 0x01,
         SYN = 0x02,
@@ -58,6 +62,10 @@ namespace ntk {
         }        
     };
 
+    // ==============================
+    //         TCP Header
+    // ==============================
+
     struct tcp_header {
         uint16_t source_port;
         uint16_t destination_port;
@@ -84,44 +92,9 @@ namespace ntk {
         }
     };
 
-    struct four_tuple { 
-        uint32_t client_ip;
-        uint32_t server_ip;
-        uint16_t client_port;
-        uint16_t server_port;
-
-        bool operator==( const four_tuple& other ) const {
-            return client_ip == other.client_ip &&
-                server_ip == other.server_ip &&
-                client_port == other.client_port &&
-                server_port == other.server_port;
-        }
-    };
-
-    struct tcp_handshake {
-        std::vector<uint8_t> syn;
-        std::vector<uint8_t> syn_ack;
-        std::vector<uint8_t> ack;
-
-        bool operator==( const tcp_handshake& other ) const {
-            return syn == other.syn && syn_ack == other.syn_ack && ack == other.ack;
-        }
-
-        bool empty() const {
-            return syn.empty() && syn_ack.empty() && ack.empty();
-        }
-    };
-
-    using fin_ack_fin_ack = std::array<std::vector<uint8_t>,4>;
-    using rst = std::vector<uint8_t>;
-
-    struct tcp_termination {
-        std::variant<fin_ack_fin_ack,rst> closing_sequence;  
-
-        bool operator==( const tcp_termination& other ) const {
-            return closing_sequence == other.closing_sequence;
-        }
-    };
+    // ==============================
+    //       TCP Header Parsing
+    // ==============================
 
     std::vector<uint8_t> extract_tcp_header( const unsigned char* ethernet_frame, const size_t ipv4_header_len );
 
@@ -130,6 +103,10 @@ namespace ntk {
     tcp_header get_tcp_header( const unsigned char* ethernet_frame );
 
     tcp_header get_tcp_header( const std::vector<uint8_t>& packet );
+
+    // ==============================
+    //      TCP Stream Parsing
+    // ==============================
 
     bool is_non_overlapping_stream( const tcp_stream& stream );
 
@@ -149,32 +126,95 @@ namespace ntk {
 
     std::vector<uint8_t> extract_payload_from_ethernet( const std::vector<uint8_t> ethernet_frame );
 
+    // ==============================
+    //     TCP Packet Predicates
+    // ==============================
+
     bool is_tcp( const unsigned char* packet );
 
     bool is_tcp_v( const std::vector<uint8_t>& packet );
+
+    bool is_data_packet( const std::vector<uint8_t>& packet );
+
+    bool is_ack_only_packet( const std::vector<uint8_t>& packet );
+
+    bool is_reset( const std::vector<uint8_t>& packet );
+
+    bool is_syn( const std::vector<uint8_t>& packet );
+
+
+    // ==============================
+    //         Four Tuple
+    // ==============================
+
+    struct four_tuple { 
+        uint32_t client_ip;
+        uint32_t server_ip;
+        uint16_t client_port;
+        uint16_t server_port;
+
+        bool operator==( const four_tuple& other ) const {
+            return client_ip == other.client_ip &&
+                server_ip == other.server_ip &&
+                client_port == other.client_port &&
+                server_port == other.server_port;
+        }
+    };
+
+} // namespace ntk
+
+namespace std {
+
+    template <>
+    struct hash<ntk::four_tuple> {
+        size_t operator()( const ntk::four_tuple& ft ) const noexcept {
+            size_t h_1 = hash<uint32_t>{}( ft.client_ip );
+            size_t h_2 = hash<uint32_t>{}( ft.server_ip );
+            size_t h_3 = hash<uint16_t>{}( ft.client_port );
+            size_t h_4 = hash<uint16_t>{}( ft.server_port );
+            return h_1 ^ ( h_2 << 1 ) ^ ( h_3 << 2 ) ^ ( h_4 << 3 ); 
+        }
+    };
+
+} // namespace std
+
+namespace ntk {
+
+    std::unordered_set<four_tuple> get_four_tuples( const session& packets );
+
+    four_tuple get_four_from_ethernet( const unsigned char* packet );
+
+    four_tuple get_four_from_ethernet( const std::vector<uint8_t>& packet );
+
+    four_tuple flip_four( const four_tuple& four );
+
+    // ==============================
+    //         TCP Handshake
+    // ==============================
+
+    struct tcp_handshake {
+        std::vector<uint8_t> syn;
+        std::vector<uint8_t> syn_ack;
+        std::vector<uint8_t> ack;
+
+        bool operator==( const tcp_handshake& other ) const {
+            return syn == other.syn && syn_ack == other.syn_ack && ack == other.ack;
+        }
+
+        bool empty() const {
+            return syn.empty() && syn_ack.empty() && ack.empty();
+        }
+    };
 
     tcp_handshake get_handshake( const four_tuple& four, const session& packets );
 
     std::vector<tcp_handshake> get_handshakes( const four_tuple& four, const session& packets );
 
-    class tcp_transfer {
-        public:
-            tcp_transfer( const four_tuple& four );
-            void load( const session& packet_data );
-        private:
-            void split_stream( const session& packet_data );
-        private:
-            tcp_handshake m_handshake;
-            tcp_termination m_termination;
-            std::vector<std::vector<uint8_t>> m_client_acks;
-            std::vector<std::vector<uint8_t>> m_server_acks;
-            std::vector<std::vector<uint8_t>> m_client_traffic;
-            std::vector<std::vector<uint8_t>> m_server_traffic;
-            
-            four_tuple m_four;
+    const std::vector<uint8_t>* get_end_of_handshake( const session& packets, 
+                                                      const four_tuple& four,
+                                                      const tcp_handshake& handshake );
 
-            friend class tcp_transfer_friend_helper;
-    };
+    bool is_valid_handshake( const tcp_handshake& handshake );
 
     struct tcp_handshake_feed { 
 
@@ -198,6 +238,33 @@ namespace ntk {
         std::optional<std::vector<uint8_t>> m_ack;
     };
 
+    // ==============================
+    //         TCP Termination
+    // ==============================
+
+    using fin_ack_fin_ack = std::array<std::vector<uint8_t>,4>;
+    using rst = std::vector<uint8_t>;
+
+    struct tcp_termination {
+        std::variant<fin_ack_fin_ack,rst> closing_sequence;  
+
+        bool operator==( const tcp_termination& other ) const {
+            return closing_sequence == other.closing_sequence;
+        }
+    };
+
+    tcp_termination get_termination( const four_tuple& four, const session& packets );
+
+    std::vector<tcp_termination> get_terminations( const four_tuple& four, const session& packets );
+
+    const std::vector<uint8_t>* get_start_of_termination( const session& packets, 
+                                                          const four_tuple& four,
+                                                          const tcp_termination& termination );
+
+    bool is_valid_fin_ack_fin_ack( const fin_ack_fin_ack& closing_sequence );
+
+    bool is_valid_fin_ack_fin_ack( const tcp_termination& termination );
+
     struct tcp_termination_feed { 
     
         bool feed( const std::vector<uint8_t>& packet );
@@ -220,6 +287,36 @@ namespace ntk {
 
         uint32_t m_fin_1_seq_number;
         uint32_t m_fin_2_seq_number;
+    };
+
+    class tcp_transfer {
+        public:
+            tcp_transfer( const four_tuple& four );
+            void load( const session& packet_data );
+        private:
+            void split_stream( const session& packet_data );
+        private:
+            tcp_handshake m_handshake;
+            tcp_termination m_termination;
+            std::vector<std::vector<uint8_t>> m_client_acks;
+            std::vector<std::vector<uint8_t>> m_server_acks;
+            std::vector<std::vector<uint8_t>> m_client_traffic;
+            std::vector<std::vector<uint8_t>> m_server_traffic;
+            
+            four_tuple m_four;
+
+            friend class tcp_transfer_friend_helper;
+    };
+
+    class tcp_transfer_friend_helper {
+        public:
+            static const tcp_handshake& handshake( const tcp_transfer& t );
+            static const tcp_termination& termination( const tcp_transfer& t );
+            static const std::vector<std::vector<uint8_t>>& client_acks( const tcp_transfer& t );
+            static const std::vector<std::vector<uint8_t>>& server_acks( const tcp_transfer& t );
+            static const std::vector<std::vector<uint8_t>>& client_traffic( const tcp_transfer& t );
+            static const std::vector<std::vector<uint8_t>>& server_traffic( const tcp_transfer& t );
+            static const four_tuple& four( const tcp_transfer& t );
     };
 
     class tcp_live_stream {
@@ -254,48 +351,6 @@ namespace ntk {
             friend void output_stream_to_file( const std::string& filename, const tcp_live_stream& live_stream );
     };
 
-    four_tuple get_four_from_ethernet( const unsigned char* packet );
-
-    four_tuple get_four_from_ethernet( const std::vector<uint8_t>& packet );
-
-    four_tuple flip_four( const four_tuple& four );
-
-} // namespace ntk
-
-namespace std {
-
-    template <>
-    struct hash<ntk::four_tuple> {
-        size_t operator()( const ntk::four_tuple& ft ) const noexcept {
-            size_t h1 = hash<uint32_t>{}( ft.client_ip );
-            size_t h2 = hash<uint32_t>{}( ft.server_ip );
-            size_t h3 = hash<uint16_t>{}( ft.client_port );
-            size_t h4 = hash<uint16_t>{}( ft.server_port );
-            return h1 ^ ( h2 << 1 ) ^ ( h3 << 2 ) ^ ( h4 << 3 ); 
-        }
-    };
-
-} // namespace std
-
-namespace ntk {
-
-    std::unordered_set<four_tuple> get_four_tuples( const session& packets );
-
-    tcp_termination get_termination( const four_tuple& four, const session& packets );
-
-    std::vector<tcp_termination> get_terminations( const four_tuple& four, const session& packets );
-
-    class tcp_transfer_friend_helper {
-        public:
-            static const tcp_handshake& handshake( const tcp_transfer& t );
-            static const tcp_termination& termination( const tcp_transfer& t );
-            static const std::vector<std::vector<uint8_t>>& client_acks( const tcp_transfer& t );
-            static const std::vector<std::vector<uint8_t>>& server_acks( const tcp_transfer& t );
-            static const std::vector<std::vector<uint8_t>>& client_traffic( const tcp_transfer& t );
-            static const std::vector<std::vector<uint8_t>>& server_traffic( const tcp_transfer& t );
-            static const four_tuple& four( const tcp_transfer& t );
-    };
-
     class tcp_live_stream_friend_helper {
         public:
             static const tcp_handshake_feed& handshake_feed( const tcp_live_stream& t );
@@ -304,21 +359,15 @@ namespace ntk {
             static const four_tuple& four( const tcp_live_stream& t );
     };
 
-    const std::vector<uint8_t>* get_end_of_handshake( const session& packets, 
-                                                      const four_tuple& four,
-                                                      const tcp_handshake& handshake );
+    struct four_tuple_filter {
+        bool operator()( const ntk::tcp_live_stream& stream ) {
+            return m_four == stream.get_four_tuple();
+        }
+        four_tuple_filter( const ntk::four_tuple& four ) 
+            : m_four( four ) {}
 
-    const std::vector<uint8_t>* get_start_of_termination( const session& packets, 
-                                                          const four_tuple& four,
-                                                          const tcp_termination& termination );
-
-    bool is_data_packet( const std::vector<uint8_t>& packet );
-
-    bool is_ack_only_packet( const std::vector<uint8_t>& packet );
-
-    bool is_reset( const std::vector<uint8_t>& packet );
-
-    bool is_syn( const std::vector<uint8_t>& packet );
+        four_tuple m_four;
+    };
 
     class tcp_live_stream_session { 
 
@@ -343,22 +392,6 @@ namespace ntk {
             static const tcp_live_stream& get_live_stream( const tcp_live_stream_session& t, const four_tuple& four );
             static const std::vector<tcp_live_stream>& live_streams( const tcp_live_stream_session& t );
             static const std::unordered_set<four_tuple>& four_tuples( const tcp_live_stream_session& t );
-    };
-
-    bool is_valid_handshake( const tcp_handshake& handshake );
-
-    bool is_valid_fin_ack_fin_ack( const fin_ack_fin_ack& closing_sequence );
-
-    bool is_valid_fin_ack_fin_ack( const tcp_termination& termination );
-
-    struct four_tuple_filter {
-        bool operator()( const ntk::tcp_live_stream& stream ) {
-            return m_four == stream.get_four_tuple();
-        }
-        four_tuple_filter( const ntk::four_tuple& four ) 
-            : m_four( four ) {}
-
-        four_tuple m_four;
     };
 
     std::vector<std::vector<uint8_t>> extract_payloads( const four_tuple& four, const std::vector<std::vector<uint8_t>>& packets );
