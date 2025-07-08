@@ -26,30 +26,37 @@
 
 namespace ntk {
 
-    using sni_to_ip = std::map<std::string,uint32_t>;
+    // ==============================
+    //          TLS Version
+    // ==============================
 
-    const std::array<std::string,5> tls_secret_labels = {
-        "SERVER_HANDSHAKE_TRAFFIC_SECRET",  
-        "EXPORTER_SECRET",
-        "SERVER_TRAFFIC_SECRET_0",  
-        "CLIENT_HANDSHAKE_TRAFFIC_SECRET",  
-        "CLIENT_TRAFFIC_SECRET_0"
+    enum class tls_version : uint16_t {
+        TLS_1_2 = 0x0303
     };
 
-    enum class tls_content_type : uint8_t {
-        CHANGE_CIPHER_SEC = 0x14,
-        ALERT,           // 0x15
-        HANDSHAKE,       // 0x16
-        APPLICATION_DATA // 0x17
-    };
+    // ==============================
+    //         Cipher Suites
+    // ==============================
 
     enum class cipher_suite : uint16_t {
         TLS_AES_128_GCM_SHA256 =  0x1301,
         TLS_AES_256_GCM_SHA384 // 0x1302
     };
 
-    enum class tls_version : uint16_t {
-        TLS_1_2 = 0x0303
+    static const std::unordered_map<cipher_suite,std::string> tls_cipher_suite_names = {
+        { cipher_suite::TLS_AES_128_GCM_SHA256, "TLS_AES_128_GCM_SHA256" },
+        { cipher_suite::TLS_AES_256_GCM_SHA384, "TLS_AES_256_GCM_SHA384" }
+    };
+
+    // ==============================
+    //        TLS Content Type
+    // ==============================
+
+    enum class tls_content_type : uint8_t {
+        CHANGE_CIPHER_SEC = 0x14,
+        ALERT,           // 0x15
+        HANDSHAKE,       // 0x16
+        APPLICATION_DATA // 0x17
     };
 
     static const std::unordered_map<tls_content_type,std::string> tls_content_type_names = {
@@ -59,10 +66,9 @@ namespace ntk {
         { tls_content_type::APPLICATION_DATA, "Application Data" }
     };
 
-    static const std::unordered_map<cipher_suite,std::string> tls_cipher_suite_names = {
-        { cipher_suite::TLS_AES_128_GCM_SHA256, "TLS_AES_128_GCM_SHA256" },
-        { cipher_suite::TLS_AES_256_GCM_SHA384, "TLS_AES_256_GCM_SHA384" }
-    };
+    // ==============================
+    //           TLS Records
+    // ==============================
 
     struct tls_record {
         tls_content_type content_type;
@@ -74,6 +80,25 @@ namespace ntk {
         std::vector<tls_record> records;
         bool has_remainder;
     };
+
+    tls_record_extraction_result extract_tls_records( const std::vector<std::vector<uint8_t>>& payloads );
+
+    std::expected<tls_record,std::string> get_tls_record_from_ethernet( std::span<const uint8_t> packet );
+
+    bool is_tls( const unsigned char* packet );
+
+    bool is_tls_v( const std::vector<uint8_t>& packet );
+
+    bool is_tls_payload( const std::vector<uint8_t>& payload );
+
+    std::expected<
+        std::tuple<std::vector<tls_record>,size_t>, 
+        std::string
+    > split_tls_records( std::span<const uint8_t> tls_payload );
+
+    // ==============================
+    //           Client Hello
+    // ==============================
 
     struct client_hello {
         tls_version client_version;
@@ -93,6 +118,26 @@ namespace ntk {
         }
     };
 
+    client_hello parse_client_hello( const std::span<const uint8_t> client_hello_bytes );
+
+    client_hello get_client_hello( const std::span<const uint8_t> tcp_payload );
+
+    client_hello get_client_hello( const tls_record& record );
+
+    client_hello get_client_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
+
+    client_hello get_client_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
+
+    bool is_client_hello( const unsigned char* packet );
+
+    bool is_client_hello_v( const std::vector<uint8_t>& packet );
+
+    bool is_client_hello( const tls_record& record );
+
+    // ==============================
+    //           Server Hello
+    // ==============================
+
     struct server_hello {
         tls_version server_version;
         std::array<uint8_t,32> random;
@@ -102,19 +147,53 @@ namespace ntk {
         std::vector<uint8_t> extensions;
     };
 
-    struct tls_key_material {
-        std::vector<uint8_t> key;
-        std::vector<uint8_t> iv;
-    };
-
-    client_hello parse_client_hello( const std::span<const uint8_t> client_hello_bytes );
-
     server_hello parse_server_hello( const std::span<const uint8_t> server_hello_bytes );
 
-    std::expected<
-        std::tuple<std::vector<tls_record>,size_t>, 
-        std::string
-    > split_tls_records( std::span<const uint8_t> tls_payload );
+    server_hello get_server_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
+
+    server_hello get_server_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
+
+    server_hello get_server_hello( const tls_record& record );
+
+    bool is_server_hello( const unsigned char* packet );
+
+    bool is_server_hello_v( const std::vector<uint8_t>& packet );
+
+    bool is_server_hello( const tls_record& record );
+
+    // ==============================
+    //              Alert
+    // ==============================
+
+    bool is_tls_alert( const unsigned char* packet );
+    
+    bool is_tls_alert_v( const std::vector<uint8_t>& packet );
+
+    // ==============================
+    //        Application Data
+    // ==============================
+
+    bool is_tls_application_data( const tls_record& record );
+
+    // ==============================
+    //              SNI
+    // ==============================
+
+    std::expected<std::string,std::string> get_sni( const client_hello& hello );
+
+    std::vector<std::string> get_snis( const session& packets, const std::string& host );
+
+    std::expected<bool,std::string> has_sni( const client_hello& hello, const std::string& host );
+
+    std::expected<bool,std::string> sni_contains( const client_hello& hello, const std::string& host );
+
+    using sni_to_ip = std::map<std::string,uint32_t>;
+
+    sni_to_ip get_sni_to_ip( const session& packets );
+
+    // ==============================
+    //          TLS Secrets
+    // ==============================
 
     using secrets = std::map<std::string,std::map<std::string,std::vector<uint8_t>>>;
 
@@ -122,11 +201,30 @@ namespace ntk {
 
     secrets get_tls_secrets( const std::string& filename, std::array<uint8_t,32> client_random );
 
-    std::string client_random_to_hex( const std::array<uint8_t,32>& random );
+    std::vector<uint8_t> get_traffic_secret( const secrets& session_keys,
+                                             const std::array<uint8_t,32>& client_random,
+                                             const std::string& label );
 
-    std::string session_id_to_hex( const std::vector<uint8_t>& session_id );
+    bool is_complete_secrets( const std::map<std::string,std::vector<uint8_t>>& secrets );
 
-    std::string string_to_hex( const std::vector<uint8_t>& data );
+    bool secret_labels_are_equal( std::array<std::string,5> lhs, std::array<std::string,5> rhs );
+
+    const std::array<std::string,5> tls_secret_labels = {
+        "SERVER_HANDSHAKE_TRAFFIC_SECRET",  
+        "EXPORTER_SECRET",
+        "SERVER_TRAFFIC_SECRET_0",  
+        "CLIENT_HANDSHAKE_TRAFFIC_SECRET",  
+        "CLIENT_TRAFFIC_SECRET_0"
+    };
+
+    // ==============================
+    //          TLS Decryption
+    // ==============================
+
+    struct tls_key_material {
+        std::vector<uint8_t> key;
+        std::vector<uint8_t> iv;
+    };
 
     tls_key_material derive_tls_key_iv( const std::vector<uint8_t>& secret, const EVP_MD* hash_func,
                                         size_t key_len, size_t iv_len );
@@ -151,65 +249,17 @@ namespace ntk {
 
     std::vector<uint8_t> build_tls13_nonce( const std::vector<uint8_t>& base_iv, uint64_t seq_num );
 
-    std::vector<uint8_t> get_traffic_secret( const secrets& session_keys,
-                                             const std::array<uint8_t,32>& client_random,
-                                             const std::string& label );
-
     std::vector<uint8_t> build_tls13_aad( tls_content_type content_type, tls_version version, uint16_t length );
+
+    // ==============================
+    //          Certficiate
+    // ==============================
 
     std::vector<uint8_t> extract_certificate( const std::vector<uint8_t>& handshake_payload );
 
-    bool is_tls( const unsigned char* packet );
-
-    bool is_tls_v( const std::vector<uint8_t>& packet );
-
-    bool is_client_hello( const unsigned char* packet );
-
-    bool is_client_hello_v( const std::vector<uint8_t>& packet );
-
-    bool is_client_hello( const tls_record& record );
-
-    bool is_server_hello( const unsigned char* packet );
-
-    bool is_server_hello_v( const std::vector<uint8_t>& packet );
-
-    bool is_server_hello( const tls_record& record );
-
-    bool is_tls_alert( const unsigned char* packet );
-    
-    bool is_tls_alert_v( const std::vector<uint8_t>& packet );
-
-    bool is_tls_application_data( const tls_record& record );
-
-    bool is_tls_payload( const std::vector<uint8_t>& payload );
-
-    bool secret_labels_are_equal( std::array<std::string,5> lhs, std::array<std::string,5> rhs );
-
-    bool is_complete_secrets( const std::map<std::string,std::vector<uint8_t>>& secrets );
-
-    client_hello get_client_hello( const std::span<const uint8_t> tcp_payload );
-
-    std::expected<std::string,std::string> get_sni( const client_hello& hello );
-
-    std::vector<std::string> get_snis( const session& packets, const std::string& host );
-
-    std::expected<bool,std::string> has_sni( const client_hello& hello, const std::string& host );
-
-    std::expected<bool,std::string> sni_contains( const client_hello& hello, const std::string& host );
-
-    sni_to_ip get_sni_to_ip( const session& packets );
-
-    client_hello get_client_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
-
-    client_hello get_client_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
-
-    client_hello get_client_hello( const tls_record& record );
-
-    server_hello get_server_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
-
-    server_hello get_server_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
-
-    server_hello get_server_hello( const tls_record& record );
+    // ==============================
+    //            Classes
+    // ==============================
 
     class tls_over_tcp : public tcp_transfer {
         public:
@@ -231,6 +281,10 @@ namespace ntk {
             friend std::ostream& operator<<( std::ostream& os, const tls_live_stream& live_stream );
     };
 
+    // ==============================
+    //            Filters
+    // ==============================
+
     struct tls_filter {
         bool operator()( const ntk::tcp_live_stream& stream );
     };
@@ -242,9 +296,15 @@ namespace ntk {
         std::string m_sni;
     };
 
-    tls_record_extraction_result extract_tls_records( const std::vector<std::vector<uint8_t>>& payloads );
+    // ==============================
+    //             Helpers
+    // ==============================
 
-    std::expected<tls_record,std::string> get_tls_record_from_ethernet( std::span<const uint8_t> packet );
+    std::string client_random_to_hex( const std::array<uint8_t,32>& random );
+
+    std::string session_id_to_hex( const std::vector<uint8_t>& session_id );
+
+    std::string string_to_hex( const std::vector<uint8_t>& data );
 
 } // namespace ntk
 
