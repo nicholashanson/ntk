@@ -441,7 +441,6 @@ namespace test {
         0x08, 0x0a, 0x58, 0x64, 0xcf, 0xfc, 0x02, 0x0d, 0x72, 0x9d      // timestamp
     };                                                                  
 
-
     inline const unsigned char ethernet_frame_udp[] = {                 
         /* ethernet header */                                           /* ethernet header */
         0x04, 0x81, 0x9b, 0x17, 0x26, 0x81,                             // destination mac address
@@ -471,16 +470,16 @@ namespace test {
         0x04, 0x81, 0x9b, 0x17, 0x26, 0x81,                             // source mac address
         0x08, 0x00,                                                     // ether-type 
         /* ipv4 header */                                               /* ipv4 header */
-        0x45,                                                           
-        0x00,                                                           
-        0x01, 0xf9,                                                      
-        0x34, 0x64,                                                     
-        0x40, 0x00,                                                     
-        0x70,                                                           
+        0x45,                                                           // version = 4, ihl = 5 (20 bytes)
+        0x00,                                                           // DSCP and ECN
+        0x01, 0xf9,                                                     // total length = 505 bytes 
+        0x34, 0x64,                                                     // identification
+        0x40, 0x00,                                                     // flags + fragment offset
+        0x70,                                                           // time-to-live = 112
         0x06,                                                           // protocol 
-        0xbe, 0x5e,                                                     
-        0x14, 0x2a, 0x41, 0x55,                                         
-        0xc0, 0xa8, 0x00, 0x15,                                         
+        0xbe, 0x5e,                                                     // header checksum
+        0x14, 0x2a, 0x41, 0x55,                                         // source ip address = 20.42.65.85
+        0xc0, 0xa8, 0x00, 0x15,                                         // destination ip address = 192.168.0.21
         /* tcp header */                                                /* tcp header */ 
         0x01, 0xbb,                                                     // source port
         0xcd, 0xcc,                                                     // destination port

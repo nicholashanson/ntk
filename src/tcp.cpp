@@ -59,11 +59,11 @@ namespace ntk {
 
         while ( index < header_byte_length ) {
 
-            uint8_t kind = raw_tcp_header[ index ];
+            option_type kind = static_cast<option_type>( raw_tcp_header[ index ] );
     
-            if ( kind == 0 ) {
+            if ( kind == option_type::END_OF_OPTIONS_LIST ) {
                 break;
-            } else if ( kind == 1 ) {
+            } else if ( kind == option_type::NOP ) {
                 header.options.push_back( { kind, {} } );
                 index += 1;
             } else {

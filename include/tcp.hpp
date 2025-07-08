@@ -36,8 +36,21 @@ namespace ntk {
 
     using raw_tcp_stream = std::vector<std::vector<uint8_t>>;
 
+    // ==============================
+    //         TCP Option
+    // ==============================
+
+    enum class option_type : uint8_t {
+        END_OF_OPTIONS_LIST, // 0x00
+        NOP,                 // 0x01
+        MSS,                 // 0x02
+        WINDOW_SCALE,        // 0x03
+        SACK_PERMITTED,      // 0x04
+        TIMESTAMP             = 0x08
+    };
+
     struct tcp_option {
-        uint8_t type;
+        option_type type;
         std::vector<uint8_t> option;
 
         bool operator==( const tcp_option& other ) const {

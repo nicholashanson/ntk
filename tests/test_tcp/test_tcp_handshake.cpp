@@ -29,11 +29,11 @@ TEST( PacketParsingTests, TCPSyn ) {
         .checksum = 5998,                                                
         .urgent_pointer = 0,                                             
         .options = {                                                        
-            { 2, { 0x05, 0xb4 } },                                       // MSS
-            { 4, {} },                                                   // SACK permitted
-            { 8, { 0x02, 0x0d, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00 } },   // timestamp
-            { 1, {} },                                                   // nop
-            { 3, { 0x09 } }                                              // window scale
+            { ntk::option_type::MSS, { 0x05, 0xb4 } },                            
+            { ntk::option_type::SACK_PERMITTED, {} },                                              
+            { ntk::option_type::TIMESTAMP, { 0x02, 0x0d, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00 } },   
+            { ntk::option_type::NOP, {} },                                                 
+            { ntk::option_type::WINDOW_SCALE, { 0x09 } }                                   
         }
     };
 
@@ -60,11 +60,11 @@ TEST( PacketParsingTests, TCPSynAck ) {
         .checksum = 0x81a8,                      
         .urgent_pointer = 0x0000,                
         .options = {
-            { 2, { 0x05, 0xb4 } },                                          // MSS
-            { 4, {} },                                                      // SACK permitted
-            { 8, { 0x58, 0x64, 0xbc, 0x69, 0x02, 0x0d, 0x72, 0x64 } },      // timestamp
-            { 1, {} },                                                      // nop
-            { 3, { 0x07 } }                                                 // window scale 
+            { ntk::option_type::MSS, { 0x05, 0xb4 } },                                         
+            { ntk::option_type::SACK_PERMITTED, {} },                                                 
+            { ntk::option_type::TIMESTAMP, { 0x58, 0x64, 0xbc, 0x69, 0x02, 0x0d, 0x72, 0x64 } },      
+            { ntk::option_type::NOP, {} },                                                   
+            { ntk::option_type::WINDOW_SCALE, { 0x07 } }                                       
         }
     };
 
@@ -91,9 +91,9 @@ TEST( PacketParsingTests, TCPAck ) {
         .checksum = 0x72de,                        
         .urgent_pointer = 0x0000,                  
         .options = {
-            { 1, {} },                                                  // nop
-            { 1, {} },                                                  // nop
-            { 8, { 0x02, 0x0d, 0x72, 0x97, 0x58, 0x64, 0xbc, 0x69 } }   // timestamp
+            { ntk::option_type::NOP, {} },                                                  
+            { ntk::option_type::NOP, {} },                                                 
+            { ntk::option_type::TIMESTAMP, { 0x02, 0x0d, 0x72, 0x97, 0x58, 0x64, 0xbc, 0x69 } }   
         }
     };
 
