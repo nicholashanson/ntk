@@ -12,7 +12,7 @@ namespace ntk {
 
         size_t tcp_header_offset = 14 + ipv4_header_len;
         uint8_t data_offset_byte = ethernet_frame[ tcp_header_offset + 12 ];
-        size_t data_offset = ( data_offset_byte >> 4 ) * 4;
+        size_t data_offset = extract_high_nibble( data_offset_byte ) * 4;
         tcp_header.resize( data_offset );
 
         std::memcpy( tcp_header.data(), ethernet_frame + 14 + ipv4_header_len, data_offset );
@@ -36,7 +36,7 @@ namespace ntk {
         header.destination_port = read_uint16_be( raw_tcp_header, 2 ); 
         header.sequence_number = read_uint32_be( raw_tcp_header, 4 ); 
         header.acknowledgment_number = read_uint32_be( raw_tcp_header, 8 );
-        header.data_offset = ( raw_tcp_header[ 12 ] >> 4 ) & 0x0f;  
+        header.data_offset = extract_high_nibble( raw_tcp_header[ 12 ] );  
         header.flags = raw_tcp_header[ 13 ];
         header.window_size = read_uint16_be( raw_tcp_header, 14 ); 
         header.checksum = read_uint16_be( raw_tcp_header, 16 ); 
