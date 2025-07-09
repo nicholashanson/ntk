@@ -10,7 +10,7 @@ namespace ntk {
 
         client_hello c_hello;
 
-        c_hello.client_version = static_cast<tls_version>( ( client_hello_bytes[ 0 ] << 8 ) | client_hello_bytes[ 1 ] );
+        c_hello.client_version = static_cast<tls_version>( read_uint16_be( client_hello_bytes, 0 ) );
         std::memcpy( c_hello.random.data(), &client_hello_bytes[ client_version_len ], random_len );
 
         const size_t session_id_len = client_hello_bytes[ client_version_len + random_len ];
@@ -19,7 +19,7 @@ namespace ntk {
 
         const size_t cipher_suites_len_pos = session_id_len_pos + 1 + session_id_len;
         const size_t cipher_suites_pos = cipher_suites_len_pos + 2;
-        size_t cipher_suites_len = ( client_hello_bytes[ cipher_suites_len_pos ] << 8 ) | client_hello_bytes[ cipher_suites_len_pos + 1 ];
+        size_t cipher_suites_len = read_uint16_be( client_hello_bytes, cipher_suites_len_pos );
         c_hello.cipher_suites.resize( cipher_suites_len );
         std::memcpy( c_hello.cipher_suites.data(), &client_hello_bytes[ cipher_suites_pos ], cipher_suites_len );
         
@@ -29,7 +29,7 @@ namespace ntk {
         std::memcpy( c_hello.compression_methods.data(), &client_hello_bytes[ compression_methods_len_pos + 1 ], compression_methods_len );
 
         const size_t extensions_len_pos = compression_methods_len_pos + 1 + compression_methods_len;
-        const size_t extensions_len = ( client_hello_bytes[ extensions_len_pos ] << 8) | client_hello_bytes[ extensions_len_pos + 1 ];
+        const size_t extensions_len = read_uint16_be( client_hello_bytes, extensions_len_pos );
         c_hello.extensions.resize( extensions_len );
         std::memcpy( c_hello.extensions.data(), &client_hello_bytes[ extensions_len_pos + 2 ], extensions_len );
 

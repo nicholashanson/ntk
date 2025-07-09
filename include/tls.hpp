@@ -23,6 +23,7 @@
 #include <openssl/kdf.h>
 
 #include <tcp.hpp>
+#include <utils.hpp>
 
 namespace ntk {
 
