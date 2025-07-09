@@ -98,6 +98,15 @@ namespace ntk {
     > split_tls_records( std::span<const uint8_t> tls_payload );
 
     // ==============================
+    //      TLS Handshake Type
+    // ==============================
+
+    enum class handshake_type : uint8_t {
+        CLIENT_HELLO  = 0x01,
+        SERVER_HELLO // 0x02
+    };
+
+    // ==============================
     //           Client Hello
     // ==============================
 

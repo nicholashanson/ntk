@@ -96,16 +96,14 @@ namespace ntk {
     // ==============================
 
     bool is_client_hello( const unsigned char* packet ) {
-
         if ( !is_tls( packet ) ) return false;
-
         auto tls_record = extract_payload_from_ethernet( packet );
 
         uint8_t content_type = tls_record[ 0 ];
         if ( content_type != 22 ) return false;
 
-        uint8_t handshake_type = tls_record[ 5 ];
-        return handshake_type == 1; 
+        uint8_t handshake_t = tls_record[ 5 ];
+        return static_cast<handshake_type>( handshake_t ) == handshake_type::CLIENT_HELLO; 
     }
 
     bool is_client_hello_v( const std::vector<uint8_t>& packet ) {
@@ -114,11 +112,9 @@ namespace ntk {
 
     bool is_client_hello(const tls_record& record) {
         if ( record.content_type != tls_content_type::HANDSHAKE ) return false;
-
         if ( record.payload.empty() ) return false;
-
-        uint8_t handshake_type = record.payload[0];
-        return handshake_type == 2;
+        uint8_t handshake_t = record.payload[ 0 ];
+        return static_cast<handshake_type>( handshake_t ) == handshake_type::CLIENT_HELLO;
     }
 
     // ==============================
@@ -221,16 +217,14 @@ namespace ntk {
 
     bool is_server_hello( const unsigned char* packet ) {
         if ( !is_tls( packet ) ) return false;
-
         auto tls_record = extract_payload_from_ethernet( packet );
-
         if ( tls_record.size() < 6 ) return false;
 
         uint8_t content_type = tls_record[ 0 ];
         if ( content_type != 22 ) return false;
 
-        uint8_t handshake_type = tls_record[ 5 ];
-        return handshake_type == 2; 
+        uint8_t handshake_t = tls_record[ 5 ];
+        return static_cast<handshake_type>( handshake_t ) == handshake_type::SERVER_HELLO; 
     }
 
     bool is_server_hello_v( const std::vector<uint8_t>& packet ) {
@@ -239,11 +233,9 @@ namespace ntk {
 
     bool is_server_hello(const tls_record& record) {
         if ( record.content_type != tls_content_type::HANDSHAKE ) return false;
-
         if ( record.payload.empty() ) return false;
-
-        uint8_t handshake_type = record.payload[0];
-        return handshake_type == 2;
+        uint8_t handshake_t = record.payload[ 0 ];
+        return static_cast<handshake_type>( handshake_t ) == handshake_type::SERVER_HELLO;
     }
 
     // ==============================
