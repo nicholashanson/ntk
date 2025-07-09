@@ -21,10 +21,37 @@ namespace ntk {
     }
 
     // ==============================
+    //      Extract TCP Option
+    // ==============================
+
+    std::optional<tcp_option> extract_tcp_option( std::span<const uint8_t>& raw_tcp_header ) {
+        option_type kind = static_cast<option_type>( raw_tcp_header[ 0 ] );
+    
+        if ( kind == option_type::END_OF_OPTIONS_LIST ) {
+            raw_tcp_header = raw_tcp_header.subspan( 1 );
+            return std::nullopt;
+        } else if ( kind == option_type::NOP ) {
+            raw_tcp_header = raw_tcp_header.subspan( 1 );
+            return tcp_option { kind, {} };
+        } else {
+            uint8_t length = raw_tcp_header[ 1 ];
+
+            std::vector<uint8_t> data;
+            if ( length > 2 ) {
+                data.insert( data.end(), 
+                             raw_tcp_header.begin() + 2,
+                             raw_tcp_header.begin() + length);
+            }
+            raw_tcp_header = raw_tcp_header.subspan( length ); 
+            return tcp_option { kind, data };
+        }
+    }  
+
+    // ==============================
     //       Parse TCP Header
     // ==============================
 
-    tcp_header parse_tcp_header( const std::vector<uint8_t>& raw_tcp_header ) {
+    tcp_header parse_tcp_header( std::span<const uint8_t> raw_tcp_header ) {
 
         if ( raw_tcp_header.size() < 20 ) {
             throw std::runtime_error( "Invalid TCP header size" );
@@ -44,34 +71,12 @@ namespace ntk {
 
         if ( header.data_offset == 5 ) // header doesn't have options
             return header;
-        
-        size_t index = 20;
-        size_t header_byte_length = header.data_offset * 4;
 
-        while ( index < header_byte_length ) {
+        raw_tcp_header = raw_tcp_header.subspan( 20 );
 
-            option_type kind = static_cast<option_type>( raw_tcp_header[ index ] );
-    
-            if ( kind == option_type::END_OF_OPTIONS_LIST ) {
-                break;
-            } else if ( kind == option_type::NOP ) {
-                header.options.push_back( { kind, {} } );
-                index += 1;
-            } else {
-
-                uint8_t length = raw_tcp_header[ index + 1 ];
-    
-                std::vector<uint8_t> data;
-
-                if ( length > 2 ) {
-                    data.insert( data.end(), 
-                                 raw_tcp_header.begin() + index + 2,
-                                 raw_tcp_header.begin() + index + length);
-                }
-    
-                header.options.push_back( { kind, data } );
-
-                index += length;
+        while ( !raw_tcp_header.empty() ) {
+            if ( auto opt = extract_tcp_option( raw_tcp_header ) ) {
+                header.options.push_back( *opt );
             }
         }
 

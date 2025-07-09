@@ -100,7 +100,7 @@ namespace ntk {
 
     std::vector<uint8_t> extract_tcp_header( const unsigned char* ethernet_frame, const size_t ipv4_header_len );
 
-    tcp_header parse_tcp_header( const std::vector<uint8_t>& raw_tcp_header );
+    tcp_header parse_tcp_header( std::span<const uint8_t> raw_tcp_header );
 
     tcp_header get_tcp_header( const unsigned char* ethernet_frame );
 
