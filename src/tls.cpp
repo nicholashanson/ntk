@@ -10,6 +10,20 @@ namespace ntk {
         return session_id_to_hex( data );
     }
 
+    std::string client_random_to_hex( const std::array<uint8_t,32>& random ) {
+        std::ostringstream oss;
+        for ( auto byte : random )
+            oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << int( byte );
+        return oss.str();
+    }
+
+    std::string session_id_to_hex( const std::vector<uint8_t>& session_id ) {
+        std::ostringstream oss;
+        for ( auto byte : session_id )
+            oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << int( byte );
+        return oss.str();
+    }
+
     // ==============================
     //       Parse Client Hello
     // ==============================
@@ -375,52 +389,6 @@ namespace ntk {
     }
 
     // ==============================
-    //            Helpers
-    // ==============================
-
-    std::string client_random_to_hex( const std::array<uint8_t,32>& random ) {
-        std::ostringstream oss;
-        for ( auto byte : random )
-            oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << int( byte );
-        return oss.str();
-    }
-
-    std::string session_id_to_hex( const std::vector<uint8_t>& session_id ) {
-        std::ostringstream oss;
-        for ( auto byte : session_id )
-            oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << int( byte );
-        return oss.str();
-    }
-
-    // ==============================
-    //      TLS Key Derivation
-    // ==============================
-
-    tls_key_material derive_tls_key_iv( const std::vector<uint8_t>& secret, const EVP_MD* hash_func,
-                                        size_t key_len, size_t iv_len ) {
-
-        tls_key_material km;
-
-        std::vector<uint8_t> context; 
-        km.key = hkdf_expand_label( secret, "key", context, key_len, hash_func );
-        km.iv = hkdf_expand_label( secret, "iv",  context, iv_len,  hash_func );
-
-        return km;
-    }
-
-    // ==============================
-    //     TLS Nonce Construction
-    // ==============================
-
-    std::vector<uint8_t> build_tls13_nonce( const std::vector<uint8_t>& base_iv, uint64_t seq_num ) {
-        std::vector<uint8_t> nonce = base_iv;
-        for ( int i = 0; i < 8; ++i ) {
-            nonce[ nonce.size() - 8 + i ] ^= static_cast<uint8_t>( ( seq_num >> ( 56 - 8 * i ) ) & 0xff );
-        }
-        return nonce;
-    }
-
-    // ==============================
     //       TLS Label Expansion
     // ==============================
 
@@ -458,6 +426,34 @@ namespace ntk {
 
         EVP_PKEY_CTX_free( ctx );
         return out;
+    }
+
+    // ==============================
+    //      TLS Key Derivation
+    // ==============================
+
+    tls_key_material derive_tls_key_iv( const std::vector<uint8_t>& secret, const EVP_MD* hash_func,
+                                        size_t key_len, size_t iv_len ) {
+
+        tls_key_material km;
+
+        std::vector<uint8_t> context; 
+        km.key = hkdf_expand_label( secret, "key", context, key_len, hash_func );
+        km.iv = hkdf_expand_label( secret, "iv",  context, iv_len,  hash_func );
+
+        return km;
+    }
+
+    // ==============================
+    //     TLS Nonce Construction
+    // ==============================
+
+    std::vector<uint8_t> build_tls13_nonce( const std::vector<uint8_t>& base_iv, uint64_t seq_num ) {
+        std::vector<uint8_t> nonce = base_iv;
+        for ( int i = 0; i < 8; ++i ) {
+            nonce[ nonce.size() - 8 + i ] ^= static_cast<uint8_t>( ( seq_num >> ( 56 - 8 * i ) ) & 0xff );
+        }
+        return nonce;
     }
 
     // ==============================
@@ -690,8 +686,8 @@ namespace ntk {
                 return std::unexpected( "Extension too short for header" );
             }
 
-            uint16_t extension_type = ( extension_bytes[ 0 ] << 8 ) | extension_bytes[ 1 ];
-            uint16_t extension_length = ( extension_bytes[ 2 ] << 8 ) | extension_bytes[ 3 ];
+            uint16_t extension_type = read_uint16_be( extension_bytes, 0 );
+            uint16_t extension_length = read_uint16_be( extension_bytes, 2 );
 
             if ( extension_bytes.size() < 4 + extension_length ) {
                 return std::unexpected( "Extension body truncated" );
@@ -703,7 +699,7 @@ namespace ntk {
                     return std::unexpected( "SNI extension too short to contain list length" );
                 }
 
-                uint16_t sni_list_length = ( extension_bytes[ sni_list_length_pos ] << 8 ) | extension_bytes[ sni_list_length_pos + 1 ];
+                uint16_t sni_list_length = read_uint16_be( extension_bytes, 0 );
 
                 if ( sni_list_length > extension_length - 2 ) {
                     return std::unexpected( "SNI list length exceeds bounds" );
@@ -718,7 +714,7 @@ namespace ntk {
                     }
 
                     uint8_t name_type = sni_list[ 0 ];
-                    uint16_t name_length = ( sni_list[ 1 ] << 8 ) | sni_list[ 2 ];
+                    uint16_t name_length = read_uint16_be( sni_list, 1 );
 
                     if (sni_list.size() < 3 + name_length) {
                         return std::unexpected( "Server name truncated" );
@@ -740,7 +736,7 @@ namespace ntk {
     }
 
     // ==============================
-    //      Get SNI From Ethernet
+    //     Get SNI From Ethernet
     // ==============================
 
     std::expected<std::string,std::string> get_sni( const std::vector<uint8_t>& hello ) {
