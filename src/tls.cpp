@@ -55,7 +55,7 @@ namespace ntk {
 
         server_hello s_hello;
 
-        s_hello.server_version = static_cast<tls_version>( ( server_hello_bytes[ 0 ] << 8 ) | server_hello_bytes[ 1 ] );
+        s_hello.server_version = static_cast<tls_version>( read_uint16_be( server_hello_bytes, 0 ) );
 
         std::memcpy( s_hello.random.data(), &server_hello_bytes[version_len], random_len );
 
@@ -64,13 +64,13 @@ namespace ntk {
         std::memcpy( s_hello.session_id.data(), &server_hello_bytes[ session_id_len_pos + 1 ], session_id_len );
 
         const size_t cipher_suite_pos = session_id_len_pos + 1 + session_id_len;
-        s_hello.cipher_suite = ( server_hello_bytes[cipher_suite_pos] << 8 ) | server_hello_bytes[ cipher_suite_pos + 1 ];
+        s_hello.cipher_suite = read_uint16_be( server_hello_bytes, cipher_suite_pos );
 
         const size_t compression_method_pos = cipher_suite_pos + 2;
         s_hello.compression_method = server_hello_bytes[ compression_method_pos ];
 
         const size_t extensions_len_pos = compression_method_pos + 1;
-        const size_t extensions_len = ( server_hello_bytes[ extensions_len_pos ] << 8 ) | server_hello_bytes[ extensions_len_pos + 1 ];
+        const size_t extensions_len = read_uint16_be( server_hello_bytes, extensions_len_pos );
         s_hello.extensions.resize( extensions_len );
         std::memcpy( s_hello.extensions.data(), &server_hello_bytes[ extensions_len_pos + 2 ], extensions_len );
 
