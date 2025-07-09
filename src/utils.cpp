@@ -6,7 +6,7 @@ namespace ntk {
         return ( buffer[ offset ] << 8 ) | buffer[ offset + 1 ];
     }
 
-    uint16_t read_uint16_be( const std::vector<uint8_t>& buffer, size_t offset ) {
+    uint16_t read_uint16_be( std::span<const uint8_t> buffer, size_t offset ) {
         return read_uint16_be( buffer.data(), offset );
     }
 
@@ -15,7 +15,7 @@ namespace ntk {
                ( buffer[ offset + 2 ] <<  8 ) |   buffer[ offset + 3 ];
     }
 
-    uint32_t read_uint32_be( const std::vector<uint8_t>& buffer, size_t offset ) {
+    uint32_t read_uint32_be( std::span<const uint8_t> buffer, size_t offset ) {
         return read_uint32_be( buffer.data(), offset );
     }
 
