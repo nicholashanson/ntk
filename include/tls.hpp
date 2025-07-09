@@ -73,7 +73,7 @@ namespace ntk {
 
     struct tls_record {
         tls_content_type content_type;
-        uint16_t version;
+        tls_version version;
         std::vector<uint8_t> payload;
     };
 

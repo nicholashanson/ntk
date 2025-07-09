@@ -100,7 +100,7 @@ namespace ntk {
             tls_record rec;
             rec.content_type = static_cast<tls_content_type>( first_byte );
 
-            uint16_t version = ( tls_payload[ 1 ] << 8 ) | tls_payload[ 2 ];
+            tls_version version = static_cast<tls_version>( ( tls_payload[ 1 ] << 8 ) | tls_payload[ 2 ] );
             uint16_t record_len = ( tls_payload[ 3 ] << 8 ) | tls_payload[ 4 ];
             
             rec.version = version;
@@ -322,13 +322,13 @@ namespace ntk {
         return plain_text;
     }
 
-    std::vector<uint8_t> build_tls13_aad( tls_content_type content_type, uint16_t version, uint16_t length ) {
+    std::vector<uint8_t> build_tls13_aad( tls_content_type content_type, tls_version version, uint16_t length ) {
         return {
             static_cast<uint8_t>( content_type ),        
-            static_cast<uint8_t>( version >> 8 ),      
-            static_cast<uint8_t>( version & 0xff ),      
-            static_cast<uint8_t>( length >> 8 ),         
-            static_cast<uint8_t>( length & 0xff )        
+            extract_most_significant_byte( version ),      
+            extract_least_significant_byte( version ),  
+            extract_most_significant_byte( length ),         
+            extract_least_significant_byte( length )    
         };
     }
 

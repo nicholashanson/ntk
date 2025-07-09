@@ -336,7 +336,7 @@ namespace ntk {
         };
 
         print_field( "Content Type:", tls_content_type_names.at( record.content_type ) );
-        print_field( "Version:", record.version );
+        print_field( "Version:", static_cast<uint16_t>( record.version ) );
 
         std::cout << "===== TLS RECORD END =====\n\n";
     }
