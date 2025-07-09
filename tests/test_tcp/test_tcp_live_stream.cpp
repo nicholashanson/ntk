@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include <tcp.hpp>
-#include <utils.hpp>
+#include <io.hpp>
 #include <test_constants.hpp>
 
 TEST( PacketParsingTests, TCPCheckerBoardLiveStream ) {
