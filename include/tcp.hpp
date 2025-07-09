@@ -18,6 +18,8 @@
 #include <constants.hpp>
 #include <spmc_queue.hpp>
 
+#include <utils.hpp>
+
 namespace ntk {
 
     // ==============================
@@ -141,7 +143,6 @@ namespace ntk {
     bool is_reset( const std::vector<uint8_t>& packet );
 
     bool is_syn( const std::vector<uint8_t>& packet );
-
 
     // ==============================
     //         Four Tuple
