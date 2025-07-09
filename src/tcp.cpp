@@ -205,7 +205,7 @@ namespace ntk {
         
         const size_t ethernet_header_len = 14;
 
-        uint8_t ihl = ethernet_frame[ ethernet_header_len ] & 0x0F;
+        uint8_t ihl = extract_low_nibble( ethernet_frame[ ethernet_header_len ] );
         size_t ipv4_header_len = ihl * 4;
 
         uint16_t total_length = read_uint16_be( ethernet_frame, ethernet_header_len + 2 );
@@ -213,7 +213,7 @@ namespace ntk {
         size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
 
         uint8_t data_offset_byte = ethernet_frame[ tcp_header_offset + 12 ];
-        size_t tcp_header_len = ( ( data_offset_byte >> 4 ) & 0x0F ) * 4;
+        size_t tcp_header_len = extract_high_nibble( data_offset_byte ) * 4;
 
         uint16_t src_port = read_uint16_be( ethernet_frame, tcp_header_offset );
         uint16_t dst_port = read_uint16_be( ethernet_frame, tcp_header_offset + 2 );
