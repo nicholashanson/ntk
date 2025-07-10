@@ -34,13 +34,14 @@ namespace ntk {
 
     template<typename MaskEnum,typename Integral>
     constexpr auto apply_and_mask( Integral value, MaskEnum mask ) {
-        using underlying = std::underlying_type_t<MaskEnum>;
-        static_assert( sizeof( Integral ) >= sizeof( underlying ),
+        using enum_underlying = std::underlying_type_t<MaskEnum>;
+        static_assert( sizeof( Integral ) >= sizeof( enum_underlying ),
                        "Integral type must be at least as large as mask underlying type" );
-        if constexpr ( std::is_enum_v<Integral> )
-            return static_cast<std::underlying_type_t<Integral>>( value ) & static_cast<underlying>( mask );
-        else {  
-            return value & static_cast<underlying>( mask );
+        if constexpr ( std::is_enum_v<Integral> ) {
+        	using integral_underlying = std::underlying_type_t<Integral>;
+            return static_cast<integral_underlying>( value ) & static_cast<enum_underlying>( mask );
+        } else {  
+            return value & static_cast<enum_underlying>( mask );
         }
     }
 
