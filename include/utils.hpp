@@ -38,7 +38,7 @@ namespace ntk {
         static_assert( sizeof( Integral ) >= sizeof( enum_underlying ),
                        "Integral type must be at least as large as mask underlying type" );
         if constexpr ( std::is_enum_v<Integral> ) {
-        	using integral_underlying = std::underlying_type_t<Integral>;
+            using integral_underlying = std::underlying_type_t<Integral>;
             return static_cast<integral_underlying>( value ) & static_cast<enum_underlying>( mask );
         } else {  
             return value & static_cast<enum_underlying>( mask );
