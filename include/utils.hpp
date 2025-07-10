@@ -7,10 +7,18 @@
 
 namespace ntk {
 
+	// ==============================
+    //            BITMASK
+    // ==============================
+
     enum class bitmask_8bit : uint8_t {
 		LOW_NIBBLE    = 0x0f,
 		FULL_BYTE     = 0xff
-	};
+    };
+
+    // ==============================
+    //       BYTES TO INTEGERS
+    // ==============================
 
     uint16_t read_uint16_be( const unsigned char* buffer, size_t offset );
 
@@ -19,6 +27,10 @@ namespace ntk {
     uint32_t read_uint32_be( const unsigned char* buffer, size_t offset );
 
     uint32_t read_uint32_be( const std::span<const uint8_t> buffer, size_t offset );
+
+    // ==============================
+    //         APPLY AND MASK
+    // ==============================
 
     template<typename MaskEnum,typename Integral>
     constexpr auto apply_and_mask( Integral value, MaskEnum mask ) {
@@ -32,6 +44,10 @@ namespace ntk {
         }
     }
 
+    // ==============================
+    //         RIGHT SHIFT
+    // ==============================
+
     template<size_t shift_by,typename Integral>
     constexpr auto right_shift( Integral value ) {
 	    const size_t size_in_bits = sizeof( Integral ) * 8;
@@ -44,6 +60,10 @@ namespace ntk {
         }
     }
 
+    // ==============================
+    //           CONCEPTS
+    // ==============================
+
     template<typename T>
     concept is_8bit_integral = 
     	( std::integral<T> && sizeof( T ) == 1 ) ||  
@@ -53,6 +73,11 @@ namespace ntk {
     concept is_16bit_integral = 
     	( std::integral<T> && sizeof( T ) == 2 ) ||  
     	( std::is_enum_v<T> && sizeof( T ) == 2 && std::is_integral_v<std::underlying_type_t<T>> );
+
+
+    // ==============================
+    //       BIT MANIPULATION
+    // ==============================
 
     template<is_8bit_integral T>
     uint8_t extract_low_nibble( T t ) {
