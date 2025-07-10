@@ -51,7 +51,7 @@ namespace ntk {
 
     template<size_t shift_by,typename Integral>
     constexpr auto right_shift( Integral value ) {
-	    const size_t size_in_bits = sizeof( Integral ) * 8;
+        const size_t size_in_bits = sizeof( Integral ) * 8;
         static_assert( shift_by < size_in_bits,
                        "Right-shifting by that value causes undefined-behavior" );
    	    if constexpr ( std::is_enum_v<Integral> )
