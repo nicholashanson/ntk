@@ -12,8 +12,8 @@ namespace ntk {
     // ==============================
 
     enum class bitmask_8bit : uint8_t {
-		LOW_NIBBLE    = 0x0f,
-		FULL_BYTE     = 0xff
+        LOW_NIBBLE    = 0x0f,
+        FULL_BYTE     = 0xff
     };
 
     // ==============================
