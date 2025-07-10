@@ -7,7 +7,7 @@
 
 namespace ntk {
 
-	enum class bitmask_8bit : uint8_t {
+    enum class bitmask_8bit : uint8_t {
 		LOW_NIBBLE    = 0x0f,
 		FULL_BYTE     = 0xff
 	};
@@ -32,17 +32,17 @@ namespace ntk {
 	    }
 	}
 
-	template<size_t shift_by,typename Integral>
-	constexpr auto right_shift( Integral value ) {
-		const size_t size_in_bits = sizeof( Integral ) * 8;
-	    static_assert( shift_by < size_in_bits,
+    template<size_t shift_by,typename Integral>
+    constexpr auto right_shift( Integral value ) {
+	    const size_t size_in_bits = sizeof( Integral ) * 8;
+        static_assert( shift_by < size_in_bits,
                        "Right-shifting by that value causes undefined-behavior" );
-	   	if constexpr ( std::is_enum_v<Integral> )
-	    	return static_cast<std::underlying_type_t<Integral>>( value ) >> shift_by;
-	    else {  
-	    	return value >> shift_by;
-	    }
-	}
+   	    if constexpr ( std::is_enum_v<Integral> )
+    	    return static_cast<std::underlying_type_t<Integral>>( value ) >> shift_by;
+        else {  
+    	    return value >> shift_by;
+        }
+    }
 
     template<typename T>
     concept is_8bit_integral = 
