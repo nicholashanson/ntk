@@ -4,7 +4,7 @@
 
 #include <http.hpp>
 
-TEST( PacketParsingTests, HTTPChunkedBodyDecoding ) {
+TEST( PacketParsingTests, DecodeChunkedHttpBody ) {
 
     std::vector<uint8_t> chunked_data = {
         '4', '\r', '\n', 'W', 'i', 'k', 'i', '\r', '\n',

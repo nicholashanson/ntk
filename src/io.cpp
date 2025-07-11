@@ -3,9 +3,7 @@
 namespace ntk {
 
     session read_packets_from_file( const std::string& packet_data_file ) {
-
         std::vector<std::vector<uint8_t>> packets;
-
         std::ifstream file_handle( packet_data_file );
 
         if ( !file_handle.is_open() ) {
@@ -14,9 +12,7 @@ namespace ntk {
         }
 
         std::string line;
-
         while ( std::getline( file_handle, line ) ) {
-            
             std::vector<uint8_t> packet;
             std::istringstream iss( line );
             std::string byte_string;
@@ -65,8 +61,7 @@ namespace ntk {
         }
     }
     
-    std::vector<uint8_t> parse_hex_line( const std::string& line ) {
-        
+    std::vector<uint8_t> parse_hex_line( const std::string& line ) {     
         std::vector<uint8_t> bytes;
         std::istringstream iss(line);
         std::string byte_str;
@@ -80,7 +75,6 @@ namespace ntk {
     }
 
     std::vector<std::streampos> index_line_offsets( const std::string& filename ) {
-
         std::ifstream file( filename );
         std::vector<std::streampos> offsets;
 
@@ -130,23 +124,20 @@ namespace ntk {
         
         os << "    Option[" << static_cast<int>( opt.type )
            << "]: Type: " << static_cast<int>( opt.type ) << ", Data: [";
-        
+
         for ( size_t i = 0; i < opt.option.size(); ++i ) {
             os << std::hex << std::setw( 2 ) << std::setfill( '0' )
                << static_cast<int>( opt.option[ i ] );
             if ( i != opt.option.size() - 1 )
                 os << " ";
         }
-
         os << std::dec << std::setfill( ' ' ) << "]\n";
     }
 
     void print_tcp_header( const tcp_header& header, std::ostream& os ) {
 
         const int label_width = 26;
-
         os << std::dec << std::setfill( ' ' );
-
         os << "===== TCP HEADER BEGIN =====\n";
 
         auto print_field = [&]( const std::string& label, auto value ) {
@@ -161,13 +152,11 @@ namespace ntk {
 
         os << std::left << std::setw( label_width ) << "Flags:"
            << "0x" << std::hex << static_cast<int>( header.flags ) << std::dec << "\n";
-
         print_field( "Window Size:", header.window_size );
-
+        
         os << std::left << std::setw( label_width ) << "Checksum:"
            << "0x" << std::hex << std::setw( 4 ) << std::setfill( '0' )
            << header.checksum << std::dec << std::setfill( ' ' ) << "\n";
-
         print_field( "Urgent Pointer:", header.urgent_pointer );
 
         os << std::left << std::setw( label_width ) << "Options:";
@@ -179,7 +168,6 @@ namespace ntk {
                 print_tcp_option( opt, os );
             }
         }
-
         os << "===== TCP HEADER END =====\n\n";
     }
 
@@ -219,36 +207,30 @@ namespace ntk {
 
     void print_client_hello( const client_hello& c_hello, std::ostream& os ) {
         const int label_width = 26;
-
-        os << std::dec << std::setfill( ' ' );
-
+        
         auto print_field = [&]( const std::string& label, auto value ) {
             os << std::left << std::setw( label_width ) << label << value << "\n";
         };
 
+        os << std::dec << std::setfill( ' ' );
         os << "===== CLIENT HELLO BEGIN =====\n";
-
         print_field( "Session ID:", session_id_to_hex( c_hello.session_id ) );
         print_field( "Client Version:", static_cast<uint16_t>( c_hello.client_version ) );
         print_field( "Client Random:", client_random_to_hex( c_hello.random ) );
-
         os << "===== CLIENT HELLO END =====\n\n";
     } 
 
     void print_server_hello( const server_hello& s_hello, std::ostream& os ) {
         const int label_width = 26;
 
-        os << std::dec << std::setfill( ' ' );
-
         auto print_field = [&]( const std::string& label, auto value ) {
             os << std::left << std::setw( label_width ) << label << value << "\n";
         };
 
+        os << std::dec << std::setfill( ' ' );
         os << "===== SERVER HELLO BEGIN =====\n";
-
         print_field( "Server Random:", client_random_to_hex( s_hello.random ) );
         print_field( "Cipher Suite:", tls_cipher_suite_names.at( static_cast<cipher_suite>( s_hello.cipher_suite ) ) );
-
         os << "===== SERVER HELLO END =====\n\n";
     } 
 
@@ -259,22 +241,18 @@ namespace ntk {
     }
 
     void print_four( const four_tuple& four, std::ostream& os ) {
-
         const int label_width = 26;
-
-        os << std::dec << std::setfill( ' ' );
-
-        os << "===== FOUR TUPLE BEGIN =====\n";
 
         auto print_field = [&]( const std::string& label, auto value ) {
             os << std::left << std::setw( label_width ) << label << value << "\n";
         };
 
+        os << std::dec << std::setfill( ' ' );
+        os << "===== FOUR TUPLE BEGIN =====\n";
         print_field( "Client IP:", four.client_ip );
         print_field( "Server IP:", four.server_ip );
         print_field( "Client Port:", four.client_port );
         print_field( "Server Port:", four.server_port );
-
         os << "===== FOUR TUPLE END =====\n\n";
     }
 
@@ -293,7 +271,7 @@ namespace ntk {
         if ( !ofs ) {
             throw std::runtime_error( "Failed to open output file: " + filename );
         }
-
+        
         auto print_packet = [&]( const std::vector<uint8_t> packet ) {
             for ( size_t i = 0; i < packet.size(); ++i ) {
                 ofs << std::hex << std::setw( 2 ) << std::setfill( '0' ) << static_cast<int>( packet[ i ] );
@@ -307,15 +285,12 @@ namespace ntk {
         const auto& handshake = live_stream.m_handshake_feed.m_handshake;
 
         std::vector<std::vector<uint8_t>> handshake_packets = { handshake.syn, handshake.syn_ack, handshake.ack };
-
         for ( const auto& packet : handshake_packets ) {
             print_packet( packet );
         }
-
         for ( const auto& packet : live_stream.m_traffic ) {
             print_packet( packet );
         }
-
         if ( std::holds_alternative<fin_ack_fin_ack>( live_stream.m_termination_feed.m_termination.closing_sequence ) ) {
             for ( const auto& packet : std::get<fin_ack_fin_ack>( live_stream.m_termination_feed.m_termination.closing_sequence ) ) {
                 print_packet( packet );
@@ -324,32 +299,27 @@ namespace ntk {
     }
 
     void print_tls_record( const tls_record& record ) {
-
         const int label_width = 26;
-
-        std::cout << std::dec << std::setfill( ' ' );
-
-        std::cout << "===== TLS RECORD BEGIN =====\n";
 
         auto print_field = [&]( const std::string& label, auto value ) {
             std::cout << std::left << std::setw( label_width ) << label << value << "\n";
         };
 
+        std::cout << std::dec << std::setfill( ' ' );
+        std::cout << "===== TLS RECORD BEGIN =====\n";
         print_field( "Content Type:", tls_content_type_names.at( record.content_type ) );
         print_field( "Version:", static_cast<uint16_t>( record.version ) );
-
         std::cout << "===== TLS RECORD END =====\n\n";
     }
 
     void print_tls_secrets( const secrets& keys ) {
-
         const int label_width = 40;
-
-        std::cout << std::dec << std::setfill( ' ' );
 
         auto print_field = [&]( const std::string& label, auto value ) {
             std::cout << std::left << std::setw( label_width ) << label << value << "\n";
         };
+
+        std::cout << std::dec << std::setfill( ' ' );
 
         for ( auto [ client_random, secret ] : keys ) {
             std::cout << "===== TLS SECRETS BEGIN "
@@ -370,13 +340,9 @@ namespace ntk {
     }
 
     void print_http_request( const http_request& request, std::ostream& os ) {
-
         const int label_width = 20;
-
         os << std::left << std::setfill(' ');
-
         os << "===== HTTP REQUEST BEGIN =====\n";
-
         os << request.request_line.method_token << " "
            << request.request_line.path << " "
            << request.request_line.http_version << "\n\n";
@@ -388,18 +354,13 @@ namespace ntk {
                 os << std::left << std::setw( label_width ) << ( key + ":" ) << value << "\n";
             }
         }
-
         os << "===== HTTP REQUEST END =====\n\n";
     }
 
     void print_http_response( const http_response& response, std::ostream& os ) {
-
         const int label_width = 40;
-
         os << std::left << std::setfill(' ');
-
         os << "===== HTTP RESPONSE BEGIN =====\n";
-
         os << response.status_line.http_version << " "
            << response.status_line.status_code << " "
            << response.status_line.reason_phrase << "\n\n";
@@ -413,7 +374,6 @@ namespace ntk {
         }
 
         os << std::left << std::setw( label_width ) << "Payload_Length: " << response.body.size() << "\n";
-
         os << "===== HTTP RESPONSE END =====\n\n";
     };
 

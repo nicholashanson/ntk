@@ -24,25 +24,25 @@ namespace ntk {
     //      Extract TCP Option
     // ==============================
 
-    std::optional<tcp_option> extract_tcp_option( std::span<const uint8_t>& raw_tcp_header ) {
-        option_type kind = static_cast<option_type>( raw_tcp_header[ 0 ] );
+    std::optional<tcp_option> extract_tcp_option( std::span<const uint8_t>& tcp_options_list ) {
+        option_type kind = static_cast<option_type>( tcp_options_list[ 0 ] );
     
         if ( kind == option_type::END_OF_OPTIONS_LIST ) {
-            raw_tcp_header = raw_tcp_header.subspan( 1 );
+            tcp_options_list = tcp_options_list.subspan( 1 );
             return std::nullopt;
         } else if ( kind == option_type::NOP ) {
-            raw_tcp_header = raw_tcp_header.subspan( 1 );
+            tcp_options_list = tcp_options_list.subspan( 1 );
             return tcp_option { kind, {} };
         } else {
-            uint8_t length = raw_tcp_header[ 1 ];
+            uint8_t length = tcp_options_list[ 1 ];
 
             std::vector<uint8_t> data;
             if ( length > 2 ) {
                 data.insert( data.end(), 
-                             raw_tcp_header.begin() + 2,
-                             raw_tcp_header.begin() + length);
+                             tcp_options_list.begin() + 2,
+                             tcp_options_list.begin() + length);
             }
-            raw_tcp_header = raw_tcp_header.subspan( length ); 
+            tcp_options_list = tcp_options_list.subspan( length ); 
             return tcp_option { kind, data };
         }
     }  

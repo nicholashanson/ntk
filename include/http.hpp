@@ -19,7 +19,9 @@ namespace ntk {
     // TODO: check http rules on whitespace in headers
     std::string trim( const std::string& str );
 
-    using http_headers = std::unordered_map<std::string,std::string>;
+    // ==============================
+    //           HTTP TYPE
+    // ==============================
 
     enum class http_type {
         REQUEST,
@@ -27,18 +29,28 @@ namespace ntk {
         DATA
     };
 
-    /*
-        first line of a http response
-    */
-    struct http_response_status_line {
-        std::string http_version;
-        int status_code;
-        std::string reason_phrase;
-    };
+    // ==============================
+    //          PREDICATES
+    // ==============================
 
-    /*
-        first line of a http request
-    */
+    bool is_http( const std::vector<uint8_t>& maybe_http_payload );
+
+    // ==============================
+    //         HTTP HEADERS
+    // ==============================
+
+    using http_headers = std::unordered_map<std::string,std::string>;
+
+    http_headers parse_http_headers( const std::vector<uint8_t>& header_bytes );
+
+    http_headers get_http_headers_from_payload( const std::vector<uint8_t>& http_payload_bytes );
+
+    http_type get_http_type( const std::vector<uint8_t>& http_payload );
+
+    // ==============================
+    //        HTTP REQUEST
+    // ==============================
+
     struct http_request_line {
         std::string method_token;
         std::string path;
@@ -50,62 +62,57 @@ namespace ntk {
         http_headers headers;
     };
 
+    http_request_line parse_http_request_line( const std::vector<uint8_t>& request_line_bytes );
+
+    http_request get_http_request( const std::vector<uint8_t>& http_payload );
+
+    std::vector<uint8_t> get_first_http_respone( const session& packet_data );
+
+    // ==============================
+    //        HTTP RESPONSE
+    // ==============================
+
+    struct http_response_status_line {
+        std::string http_version;
+        int status_code;
+        std::string reason_phrase;
+    };
+
     struct http_response {
         http_response_status_line status_line;
         http_headers headers;
         std::vector<uint8_t> body;
     };
 
+    http_response_status_line parse_http_status_line( const std::vector<uint8_t>& status_line_bytes );
+
+    http_response get_http_response( const std::vector<uint8_t>& http_payload );
+
+    std::vector<uint8_t> get_http_response_data( const tcp_stream& stream );
+
+    // ==============================
+    //        HTTP EXTRACTION
+    // ==============================
+
     std::vector<uint8_t> extract_http_payload_from_ethernet( const unsigned char* ethernet_frame );
 
     std::vector<uint8_t> extract_http_payload_from_tcp( const std::vector<uint8_t> tcp_frame );
 
-    /*
-        take an array of bytes obtained from extract_http_payload* and split into into three
-        arrays, representing:
-            request_line, headers, and body in the case of a http request and
-            status_line, headers, and body in the case of http response
-    */
+    // ==============================
+    //       SPLIT HTTP PAYLOAD
+    // ==============================
     std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::vector<uint8_t>>
     split_http_payload( const std::vector<uint8_t>& payload );
 
-    /*
-        parse the request line from a http request
-    */
-    http_request_line parse_http_request_line( const std::vector<uint8_t>& request_line_bytes );
-
     bool contains_http_header( const http_headers& headers, const std::string& header_name );
-
-    /*
-        parse the status line from a http response
-    */
-    http_response_status_line parse_http_status_line( const std::vector<uint8_t>& status_line_bytes );
-
-    /*
-        parse headers directly from an array of bytes representing those headers
-    */
-    http_headers parse_http_headers( const std::vector<uint8_t>& header_bytes );
-
-    http_headers get_http_headers_from_payload( const std::vector<uint8_t>& http_payload_bytes );
-
-    /*
-        determine if a http payload is a http request, a http respense or raw data
-    */
-    http_type get_http_type( const std::vector<uint8_t>& http_payload );
-
-    bool is_http( const std::vector<uint8_t>& maybe_http_payload );
+   
+    // ==============================
+    //        CHUNK DECODING
+    // ==============================
 
     std::vector<uint8_t> decode_single_chunk( const std::vector<uint8_t>& chunked_body );
 
     std::vector<uint8_t> decode_chunked_http_body( const std::vector<uint8_t>& chunked_body );
-
-    std::vector<uint8_t> get_first_http_respone( const session& packet_data );
-
-    std::vector<uint8_t> get_http_response_data( const tcp_stream& stream );
-
-    http_request get_http_request( const std::vector<uint8_t>& http_payload );
-
-    http_response get_http_response( const std::vector<uint8_t>& http_payload );
 
 } // namespace ntk
 
