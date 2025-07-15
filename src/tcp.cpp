@@ -16,17 +16,19 @@ namespace ntk {
     //      Extract TCP Header
     // ==============================
 
-    std::vector<uint8_t> extract_tcp_header( const unsigned char* ethernet_frame,
-                                             const size_t ipv4_header_len ) {
+    std::vector<uint8_t> extract_tcp_header( const unsigned char* ethernet_frame, const std::size_t ipv4_header_len ) {
+        constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
+        constexpr std::size_t bytes_per_offset = 4;
+        
         std::vector<uint8_t> tcp_header;
 
-        size_t tcp_header_offset = constants::ethernet_header_len + ipv4_header_len;
-        size_t data_offset_pos = tcp_header_offset + static_cast<size_t>( tcp_header_offset::DATA_OFFSET );
+        std::size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
+        std::size_t data_offset_pos = tcp_header_offset + static_cast<std::size_t>( tcp_header_offset::DATA_OFFSET );
         uint8_t data_offset_byte = ethernet_frame[ data_offset_pos ];
-        size_t data_offset = extract_high_nibble( data_offset_byte ) * 4;
-        tcp_header.resize( data_offset );
-
-        std::memcpy( tcp_header.data(), ethernet_frame + constants::ethernet_header_len + ipv4_header_len, data_offset );
+        std::size_t tcp_header_len = extract_high_nibble( data_offset_byte ) * bytes_per_offset;
+        
+        tcp_header.resize( tcp_header_len );
+        std::memcpy( tcp_header.data(), ethernet_frame + tcp_header_offset, tcp_header_len );
 
         return tcp_header;
     }
