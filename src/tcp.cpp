@@ -34,6 +34,32 @@ namespace ntk {
     }
 
     // ==============================
+    //        Extract Payload
+    // ==============================
+
+    std::vector<uint8_t> extract_tcp_payload( const unsigned char* ethernet_frame ) { 
+        constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
+        
+        const uint8_t ihl = extract_low_nibble( ethernet_frame[ ethernet_header_len ] );
+        const std::size_t ipv4_header_len = ihl * 4;
+
+        const uint16_t total_length = read_uint16_be( ethernet_frame, ethernet_header_len + 2 );
+        const std::size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
+
+        const::size_t data_offset_pos = tcp_header_offset + static_cast<size_t>( tcp_header_offset::DATA_OFFSET );
+        const uint8_t data_offset_byte = ethernet_frame[ data_offset_pos ];
+        const std::size_t tcp_header_len = extract_high_nibble( data_offset_byte ) * 4;
+        
+        size_t payload_len = total_length - ipv4_header_len - tcp_header_len;
+        const uint8_t* payload_ptr = ethernet_frame + tcp_header_offset + tcp_header_len;
+
+        std::vector<uint8_t> payload( payload_len );
+        std::memcpy( payload.data(), payload_ptr, payload_len );
+
+        return payload;
+    }
+
+    // ==============================
     //      Extract TCP Option
     // ==============================
 
@@ -65,8 +91,7 @@ namespace ntk {
     // ==============================
 
     tcp_header parse_tcp_header( std::span<const uint8_t> raw_tcp_header ) {
-
-        const size_t basic_header_len = 20;
+        constexpr std::size_t basic_header_len = 20;
 
         if ( raw_tcp_header.size() < basic_header_len ) {
             throw std::runtime_error( "Invalid TCP header size" );
@@ -121,16 +146,10 @@ namespace ntk {
     // ==============================
 
     std::vector<raw_tcp_frame> extract_raw_tcp_stream( const session& tcp_session ) {
-
         std::vector<raw_tcp_frame> tcp_stream;
 
         for ( auto& packet : tcp_session ) {
-            const unsigned char* packet_data = reinterpret_cast<const unsigned char*>( packet.data() );
-
-            auto ipv4_header = extract_ipv4_header( packet_data );
-            auto parsed_ipv4_header = parse_ipv4_header( ipv4_header );
-
-            auto header = extract_tcp_header( packet_data, parsed_ipv4_header.ihl );
+            auto header = extract_raw_tcp_header( packet_data );
             auto body = extract_payload_from_ethernet( packet_data );
 
             if ( body.empty() ) {
@@ -214,37 +233,6 @@ namespace ntk {
         auto tcp_stream = get_tcp_stream( raw_stream );
         auto merged_tcp_stream = merge_tcp_stream_non_overlapping( tcp_stream );
         return merged_tcp_stream;
-    }
-
-    // ==============================
-    //        Extract Payload
-    // ==============================
-
-    std::vector<uint8_t> extract_payload_from_ethernet( const unsigned char* ethernet_frame ) {      
-        uint8_t ihl = extract_low_nibble( ethernet_frame[ constants::ethernet_header_len ] );
-        size_t ipv4_header_len = ihl * 4;
-
-        uint16_t total_length = read_uint16_be( ethernet_frame, constants::ethernet_header_len + 2 );
-        size_t tcp_header_offset = constants::ethernet_header_len + ipv4_header_len;
-
-        size_t data_offset_pos = tcp_header_offset + static_cast<size_t>( tcp_header_offset::DATA_OFFSET );
-        uint8_t data_offset_byte = ethernet_frame[ data_offset_pos ];
-        size_t tcp_header_len = extract_high_nibble( data_offset_byte ) * 4;
-
-        uint16_t src_port = read_uint16_be( ethernet_frame, tcp_header_offset );
-        uint16_t dst_port = read_uint16_be( ethernet_frame, tcp_header_offset + 2 );
-
-        size_t payload_len = total_length - ipv4_header_len - tcp_header_len;
-        const uint8_t* payload_ptr = ethernet_frame + tcp_header_offset + tcp_header_len;
-
-        std::vector<uint8_t> payload( payload_len );
-        std::memcpy( payload.data(), payload_ptr, payload_len );
-
-        return payload;
-    }
-
-    std::vector<uint8_t> extract_payload_from_ethernet( const std::vector<uint8_t> ethernet_frame ) {
-        return extract_payload_from_ethernet( ethernet_frame.data() );
     }
 
     // ==============================
