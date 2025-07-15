@@ -21,7 +21,7 @@ namespace ntk {
         std::vector<uint8_t> tcp_header;
 
         size_t tcp_header_offset = constants::ethernet_header_len + ipv4_header_len;
-        size_t data_offset_pos = tcp_header_offset + static_cast<size_t>( tcp_header_offset::DATA_OFFSET )
+        size_t data_offset_pos = tcp_header_offset + static_cast<size_t>( tcp_header_offset::DATA_OFFSET );
         uint8_t data_offset_byte = ethernet_frame[ data_offset_pos ];
         size_t data_offset = extract_high_nibble( data_offset_byte ) * 4;
         tcp_header.resize( data_offset );
@@ -123,7 +123,6 @@ namespace ntk {
         std::vector<raw_tcp_frame> tcp_stream;
 
         for ( auto& packet : tcp_session ) {
-
             const unsigned char* packet_data = reinterpret_cast<const unsigned char*>( packet.data() );
 
             auto ipv4_header = extract_ipv4_header( packet_data );
@@ -152,7 +151,6 @@ namespace ntk {
     // ==============================
 
     tcp_stream get_tcp_stream( const std::vector<raw_tcp_frame>& raw_stream ) {
-
         tcp_stream stream;
 
         for ( auto& tcp_frame : raw_stream ) {
@@ -164,14 +162,12 @@ namespace ntk {
     } 
 
     bool is_non_overlapping_stream( const tcp_stream& stream ) {
-
         if ( stream.empty() ) return true;
 
         uint32_t last_end_seq = 0;
         bool first = true;
 
         for ( const auto& [ seq, payload ] : stream ) {
-
             uint32_t start_seq = seq;
             uint32_t length = static_cast<uint32_t>( payload.size() );
             uint32_t end_seq = start_seq + length;
@@ -222,25 +218,21 @@ namespace ntk {
     //        Extract Payload
     // ==============================
 
-    std::vector<uint8_t> extract_payload_from_ethernet( const unsigned char* ethernet_frame ) {
-        
-        const size_t ethernet_header_len = 14;
-
-        uint8_t ihl = extract_low_nibble( ethernet_frame[ ethernet_header_len ] );
+    std::vector<uint8_t> extract_payload_from_ethernet( const unsigned char* ethernet_frame ) {      
+        uint8_t ihl = extract_low_nibble( ethernet_frame[ constants::ethernet_header_len ] );
         size_t ipv4_header_len = ihl * 4;
 
-        uint16_t total_length = read_uint16_be( ethernet_frame, ethernet_header_len + 2 );
+        uint16_t total_length = read_uint16_be( ethernet_frame, constants::ethernet_header_len + 2 );
+        size_t tcp_header_offset = constants::ethernet_header_len + ipv4_header_len;
 
-        size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
-
-        uint8_t data_offset_byte = ethernet_frame[ tcp_header_offset + 12 ];
+        size_t data_offset_pos = tcp_header_offset + static_cast<size_t>( tcp_header_offset::DATA_OFFSET );
+        uint8_t data_offset_byte = ethernet_frame[ data_offset_pos ];
         size_t tcp_header_len = extract_high_nibble( data_offset_byte ) * 4;
 
         uint16_t src_port = read_uint16_be( ethernet_frame, tcp_header_offset );
         uint16_t dst_port = read_uint16_be( ethernet_frame, tcp_header_offset + 2 );
 
         size_t payload_len = total_length - ipv4_header_len - tcp_header_len;
-
         const uint8_t* payload_ptr = ethernet_frame + tcp_header_offset + tcp_header_len;
 
         std::vector<uint8_t> payload( payload_len );
