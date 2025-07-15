@@ -1,6 +1,8 @@
 #ifndef TCP_HANDSHAKE_PACKETS_HPP
 #define TCP_HANDSHAKE_PACKETS_HPP
 
+#include <tcp.hpp>
+
 namespace test_constants {
 
     inline const unsigned char tcp_syn_packet[] = {
@@ -35,7 +37,58 @@ namespace test_constants {
         0x08, 0x0a, 0x02, 0x0d, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00,     // timestamp option
         0x01,                                                           // no operation
         0x03, 0x03, 0x09                                                // window scale factor 
-    };   
+    };
+
+    inline const unsigned char tcp_syn_ipv4_header[] = {
+        /* ipv4 header */                                               /* ipv4 header */
+        0x45,                                                           // version = 4, header-length = 5 * 4 = 20 bytes
+        0x00,                                                           // DSCP and ECN
+        0x00, 0x3c,                                                     // total length of packet
+        0x44, 0xeb,                                                     // identification
+        0x40, 0x00,                                                     // flags and fragment offset
+        0x40,                                                           // time-to-live
+        0x06,                                                           // TCP protocol
+        0x74, 0x57,                                                     // header checksum
+        0xc0, 0xa8, 0x00, 0x14,                                         // source ip address  
+        0xc0, 0xa8, 0x00, 0x15                                          // destination ip address
+    };      
+
+    inline const unsigned char tcp_syn_raw_tcp_header[] = {
+        /* tcp header */                                                /* tcp header */
+        0xac, 0x18,                                                     // source port
+        0x0b, 0xb8,                                                     // destination port
+        0xb9, 0x20, 0xc9, 0xb3,                                         // sequence number   
+        0x00, 0x00, 0x00, 0x00,                                         // acknowledgment number
+        0xa0,                                                           // data offset and reserved
+        0x02,                                                           // flags ( SYN )
+        0xff, 0xff,                                                     // window size
+        0x17, 0x6e,                                                     // checksum
+        0x00, 0x00,                                                     // urgent pointer
+        /* tcp options */                                               /* tcp options */
+        0x02, 0x04, 0x05, 0xb4,                                         // maximum segment size ( MSS ) = 1460
+        0x04, 0x02,                                                     // selective acknowledgment permitted
+        0x08, 0x0a, 0x02, 0x0d, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00,     // timestamp option
+        0x01,                                                           // no operation
+        0x03, 0x03, 0x09                                                // window scale factor 
+    };  
+
+    ntk::tcp_header tcp_syn_parsed_tcp_header = {
+        .source_port = 44056,                    
+        .destination_port = 3000,                
+        .sequence_number = 0xb920c9b3,           
+        .acknowledgment_number = 0,               
+        .data_offset = 10,                                          
+        .window_size = 65535,                                            
+        .checksum = 5998,                                                
+        .urgent_pointer = 0,                                             
+        .options = {                                                        
+            { ntk::option_type::MSS, { 0x05, 0xb4 } },                            
+            { ntk::option_type::SACK_PERMITTED, {} },                                              
+            { ntk::option_type::TIMESTAMP, { 0x02, 0x0d, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00 } },   
+            { ntk::option_type::NOP, {} },                                                 
+            { ntk::option_type::WINDOW_SCALE, { 0x09 } }                                   
+        }
+    }; 
 
     inline const unsigned char tcp_synack_packet[] = {
         /* ethernet header */                                           /* ethernet header */
@@ -71,6 +124,43 @@ namespace test_constants {
         0x03, 0x03, 0x07                                                // window scale
     };
 
+    inline const unsigned char tcp_synack_raw_tcp_header[] = {
+        /* tcp header */                                                /* tcp header */
+        0x0b, 0xb8,                                                     // source port = 3000
+        0xac, 0x18,                                                     // destination port = 44056
+        0xd3, 0xc1, 0xea, 0x09,                                         // sequence number
+        0xb9, 0x20, 0xc9, 0xb4,                                         // acknowledgment number
+        0xa0,                                                           // data offset ( 10 ) << 4 + reserved
+        0x12,                                                           // flags: SYN and ACK
+        0xfe, 0x88,                                                     // window size
+        0x81, 0xa8,                                                     // checksum
+        0x00, 0x00,                                                     // urgent pointer
+        /* tcp options */                                               /* tcp options */
+        0x02, 0x04, 0x05, 0xb4,                                         // MSS = 1460
+        0x04, 0x02,                                                     // SACK permitted
+        0x08, 0x0a, 0x58, 0x64, 0xbc, 0x69, 0x02, 0x0d, 0x72, 0x64,     // timestamp
+        0x01,                                                           // NOP 
+        0x03, 0x03, 0x07                                                // window scale
+    };
+
+    ntk::tcp_header tcp_synack_parsed_tcp_header = {
+        .source_port = 3000,                                               
+        .destination_port = 44056,                                        
+        .sequence_number = 0xd3c1ea09,           
+        .acknowledgment_number = 0xb920c9b4,     
+        .data_offset = 10,                   
+        .window_size = 0xfe88,                   
+        .checksum = 0x81a8,                      
+        .urgent_pointer = 0x0000,                
+        .options = {
+            { ntk::option_type::MSS, { 0x05, 0xb4 } },                                         
+            { ntk::option_type::SACK_PERMITTED, {} },                                                 
+            { ntk::option_type::TIMESTAMP, { 0x58, 0x64, 0xbc, 0x69, 0x02, 0x0d, 0x72, 0x64 } },      
+            { ntk::option_type::NOP, {} },                                                   
+            { ntk::option_type::WINDOW_SCALE, { 0x07 } }                                       
+        }
+    };
+
     inline const unsigned char tcp_ack_packet[] = {
         /* ethernet header */
         0x14, 0xf6, 0xd8, 0xaa, 0x69, 0xfa,                             // destination MAC address ( server )
@@ -102,6 +192,39 @@ namespace test_constants {
         0x01,                                                           // NOP
         0x08, 0x0a, 0x02, 0x0d, 0x72, 0x97, 0x58, 0x64, 0xbc, 0x69      // timestamp             
     };    
+
+    inline const unsigned char tcp_ack_raw_tcp_header[] = {
+        /* tcp header */                                                /* tcp header */
+        0xac, 0x18,                                                     // source port = 44056
+        0x0b, 0xb8,                                                     // destination port = 3000
+        0xb9, 0x20, 0xc9, 0xb4,                                         // sequence number
+        0xd3, 0xc1, 0xea, 0x0a,                                         // acknowledgment number
+        0x80,                                                           // data offset ( 8 ) << 4, reserved
+        0x10,                                                           // flags = ACK
+        0x00, 0x80,                                                     // window size
+        0x72, 0xde,                                                     // checksum
+        0x00, 0x00,                                                     // urgent pointer
+        /* tcp options */                                               /* tcp options */
+        0x01,                                                           // NOP
+        0x01,                                                           // NOP
+        0x08, 0x0a, 0x02, 0x0d, 0x72, 0x97, 0x58, 0x64, 0xbc, 0x69      // timestamp             
+    };    
+
+    ntk::tcp_header tcp_ack_parsed_tcp_header = {
+        .source_port = 44056,                                    
+        .destination_port = 3000,                                     
+        .sequence_number = 0xb920c9b4,             
+        .acknowledgment_number = 0xd3c1ea0a,       
+        .data_offset = 8,                                             
+        .window_size = 0x0080,                     
+        .checksum = 0x72de,                        
+        .urgent_pointer = 0x0000,                  
+        .options = {
+            { ntk::option_type::NOP, {} },                                                  
+            { ntk::option_type::NOP, {} },                                                 
+            { ntk::option_type::TIMESTAMP, { 0x02, 0x0d, 0x72, 0x97, 0x58, 0x64, 0xbc, 0x69 } }   
+        }
+    };
 
 } // namespace test_constants
 
