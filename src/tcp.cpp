@@ -489,9 +489,9 @@ namespace ntk {
 
         for ( size_t i = 0; i + 2 < packets.size(); ++i ) {
 
-            auto sequ_number_1 = get_tcp_header( packets[ i ].data() ).seq_number;
-            auto sequ_number_2 = get_tcp_header( packets[ i + 1 ].data() ).seq_number;
-            auto sequ_number_3 = get_tcp_header( packets[ i + 2 ].data() ).seq_number;
+            auto sequ_number_1 = get_seq_number( packets[ i ] );
+            auto sequ_number_2 = get_seq_number( packets[ i + 1 ] );
+            auto sequ_number_3 = get_seq_number( packets[ i + 2 ] );
 
             for ( size_t i = 0; i + 3 < packets.size(); ++i ) {
                 if ( sequ_number_1 == syn_header.seq_number &&
