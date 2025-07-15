@@ -20,12 +20,12 @@ namespace ntk {
                                              const size_t ipv4_header_len ) {
         std::vector<uint8_t> tcp_header;
 
-        size_t tcp_header_offset = 14 + ipv4_header_len;
+        size_t tcp_header_offset = constants::ethernet_header_len + ipv4_header_len;
         uint8_t data_offset_byte = ethernet_frame[ tcp_header_offset + 12 ];
         size_t data_offset = extract_high_nibble( data_offset_byte ) * 4;
         tcp_header.resize( data_offset );
 
-        std::memcpy( tcp_header.data(), ethernet_frame + 14 + ipv4_header_len, data_offset );
+        std::memcpy( tcp_header.data(), ethernet_frame + constants::ethernet_header_len + ipv4_header_len, data_offset );
 
         return tcp_header;
     }
