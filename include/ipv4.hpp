@@ -51,10 +51,9 @@ namespace ntk {
 
     using sender_reciever = std::pair<uint32_t,uint32_t>;
 
-    /*
-        takes a raw ethernet frame and extracts the ipv4 header
-    */
     std::vector<uint8_t> extract_ipv4_header( const unsigned char* ethernet_frame );
+
+    std::size_t get_ipv4_header_len( const unsigned char* ethernet_frame );
 
     ipv4_header parse_ipv4_header( const std::vector<uint8_t>& raw_ipv4_header );
 
