@@ -4,12 +4,12 @@ namespace ntk {
 
     uint32_t get_seq_number( const std::vector<uint8_t>& packet ) {
         auto raw_tcp_header = get_raw_tcp_header( packet );
-        return read_uint32_be( raw_tcp_header, 4 ); 
+        return read_uint32_be( raw_tcp_header, tcp_header_offset::SEQ_NUMBER ); 
     }
 
     uint32_t get_ack_number( const std::vector<uint8_t>& packet ) {
         auto raw_tcp_header = get_raw_tcp_header( packet );
-        return read_uint32_be( raw_tcp_header, 8 );
+        return read_uint32_be( raw_tcp_header, tcp_header_offset::ACK_NUMBER );
     }
 
     // ==============================
