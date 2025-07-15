@@ -21,7 +21,7 @@ namespace ntk {
         std::vector<uint8_t> tcp_header;
 
         size_t tcp_header_offset = constants::ethernet_header_len + ipv4_header_len;
-        uint8_t data_offset_byte = ethernet_frame[ tcp_header_offset + 12 ];
+        uint8_t data_offset_byte = ethernet_frame[ tcp_header_offset + static_cast<size_t>( tcp_header_offset::DATA_OFFSET ) ];
         size_t data_offset = extract_high_nibble( data_offset_byte ) * 4;
         tcp_header.resize( data_offset );
 
