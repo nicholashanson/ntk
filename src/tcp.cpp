@@ -38,6 +38,7 @@ namespace ntk {
     // ==============================
 
     std::optional<tcp_option> extract_tcp_option( std::span<const uint8_t>& tcp_options_list ) {
+        constexpr std::size_t option_data_offset = 2;
         option_type kind = static_cast<option_type>( tcp_options_list[ 0 ] );
     
         if ( kind == option_type::END_OF_OPTIONS_LIST ) {
@@ -48,11 +49,10 @@ namespace ntk {
             return tcp_option { kind, {} };
         } else {
             uint8_t length = tcp_options_list[ 1 ];
-
             std::vector<uint8_t> data;
             if ( length > 2 ) {
                 data.insert( data.end(), 
-                             tcp_options_list.begin() + 2,
+                             tcp_options_list.begin() + option_data_offset,
                              tcp_options_list.begin() + length);
             }
             tcp_options_list = tcp_options_list.subspan( length ); 
