@@ -4,7 +4,6 @@
 namespace ntk {
 
     std::vector<uint8_t> extract_ipv4_header( const unsigned char* ethernet_frame ) {
-
         uint8_t ihl = ethernet_frame[ 14 ] & 0x0F;      
         size_t header_len = ihl * 4;         
 
@@ -12,6 +11,12 @@ namespace ntk {
         std::memcpy( ipv4_header.data(), ethernet_frame + 14, header_len );
 
         return ipv4_header;  
+    }
+
+    std::size_t get_ipv4_header_len( const unsigned char* ethernet_frame ) {
+        constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
+        const uint8_t ihl = extract_low_nibble( ethernet_frame[ ethernet_header_len ] );
+        return ihl * 4;
     }
 
     ipv4_header parse_ipv4_header( const std::vector<uint8_t>& raw_ipv4_header ) {
