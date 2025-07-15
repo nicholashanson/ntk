@@ -23,6 +23,23 @@
 namespace ntk {
 
     // ==============================
+    //       TCP Header Offset
+    // ==============================
+
+    enum class tcp_header_offset : uint8_t {
+        SRC_PORT        = 0,
+        DEST_PORT       = 2,
+        SEQ_NUMBER      = 4,
+        ACK_NUMBER      = 8,
+        DATA_OFFSET    = 12,
+        FLAGS          = 13,
+        WINDOW_SIZE    = 14,
+        CHECKSUM       = 16,
+        URGENT_PTR     = 18
+    };
+
+
+    // ==============================
     //           TCP Flags
     // ==============================
 
@@ -34,6 +51,8 @@ namespace ntk {
         FIN_ACK = 0x11,
         SYN_ACK = 0x12
     };
+
+    bool flags_contains( const uint8_t header_flags, const tcp_flags flags );
 
     struct raw_tcp_frame {
         std::vector<uint8_t> header;
@@ -69,27 +88,27 @@ namespace ntk {
     // ==============================
 
     struct tcp_header {
-        uint16_t source_port;
-        uint16_t destination_port;
-        uint32_t sequence_number;
-        uint32_t acknowledgment_number;
+        uint16_t src_port;
+        uint16_t dest_port;
+        uint32_t seq_number;
+        uint32_t ack_number;
         uint16_t data_offset;
         uint8_t flags;
         uint16_t window_size;
         uint16_t checksum;
-        uint16_t urgent_pointer;
+        uint16_t urgent_ptr;
 
         std::vector<tcp_option> options;
 
         bool operator==( const tcp_header& other ) const {
-            return source_port == other.source_port &&
-                destination_port == other.destination_port &&
-                sequence_number == other.sequence_number &&
-                acknowledgment_number == other.acknowledgment_number &&
+            return src_port == other.src_port &&
+                dest_port == other.dest_port &&
+                seq_number == other.seq_number &&
+                ack_number == other.ack_number &&
                 data_offset == other.data_offset &&
                 window_size == other.window_size &&
                 checksum == other.checksum &&
-                urgent_pointer == other.urgent_pointer &&
+                urgent_ptr == other.urgent_ptr &&
                 options == other.options;
         }
     };
@@ -105,6 +124,8 @@ namespace ntk {
     tcp_header get_tcp_header( const unsigned char* ethernet_frame );
 
     tcp_header get_tcp_header( const std::vector<uint8_t>& packet );
+
+    std::vector<uint8_t> get_raw_tcp_header( const std::vector<uint8_t>& packet );
 
     // ==============================
     //      TCP Stream Parsing
@@ -143,6 +164,10 @@ namespace ntk {
     bool is_reset( const std::vector<uint8_t>& packet );
 
     bool is_syn( const std::vector<uint8_t>& packet );
+
+    bool is_fin_ack( const std::vector<uint8_t>& packet );
+
+    bool is_ack_of_seq( const std::vector<uint8_t>& data_sender_packet, const std::vector<uint8_t>& data_reciever_packet );
 
     // ==============================
     //         Four Tuple
@@ -217,8 +242,9 @@ namespace ntk {
 
     bool is_valid_handshake( const tcp_handshake& handshake );
 
-    struct tcp_handshake_feed { 
+    bool is_valid_handshake( const tcp_header& syn_header, const tcp_header& syn_ack_header, const tcp_header& ack_header );
 
+    struct tcp_handshake_feed { 
         bool feed( const std::vector<uint8_t>& packet );
     private:
         bool feed_packet( const std::vector<uint8_t>& packet ); 
@@ -243,7 +269,21 @@ namespace ntk {
     //         TCP Termination
     // ==============================
 
-    using fin_ack_fin_ack = std::array<std::vector<uint8_t>,4>;
+    struct fin_ack_fin_ack {
+        std::vector<uint8_t> initiator_fin;
+        std::vector<uint8_t> responder_ack;
+        std::vector<uint8_t> responder_fin;
+        std::vector<uint8_t> initiator_ack;
+
+        bool operator==( const fin_ack_fin_ack& other ) const {
+            return initiator_fin == other.initiator_fin &&
+                   responder_ack == other.responder_ack &&
+                   responder_fin == other.responder_fin &&
+                   initiator_ack == other.initiator_ack;
+        }
+
+    };
+    
     using rst = std::vector<uint8_t>;
 
     struct tcp_termination {
@@ -267,7 +307,6 @@ namespace ntk {
     bool is_valid_fin_ack_fin_ack( const tcp_termination& termination );
 
     struct tcp_termination_feed { 
-    
         bool feed( const std::vector<uint8_t>& packet );
     private:
         bool feed_packet( const std::vector<uint8_t>& packet );
