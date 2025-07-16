@@ -344,9 +344,21 @@ namespace ntk {
         return is_ack( packet_tcp_header ) && is_same_connection( packet_ip_header, packet_tcp_header, four );
     }
 
+    // ==============================
+    //         Is Ack Of Seq
+    // ==============================
+
     bool is_ack_of_seq( const std::vector<uint8_t>& data_sender_packet, const std::vector<uint8_t>& data_reciever_packet ) {
         auto seq_number = get_seq_number( data_sender_packet );
         auto ack_number = get_ack_number( data_reciever_packet );
+        return is_ack_of_seq( ack_number, seq_number );
+    }
+
+    bool is_ack_of_seq( const tcp_header& data_sender_header, const tcp_header& data_reciever_header ) {
+        return is_ack_of_seq( data_sender_header.seq_number, data_reciever_header.ack_number );
+    }
+
+    bool is_ack_of_seq( const uint32_t seq_number, const uint32_t ack_number ) {
         return ack_number == seq_number + 1;
     }
 
@@ -431,13 +443,12 @@ namespace ntk {
         return is_valid_handshake( handshake.syn, handshake.syn_ack, handshake.ack );
     }
 
-    bool is_valid_handshake( const tcp_header& syn_header, const tcp_header& syn_ack_header, const tcp_header& ack_header ) {
-        return syn_ack_header.ack_number == syn_header.seq_number + 1 &&
-               ack_header.ack_number == syn_ack_header.seq_number + 1;
+    bool is_valid_handshake( const tcp_header& syn_header, const tcp_header& synack_header, const tcp_header& ack_header ) {
+        return is_ack_of_seq( syn_header, synack_header ) && is_ack_of_seq( synack_header, ack_header );
     }
 
-    bool is_valid_handshake( const std::vector<uint8_t>& syn_packet, const std::vector<uint8_t>& synack_packet, const std::vector<uint8_t>& ack_packet ) {
-        return is_ack_of_seq( syn_packet, syn_ack_packet ) && is_ack_of_seq( synack_packet, ack_packet );
+    bool is_valid_handshake( const std::vector<uint8_t>& syn, const std::vector<uint8_t>& synack, const std::vector<uint8_t>& ack ) {
+        return is_ack_of_seq( syn, syn_ack ) && is_ack_of_seq( synack, ack );
     }
 
     // ==============================
