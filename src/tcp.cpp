@@ -27,7 +27,6 @@ namespace ntk {
 
     std::vector<uint8_t> extract_tcp_header( const unsigned char* ethernet_frame, const std::size_t ipv4_header_len ) {
         constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
-        constexpr std::size_t bytes_per_offset = 4;
         
         std::vector<uint8_t> tcp_header;
         const std::size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
@@ -990,11 +989,13 @@ namespace ntk {
     // ==============================
 
     bool is_data_packet( const std::vector<uint8_t>& packet ) {
-        ipv4_header packet_ip_header = get_ipv4_header( packet.data() );
-        tcp_header packet_tcp_header = get_tcp_header( packet.data() );
-        size_t tcp_header_len = packet_tcp_header.data_offset * 4;
+        constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
+        
+        auto ipv4_header_len = get_ipv_header_len( packet );
+        const std::size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
+        auto tcp_header_len = get_tcp_header_len( packet.data(), tcp_header_offset );
 
-        size_t payload_len = packet.size() - packet_ip_header.ihl - tcp_header_len - constants::ethernet_header_len;
+        const std::size_t payload_len = packet.size() - tcp_header_offset - tcp_header_len;
         return payload_len > 0;
     }
 
@@ -1003,19 +1004,17 @@ namespace ntk {
     // ==============================
 
     bool is_ack_only_packet( const std::vector<uint8_t>& packet ) {
-        return !is_data_packet( packet ) && ( get_tcp_header( packet.data() ).flags & 0x10 );
+        return !is_data_packet( packet ) && is_ack( packet );
     }
 
     std::vector<std::vector<uint8_t>> extract_payloads( const four_tuple& four, const std::vector<std::vector<uint8_t>>& packets ) {
         std::vector<std::vector<uint8_t>> payloads;
-
         for ( auto& packet : packets ) {
             if ( get_four_from_ethernet( packet ) == four ) {
-                auto payload = extract_payload_from_ethernet( packet );
+                auto payload = extract_tcp_payload( packet );
                 if ( payload.size() > 0 ) payloads.push_back( payload );
             }
         }
-
         return payloads;
     } 
 
