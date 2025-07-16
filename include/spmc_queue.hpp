@@ -9,10 +9,18 @@
 
 namespace ntk {
 
+    // ==============================
+    //           Concepts
+    // ==============================
+
     template<typename Filter,typename T>
     concept FilterConcept = requires( Filter f, T t ) {
         { f( t ) } -> std::convertible_to<bool>;
     };
+
+    // ==============================
+    //        Default Filter
+    // ==============================
 
     template<typename T>
     struct accept_all {
@@ -20,6 +28,10 @@ namespace ntk {
             return true;
         } 
     };
+
+    // ==============================
+    //           Interface
+    // ==============================
 
     template <typename T>
     class transfer_queue_interface {
@@ -50,10 +62,18 @@ namespace ntk {
             Filter m_filter;
     };
 
+    // ==============================
+    //          Constructor
+    // ==============================
+
     template<typename T,typename Filter> 
         requires FilterConcept<Filter,T>
     spmc_transfer_queue<T,Filter>::spmc_transfer_queue( Filter filter ) 
         : m_filter( filter ) {}
+
+    // ==============================
+    //             Push
+    // ==============================
 
     template<typename T,typename Filter>
         requires FilterConcept<Filter,T> 
@@ -65,6 +85,10 @@ namespace ntk {
         }
         m_cv.notify_one(); 
     }
+
+    // ==============================
+    //            Pop For
+    // ==============================
 
     template<typename T,typename Filter>
         requires FilterConcept<Filter,T>
@@ -78,6 +102,10 @@ namespace ntk {
         return item;
     }
 
+    // ==============================
+    //           Try Pop
+    // ==============================
+
     template<typename T,typename Filter>
         requires FilterConcept<Filter,T>
     std::optional<T> spmc_transfer_queue<T,Filter>::try_pop() {
@@ -87,6 +115,10 @@ namespace ntk {
         m_queue.pop();
         return item;
     }
+
+    // ==============================
+    //            Empty
+    // ==============================
 
     template<typename T,typename Filter>
         requires FilterConcept<Filter,T>
