@@ -12,7 +12,10 @@ namespace ntk {
         return read_uint32_be( raw_tcp_header, tcp_header_offset::ACK_NUMBER );
     }
 
-        
+    // ==============================
+    //      Get TCP Header Len
+    // ==============================
+
     std::size_t get_tcp_header_len( const unsigned char* ethernet_frame, const std::size_t tcp_header_offset ) {  
         constexpr std::size_t bytes_per_offset = 4;
         const std::size_t data_offset_pos = tcp_header_offset + static_cast<std::size_t>( tcp_header_offset::DATA_OFFSET );
@@ -22,10 +25,10 @@ namespace ntk {
     }
 
     // ==============================
-    //      Extract TCP Header
+    //      Get Raw TCP Header
     // ==============================
 
-    std::vector<uint8_t> extract_tcp_header( const unsigned char* ethernet_frame, const std::size_t ipv4_header_len ) {
+    std::vector<uint8_t> get_raw_tcp_header( const unsigned char* ethernet_frame, const std::size_t ipv4_header_len ) {
         constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
         
         std::vector<uint8_t> tcp_header;
@@ -38,11 +41,16 @@ namespace ntk {
         return tcp_header;
     }
 
+    std::vector<uint8_t> get_raw_tcp_header( const std::vector<uint8_t>& packet ) {
+        auto ipv4_header_len = get_ipv4_header_len( packet.data() );
+        return get_raw_tcp_header( packet.data(),  );
+    }
+
     // ==============================
-    //     Extract TCP Payload
+    //        Get TCP Payload
     // ==============================
 
-    std::vector<uint8_t> extract_tcp_payload( const unsigned char* ethernet_frame ) { 
+    std::vector<uint8_t> get_tcp_payload( const unsigned char* ethernet_frame ) { 
         constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
         
         const auto ipv4_header_len = get_ipv4_header_len( ethernet_frame ); 
@@ -79,7 +87,7 @@ namespace ntk {
             if ( length > 2 ) {
                 data.insert( data.end(), 
                              tcp_options_list.begin() + option_data_offset,
-                             tcp_options_list.begin() + length);
+                             tcp_options_list.begin() + length );
             }
             tcp_options_list = tcp_options_list.subspan( length ); 
             return tcp_option { kind, data };
@@ -87,10 +95,10 @@ namespace ntk {
     }  
 
     // ==============================
-    //       Parse TCP Header
+    //     Get Parsed TCP Header
     // ==============================
 
-    tcp_header parse_tcp_header( std::span<const uint8_t> raw_tcp_header ) {
+    tcp_header get_parsed_tcp_header( std::span<const uint8_t> raw_tcp_header ) {
         constexpr std::size_t basic_header_len = 20;
 
         if ( raw_tcp_header.size() < basic_header_len ) {
@@ -123,29 +131,20 @@ namespace ntk {
         return header;
     }
 
-    // ==============================
-    //        Get TCP Header
-    // ==============================
-
-    tcp_header get_tcp_header( const unsigned char* ethernet_frame ) {
+    tcp_header get_parsed_tcp_header( const unsigned char* ethernet_frame ) {
         ipv4_header header = get_ipv4_header( ethernet_frame );
         return parse_tcp_header( extract_tcp_header( ethernet_frame, header.ihl ) );
     }
 
-    tcp_header get_tcp_header( const std::vector<uint8_t>& packet ) {
+    tcp_header get_parsed_tcp_header( const std::vector<uint8_t>& packet ) {
         return get_tcp_header( packet.data() );
     }
 
-    std::vector<uint8_t> get_raw_tcp_header( const std::vector<uint8_t>& packet ) {
-        ipv4_header header = get_ipv4_header( packet.data() );
-        return extract_tcp_header( packet.data(), header.ihl );
-    }
-
     // ==============================
-    //      Extract TCP Stream
+    //      Get Raw TCP Stream
     // ==============================
 
-    std::vector<raw_tcp_frame> extract_raw_tcp_stream( const session& tcp_session ) {
+    std::vector<raw_tcp_frame> get_raw_tcp_stream( const session& tcp_session ) {
         std::vector<raw_tcp_frame> tcp_stream;
 
         for ( auto& packet : tcp_session ) {
@@ -484,7 +483,7 @@ namespace ntk {
     };
 
     // ==============================
-    //        TCP Termination
+    //      Get TCP Termination
     // ==============================
 
     tcp_termination get_termination( const four_tuple& four, const session& packets ) {
@@ -635,6 +634,10 @@ namespace ntk {
 
         return terminations;
     }
+
+    // ==============================
+    //  Get Start of TCP Termination
+    // ==============================
 
     const std::vector<uint8_t>* get_start_of_termination( const session& packets, const tcp_termination& termination ) {
         if ( std::holds_alternative<fin_ack_fin_ack>( termination.closing_sequence ) ) {
