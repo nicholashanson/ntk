@@ -268,8 +268,8 @@ namespace ntk {
     }
 
     bool is_same_connection( const std::vector<uint8_t>& packet, const four_tuple& four ) {
-        tcp_header packet_tcp_header = get_tcp_header( packet.data() );
-        ipv4_header packet_ip_header = get_ipv4_header( packet.data() );
+        tcp_header packet_tcp_header = get_parsed_tcp_header( packet );
+        ipv4_header packet_ip_header = get_parsed_ipv4_header( packet );
         return is_same_connection( packet_ip_header, packet_tcp_header, four );
     }
 
