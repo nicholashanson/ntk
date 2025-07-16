@@ -41,9 +41,13 @@ namespace ntk {
         return tcp_header;
     }
 
+    std::vector<uint8_t> get_raw_tcp_header( const unsigned char* ethernet_frame ) {
+        auto ipv4_header_len = get_ipv4_header_len( ethernet_frame );
+        return get_raw_tcp_header( ethernet_frame, ipv4_header_len );
+    }
+
     std::vector<uint8_t> get_raw_tcp_header( const std::vector<uint8_t>& packet ) {
-        auto ipv4_header_len = get_ipv4_header_len( packet.data() );
-        return get_raw_tcp_header( packet.data(),  );
+        return get_raw_tcp_header( packet.data() );
     }
 
     // ==============================
@@ -84,7 +88,7 @@ namespace ntk {
         } else {
             uint8_t length = tcp_options_list[ 1 ];
             std::vector<uint8_t> data;
-            if ( length > 2 ) {
+            if ( length > option_data_offset ) {
                 data.insert( data.end(), 
                              tcp_options_list.begin() + option_data_offset,
                              tcp_options_list.begin() + length );
