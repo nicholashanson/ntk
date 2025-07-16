@@ -22,11 +22,11 @@ namespace ntk {
     namespace constants {
 
         // protocols
-        const size_t ethernet_header_len = 14;
-        const size_t udp_header_len = 8;
+        constexpr std::size_t ethernet_header_len = 14;
+        constexpr std::size_t udp_header_len = 8;
 
         // packet-capture
-        const size_t max_snap_len = 65535; 
+        constexpr std::size_t max_snap_len = 65535; 
     
     } // namespace constants
 
