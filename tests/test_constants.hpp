@@ -18,6 +18,34 @@ namespace test {
         { "long_stream", packet_data_dir + "/192.168.0.21_48658_204.107.64.57_443.txt" }
     };
 
+    enum class tls_handshake : uint8_t {
+        SYN,
+        SYNACK,
+        ACK,
+        RST = 17
+    };
+
+    enum class tiny_cross : uint8_t {
+        SYN,
+        SYNACK,
+        ACK,
+        INITIATOR_FIN  = 9,
+        RESPONDER_FIN,
+        INITIATOR_ACK,
+        RESPONDER_ACK
+    };
+
+    enum class checkerboard : uint8_t {
+        SYN,
+        SYNACK,
+        ACK
+    };
+
+    template<typename T>
+    constexpr std::size_t to_index( T val ) {
+        return static_cast<std::size_t>( val );
+    }
+
     //inline const unsigned char http_partial_request[] = {}
 
     inline const unsigned char mp4_meta_data[] = {

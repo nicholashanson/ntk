@@ -49,10 +49,10 @@ TEST( UnitTest, TcpLiveStream_TerminationFeed_TinyCross ) {
     auto& termination_feed = ntk::tcp_live_stream_friend_helper::termination_feed( live_stream );
     auto& closing_sequence = std::get<ntk::fin_ack_fin_ack>( termination_feed.m_termination.closing_sequence );
 
-    ASSERT_EQ( closing_sequence[ 0 ], packet_data[ to_index( test::tiny_cross::CLIENT_FIN ) ] );
-    ASSERT_EQ( closing_sequence[ 1 ], packet_data[ to_index( test::tiny_cross::SERVER_FIN ) ] );
-    ASSERT_EQ( closing_sequence[ 2 ], packet_data[ to_index( test::tiny_cross::CLIENT_ACK ) ] );
-    ASSERT_EQ( closing_sequence[ 3 ], packet_data[ to_index( test::tiny_cross::SERVER_ACK ) ] );
+    ASSERT_EQ( closing_sequence.initiator_fin, packet_data[ to_index( test::tiny_cross::INITIATOR_FIN ) ] );
+    ASSERT_EQ( closing_sequence.responder_ack, packet_data[ to_index( test::tiny_cross::RESPONDER_ACK ) ] );
+    ASSERT_EQ( closing_sequence.responder_fin, packet_data[ to_index( test::tiny_cross::RESPONDER_FIN ) ] );
+    ASSERT_EQ( closing_sequence.initiator_ack, packet_data[ to_index( test::tiny_cross::INITIATOR_ACK ) ] );
 }
 
 TEST( UnitTest, TcpLiveStream_TerminationFeed_Checkerboard ) {
@@ -71,10 +71,10 @@ TEST( UnitTest, TcpLiveStream_TerminationFeed_Checkerboard ) {
     auto& termination_feed = ntk::tcp_live_stream_friend_helper::termination_feed( live_stream );
     auto& closing_sequence = std::get<ntk::fin_ack_fin_ack>( termination_feed.m_termination.closing_sequence );
 
-    ASSERT_EQ( closing_sequence[ 0 ], packet_data[ 25 ] );
-    ASSERT_EQ( closing_sequence[ 1 ], packet_data[ 28 ] );
-    ASSERT_EQ( closing_sequence[ 2 ], packet_data[ 26 ] );
-    ASSERT_EQ( closing_sequence[ 3 ], packet_data[ 27 ] );
+    ASSERT_EQ( closing_sequence.initiator_fin, packet_data[ 25 ] );
+    ASSERT_EQ( closing_sequence.responder_ack, packet_data[ 28 ] );
+    ASSERT_EQ( closing_sequence.responder_fin, packet_data[ 26 ] );
+    ASSERT_EQ( closing_sequence.initiator_ack, packet_data[ 27 ] );
 }
 
 TEST( UnitTest, TcpLiveStream_HandshakeFeed_TinyCross ) {

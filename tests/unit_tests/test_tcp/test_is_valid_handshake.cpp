@@ -7,17 +7,13 @@
 #include <requests.hpp>
 #include <io.hpp>
 
-#include <test_constants.hpp>
+#include <test_tcp_handshake_packets.hpp>
 
 TEST( UnitTest, IsValidHandshake ) {
-    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ]);
-    auto four_tuples = ntk::get_four_tuples( packet_data );
-    auto four_tuple = *four_tuples.begin();
-    auto tcp_handshake = ntk::get_handshake( four_tuple, packet_data );
-
-    auto syn_header = ntk::get_tcp_header( tcp_handshake.syn.data() );
-    auto syn_ack_header = ntk::get_tcp_header( tcp_handshake.syn_ack.data() );
-    auto ack_header = ntk::get_tcp_header( tcp_handshake.ack.data() );
-
-    ASSERT_TRUE( ntk::is_valid_handshake( syn_header, syn_ack_header, ack_header ) );
+    auto is_valid_handshake = ntk::is_valid_handshake( 
+        test_constants::tcp_syn_parsed_tcp_header, 
+        test_constants::tcp_synack_parsed_tcp_header, 
+        test_constants::tcp_ack_parsed_tcp_header 
+    );
+    ASSERT_TRUE( is_valid_handshake );
 }

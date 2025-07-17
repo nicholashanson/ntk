@@ -124,7 +124,6 @@ TEST( PacketParsingTests, TCPCheckerBoardLiveStreamSessionEquivalence ) {
     ntk::session combined_packets;
 
     for ( size_t i = 0; i < max_size; ++i ) {
-
         for ( auto& transfer : transfer_data ) {
             if ( i < transfer.size() ) combined_packets.push_back( transfer[ i ] );
         }

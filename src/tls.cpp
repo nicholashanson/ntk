@@ -708,7 +708,7 @@ namespace ntk {
                     uint8_t name_type = sni_list[ 0 ];
                     uint16_t name_length = read_uint16_be( sni_list, 1 );
 
-                    if (sni_list.size() < 3 + name_length) {
+                    if ( sni_list.size() < 3 + name_length ) {
                         return std::unexpected( "Server name truncated" );
                     }
 

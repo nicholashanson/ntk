@@ -22,6 +22,16 @@
 
 namespace ntk {
 
+    struct maybe_termination {
+        std::optional<std::vector<uint8_t>> initiator_fin;
+        std::optional<std::vector<uint8_t>> responder_ack; 
+        std::optional<std::vector<uint8_t>> responder_fin; 
+        std::optional<std::vector<uint8_t>> initiator_ack;
+
+        void feed( const std::vector<uint8_t>& );
+        operator bool() const;
+    };
+
     // ==============================
     //       TCP Header Offset
     // ==============================
@@ -44,12 +54,12 @@ namespace ntk {
     // ==============================
 
     enum class tcp_flags : uint8_t {
-        FIN = 0x01,
-        SYN = 0x02,
-        RST = 0x04,
-        ACK = 0x10,
-        FIN_ACK = 0x11,
-        SYN_ACK = 0x12
+        FIN         = 0x01,
+        SYN         = 0x02,
+        RST         = 0x04,
+        ACK         = 0x10,
+        FIN_ACK     = 0x11,
+        SYN_ACK     = 0x12
     };
 
     bool flags_contains( const uint8_t header_flags, const tcp_flags flags );
@@ -164,6 +174,8 @@ namespace ntk {
     bool is_reset( const std::vector<uint8_t>& packet );
 
     bool is_syn( const std::vector<uint8_t>& packet );
+
+    bool is_ack( const std::vector<uint8_t>& packet );
 
     bool is_fin_ack( const std::vector<uint8_t>& packet );
 
@@ -292,9 +304,11 @@ namespace ntk {
         bool operator==( const tcp_termination& other ) const {
             return closing_sequence == other.closing_sequence;
         }
+
+        tcp_termination& operator=( const maybe_termination& maybe );
     };
 
-    tcp_termination get_termination( const four_tuple& four, const session& packets );
+    std::optional<tcp_termination> get_termination( const four_tuple& four, const session& packets );
 
     std::vector<tcp_termination> get_terminations( const four_tuple& four, const session& packets );
 

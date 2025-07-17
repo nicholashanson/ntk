@@ -4,11 +4,9 @@
 
 #include <test_constants.hpp>
 
-TEST( PacketParsingTests, GetHttpType ) {
-
+TEST( UnitTest, GetHttpType ) {
     auto http_request_payload = ntk::extract_http_payload_from_ethernet( test::http_get_packet );
     auto http_response_payload = ntk::extract_http_payload_from_ethernet( test::http_response_packet );
-
     ntk::http_type request_type = ntk::get_http_type( http_request_payload );
     ntk::http_type response_type = ntk::get_http_type( http_response_payload );
 

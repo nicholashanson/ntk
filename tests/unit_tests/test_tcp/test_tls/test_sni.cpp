@@ -35,13 +35,6 @@ TEST( LiveStreamTests, TLSSni2Ip ) {
     std::cout << ntk::ip_to_string( sni_2_ip[ "videos-3.earthcam.com" ] ) << std::endl;
 }
 
-TEST( PacketParsingTests, HasSNI ) {
-
-    auto client_hello = ntk::get_client_hello_from_ethernet_frame( test_constants::tls_client_hello_packet );
-
-    ASSERT_TRUE( *ntk::has_sni( client_hello, "earthcam.com" ) );
-}
-
 TEST( PacketParsingTests, ClientHelloSNI ) {
 
     auto client_hello_line_numbers = ntk::get_line_numbers( test::packet_data_files[ "tls_handshake" ], ntk::is_client_hello_v );

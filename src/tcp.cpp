@@ -2,6 +2,46 @@
 
 namespace ntk {
 
+    tcp_termination& tcp_termination::operator=( const maybe_termination& maybe ) {
+        closing_sequence = fin_ack_fin_ack{ *maybe.initiator_fin, *maybe.responder_ack, *maybe.responder_fin, *maybe.initiator_ack };
+        return *this;
+    }
+
+    void maybe_termination::feed( const std::vector<uint8_t>& packet ) {
+        auto packet_tcp_header = get_tcp_header( packet.data() );
+
+        if ( !initiator_fin && is_fin_ack( packet ) ) {
+            initiator_fin = packet;
+            return;
+        }
+
+        if ( !responder_fin && is_fin_ack( packet ) ) {
+            responder_fin = packet;
+            if ( is_ack_of_seq( *initiator_fin, packet ) ) {
+                responder_ack = packet;
+            }
+            return;
+        }
+
+        if ( initiator_fin && !responder_ack ) {
+            if ( is_ack( packet ) && is_ack_of_seq( *initiator_fin, packet ) ) {
+                responder_ack = packet;
+                return;
+            }
+        }
+
+        if ( responder_fin && !initiator_ack && is_ack( packet ) ) {
+            if ( is_ack_of_seq( *responder_fin, packet ) ) {
+                initiator_ack = packet;
+                return;
+            }
+        }
+    }
+
+    maybe_termination::operator bool() const {
+        return initiator_fin && responder_ack && responder_fin && initiator_ack;
+    }
+
     uint32_t get_seq_number( const std::vector<uint8_t>& packet ) {
         auto raw_tcp_header = get_raw_tcp_header( packet );
         return read_uint32_be( raw_tcp_header, tcp_header_offset::SEQ_NUMBER ); 
@@ -480,9 +520,7 @@ namespace ntk {
     }
 
     bool tcp_handshake_feed::feed( const std::vector<uint8_t>& packet ) { 
-        
         bool accepted = feed_packet( packet );
-
         if ( !accepted ) return false;
 
         if ( m_syn && m_syn_ack && m_ack ) {
@@ -501,7 +539,7 @@ namespace ntk {
     //      Get TCP Termination
     // ==============================
 
-    tcp_termination get_termination( const four_tuple& four, const session& packets ) {
+    std::optional<tcp_termination> get_termination( const four_tuple& four, const session& packets ) {
 
         std::vector<std::vector<uint8_t>> connection_packets;
 
@@ -511,67 +549,16 @@ namespace ntk {
             }
         }
 
-        std::optional<std::vector<uint8_t>> initiator_fin;
-        std::optional<std::vector<uint8_t>> responder_ack; 
-        std::optional<std::vector<uint8_t>> responder_fin; 
-        std::optional<std::vector<uint8_t>> initiator_ack;
+        maybe_termination termination;
 
         for ( const auto& packet : connection_packets ) {
-
-            std::cout << "seq_: " << get_seq_number( packet ) << std::endl;
-            std::cout << "ack_: " << get_ack_number( packet ) << std::endl;
-    
-            auto packet_tcp_header = get_tcp_header( packet.data() );
-
-            if ( !initiator_fin && is_fin_ack( packet ) ) {
-                std::cout << "if detected" << std::endl;
-                std::cout << "seq: " << get_seq_number( packet ) << std::endl;
-                std::cout << "ack: " << get_ack_number( packet ) << std::endl;
-                initiator_fin = packet;
-                continue;
-            }
-
-            if ( !responder_fin && is_fin_ack( packet ) ) {
-
-                std::cout << "seq: " << get_seq_number( packet ) << std::endl;
-                std::cout << "ack: " << get_ack_number( packet ) << std::endl;
-
-                // if ( get_seq_number( packet ) == get_seq_number( *initiator_fin ) ) continue;
-                responder_fin = packet;
-                std::cout << "rf detected" << std::endl; 
-                std::cout << "seq: " << get_seq_number( packet ) << std::endl;
-                std::cout << "ack: " << get_ack_number( packet ) << std::endl;
-                if ( is_ack_of_seq( *initiator_fin, packet ) ) {
-                    std::cout << "pg ra detected" << std::endl;
-                    responder_ack = packet;
-                }
-                continue;
-            }
-
-            if ( initiator_fin && !responder_ack ) {
-                std::cout << "first check passed" << std::endl;
-                std::cout << "is ack: " << is_ack( packet_tcp_header ) << std::endl;
-                std::cout << "is ack of seq: " << is_ack_of_seq( *initiator_fin, packet ) << std::endl;
-                if ( is_ack( packet_tcp_header ) && is_ack_of_seq( *initiator_fin, packet ) ) {
-                    std::cout << "ra detected" << std::endl;
-                    responder_ack = packet;
-                    continue;
-                }
-            }
-
-            if ( responder_fin && !initiator_ack && is_ack( packet_tcp_header ) ) {
-                if ( is_ack_of_seq( *responder_fin, packet ) ) {
-                    initiator_ack = packet;
-                    std::cout << "ia detected" << std::endl;
-                    continue;
-                }
-            }
+            termination.feed( packet );
         }
 
-        if ( initiator_fin && responder_ack && responder_fin && initiator_ack ) {
-            return tcp_termination{
-                .closing_sequence = fin_ack_fin_ack{ *initiator_fin, *responder_ack, *responder_fin, *initiator_ack }
-            };
+        if ( termination ) {
+            tcp_termination result; 
+            result = termination;
+            return result;
         }
 
         for ( const auto& packet : connection_packets ) {
@@ -582,7 +569,7 @@ namespace ntk {
             }
         }
 
-        return {};
+        return std::nullopt;
     }
 
     std::vector<tcp_termination> get_terminations( const four_tuple& four, const session& packets ) {
@@ -757,7 +744,7 @@ namespace ntk {
     void tcp_transfer::load( const session& packet_data ) {
 
         tcp_handshake handshake = get_handshake( m_four, packet_data );
-        tcp_termination termination = get_termination( m_four, packet_data );
+        tcp_termination termination = *get_termination( m_four, packet_data );
 
         m_handshake = handshake;
         m_termination = termination;

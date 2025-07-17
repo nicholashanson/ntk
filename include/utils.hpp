@@ -22,11 +22,17 @@ namespace ntk {
 
     uint16_t read_uint16_be( const unsigned char* buffer, size_t offset );
 
-    uint16_t read_uint16_be( const std::span<const uint8_t> buffer, size_t offset );
+    template<typename Index> 
+    uint16_t read_uint16_be( std::span<const uint8_t> buffer, Index offset ) {
+        return read_uint16_be( buffer.data(), static_cast<size_t>( offset ) );
+    }
 
     uint32_t read_uint32_be( const unsigned char* buffer, size_t offset );
 
-    uint32_t read_uint32_be( const std::span<const uint8_t> buffer, size_t offset );
+    template<typename Index>
+    uint32_t read_uint32_be( std::span<const uint8_t> buffer, Index offset ) {
+        return read_uint32_be( buffer.data(), static_cast<size_t>( offset ) );
+    }
 
     // ==============================
     //         APPLY AND MASK

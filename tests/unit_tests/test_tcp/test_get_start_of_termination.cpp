@@ -31,5 +31,5 @@ TEST( UnitTest, GetStartOfTermination_TLSHandshake ) {
 
     ASSERT_NE( start_of_termination_ptr, nullptr );
     ASSERT_EQ( *start_of_termination_ptr, termination_start );
-    ASSERT_EQ( static_cast<int>( termination_header.sequence_number ), 1441872756 );
+    ASSERT_EQ( static_cast<int>( termination_header.seq_number ), 1441872756 );
 }

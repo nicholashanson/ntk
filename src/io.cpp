@@ -144,10 +144,10 @@ namespace ntk {
             os << std::left << std::setw( label_width ) << label << value << "\n";
         };
 
-        print_field( "Source Port:", header.source_port );
-        print_field( "Destination Port:", header.destination_port );
-        print_field( "Sequence Number:", header.sequence_number );
-        print_field( "Acknowledgment Number:", header.acknowledgment_number );
+        print_field( "Source Port:", header.src_port );
+        print_field( "Destination Port:", header.dest_port );
+        print_field( "Sequence Number:", header.seq_number );
+        print_field( "Acknowledgment Number:", header.ack_number );
         print_field( "Data Offset:", static_cast<uint32_t>( header.data_offset ) ); 
 
         os << std::left << std::setw( label_width ) << "Flags:"
@@ -157,7 +157,7 @@ namespace ntk {
         os << std::left << std::setw( label_width ) << "Checksum:"
            << "0x" << std::hex << std::setw( 4 ) << std::setfill( '0' )
            << header.checksum << std::dec << std::setfill( ' ' ) << "\n";
-        print_field( "Urgent Pointer:", header.urgent_pointer );
+        print_field( "Urgent Pointer:", header.urgent_ptr );
 
         os << std::left << std::setw( label_width ) << "Options:";
         if ( header.options.empty() ) {
@@ -190,16 +190,16 @@ namespace ntk {
         auto& closing_sequence = std::get<fin_ack_fin_ack>( live_stream.m_termination_feed.m_termination.closing_sequence );
 
         os << "===== FIN_1 HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( closing_sequence[ 0 ].data() ), os );
+        print_tcp_header( get_tcp_header( closing_sequence.initiator_fin.data() ), os );
         os << "===== FIN_1 HEADER END =====\n";
         os << "===== ACK_1 HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( closing_sequence[ 1 ].data() ), os );
+        print_tcp_header( get_tcp_header( closing_sequence.responder_ack.data() ), os );
         os << "===== ACK_1 HEADER END =====\n";
         os << "===== FIN_2 HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( closing_sequence[ 2 ].data() ), os );
+        print_tcp_header( get_tcp_header( closing_sequence.responder_fin.data() ), os );
         os << "===== FIN_2 HEADER END =====\n";
         os << "===== ACK_2 HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( closing_sequence[ 3 ].data() ), os );
+        print_tcp_header( get_tcp_header( closing_sequence.initiator_ack.data() ), os );
         os << "===== ACK_2 HEADER END =====\n";
 
         return os;
@@ -292,8 +292,9 @@ namespace ntk {
             print_packet( packet );
         }
         if ( std::holds_alternative<fin_ack_fin_ack>( live_stream.m_termination_feed.m_termination.closing_sequence ) ) {
-            for ( const auto& packet : std::get<fin_ack_fin_ack>( live_stream.m_termination_feed.m_termination.closing_sequence ) ) {
-                print_packet( packet );
+            auto& closing_sequence = std::get<fin_ack_fin_ack>( live_stream.m_termination_feed.m_termination.closing_sequence );
+            for ( const auto* packet : { &closing_sequence.initiator_fin, &closing_sequence.responder_ack, &closing_sequence.responder_fin, &closing_sequence.initiator_ack } ) {
+                print_packet( *packet );
             }
         }
     }
