@@ -8,13 +8,11 @@
 
 #include <test_constants.hpp>
 
-TEST( UnitTests, GetTermination_TLSHandshake ) {
-
+TEST( UnitTest_, GetTermination_TLSHandshake ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
-    auto tcp_termination = ntk::get_termination( four_tuple, packet_data );
-
+    auto tcp_termination = *ntk::get_termination( four_tuple, packet_data );
     ASSERT_EQ( std::get<ntk::rst>( tcp_termination.closing_sequence ), packet_data[ to_index( test::tls_handshake::RST ) ] );
 }
 
@@ -22,7 +20,7 @@ TEST( UnitTest, GetTermination_TinyCross ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tiny_cross" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
-    auto tcp_termination = ntk::get_termination( four_tuple, packet_data );
+    auto tcp_termination = *ntk::get_termination( four_tuple, packet_data );
 
     ASSERT_TRUE( std::holds_alternative<ntk::fin_ack_fin_ack>( tcp_termination.closing_sequence ) );
 
@@ -43,7 +41,7 @@ TEST( UnitTest, GetTermination_Lena ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "lena" ]  );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
-    auto tcp_termination = ntk::get_termination( four_tuple, packet_data );
+    auto tcp_termination = *ntk::get_termination( four_tuple, packet_data );
 
     ASSERT_TRUE( std::holds_alternative<ntk::fin_ack_fin_ack>( tcp_termination.closing_sequence ) );
 

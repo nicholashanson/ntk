@@ -14,10 +14,8 @@
 
 #include <test_constants.hpp>
 
-TEST( LiveStreamTests, Google ) {
-
+TEST( SystemTest, Google ) {
     ntk::tcp_live_stream_session live_stream_session;
-
     std::mutex mtx;
     std::condition_variable cv;
     bool finished = false;
@@ -44,31 +42,24 @@ TEST( LiveStreamTests, Google ) {
     }
     
     listener.stop();
-
     ASSERT_TRUE( live_stream_session.number_of_completed_transfers() != 0 );
 
     auto& live_streams = ntk::tcp_live_stream_session_friend_helper::live_streams( live_stream_session );
-
+    ASSERT_TRUE( live_streams.front().traffic_contains( ntk::is_client_hello_v ) );
     ASSERT_EQ( live_streams.size(), 1 );
 
     auto& handshake = ntk::tcp_live_stream_friend_helper::handshake_feed( live_streams.front() ).m_handshake;
     auto& termination = ntk::tcp_live_stream_friend_helper::termination_feed( live_streams.front() ).m_termination;
-
     ASSERT_TRUE( ntk::is_valid_handshake( handshake ) );
     ASSERT_TRUE( ntk::is_valid_fin_ack_fin_ack( termination ) );
-
-    ASSERT_TRUE( live_streams.front().traffic_contains( ntk::is_client_hello_v ) );
 
     ntk::tls_live_stream tls_stream( live_streams.front() );
 }
 
-TEST( LiveStreamTests, OffloadQueueTestFilter ) {
-
+TEST( SystemTest, OffloadQueueTestFilter ) {
     ntk::tls_filter filter;
-
     ntk::spmc_transfer_queue<ntk::tcp_live_stream,ntk::tls_filter> offload_queue( filter );
     ntk::tcp_live_stream_session live_stream_session( &offload_queue ); 
-
     std::mutex mtx;
     std::condition_variable cv;
     bool ready = false;
@@ -95,22 +86,17 @@ TEST( LiveStreamTests, OffloadQueueTestFilter ) {
     }
 
     listener.stop();
-
     ASSERT_FALSE( offload_queue.empty() );
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
-
     const auto& stream = maybe_stream.value();
     ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
 }
 
-TEST( LiveStreamTests, FireFoxGoogleTLSFilter ) {
-
+TEST( SystemTest, FireFoxGoogleTLSFilter ) {
     ntk::tls_filter filter;
-
     ntk::spmc_transfer_queue<ntk::tcp_live_stream,ntk::tls_filter> offload_queue( filter );
     ntk::tcp_live_stream_session live_stream_session( &offload_queue ); 
-
     std::mutex mtx;
     std::condition_variable cv;
     bool ready = false;
@@ -137,25 +123,19 @@ TEST( LiveStreamTests, FireFoxGoogleTLSFilter ) {
     }
 
     listener.stop();
-
     ASSERT_FALSE( offload_queue.empty() );
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
-
     const auto& stream = maybe_stream.value();
     ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
 
     ntk::tls_live_stream tls_stream( stream );
-    std::cout << tls_stream.get_sni() << std::endl;
 }
 
-TEST( LiveStreamTests, FireFoxEarthCamTLSFilter ) {
-
+TEST( SystemTest, FireFoxEarthCamTLSFilter ) {
     ntk::tls_filter filter;
-
     ntk::spmc_transfer_queue<ntk::tcp_live_stream,ntk::tls_filter> offload_queue( filter );
     ntk::tcp_live_stream_session live_stream_session( &offload_queue ); 
-
     std::mutex mtx;
     std::condition_variable cv;
     bool ready = false;
@@ -182,11 +162,9 @@ TEST( LiveStreamTests, FireFoxEarthCamTLSFilter ) {
     }
 
     listener.stop();
-
     ASSERT_FALSE( offload_queue.empty() );
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
-
     const auto& stream = maybe_stream.value();
     ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
 
@@ -194,13 +172,10 @@ TEST( LiveStreamTests, FireFoxEarthCamTLSFilter ) {
     ASSERT_EQ( tls_stream.get_sni(), "static.earthcam.com" );
 }
 
-TEST( LiveStreamTests, FireFoxEarthCamSNIFilter ) {
-
+TEST( SystemTest, FireFoxEarthCamSNIFilter ) {
     ntk::sni_filter filter( "earthcam" );
-
     ntk::spmc_transfer_queue<ntk::tcp_live_stream,ntk::sni_filter> offload_queue( filter );
     ntk::tcp_live_stream_session live_stream_session( &offload_queue ); 
-
     std::mutex mtx;
     std::condition_variable cv;
     bool ready = false;
@@ -231,18 +206,14 @@ TEST( LiveStreamTests, FireFoxEarthCamSNIFilter ) {
     ASSERT_FALSE( offload_queue.empty() );
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
-
     const auto& stream = maybe_stream.value();
     ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
 }
 
-TEST( LiveStreamTests, FireFoxEarthCamStrictSNIFilter ) {
-
+TEST( SystemTest, FireFoxEarthCamStrictSNIFilter ) {
     ntk::sni_filter filter( "videos-3.earthcam.com" );
-
     ntk::spmc_transfer_queue<ntk::tcp_live_stream,ntk::sni_filter> offload_queue( filter );
     ntk::tcp_live_stream_session live_stream_session( &offload_queue ); 
-
     std::mutex mtx;
     std::condition_variable cv;
     bool ready = false;
@@ -269,11 +240,9 @@ TEST( LiveStreamTests, FireFoxEarthCamStrictSNIFilter ) {
     }
 
     listener.stop();
-
     ASSERT_FALSE( offload_queue.empty() );
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
-
     const auto& stream = maybe_stream.value();
     ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
 }

@@ -12,11 +12,9 @@
 // ==============================
 
 TEST( UnitTest, TcpLiveStream_Traffic_Size ) {
-
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "checkerboard" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
-
     ntk::tcp_live_stream live_stream( four_tuple );
 
     for ( auto& packet : packet_data ) {
@@ -25,7 +23,6 @@ TEST( UnitTest, TcpLiveStream_Traffic_Size ) {
     }
 
     auto& traffic = ntk::tcp_live_stream_friend_helper::traffic( live_stream );
-
     ASSERT_EQ( traffic.size(), 22 );
 }
 
@@ -34,7 +31,6 @@ TEST( UnitTest, TcpLiveStream_Traffic_Size ) {
 // ==============================
 
 TEST( UnitTest, TcpLiveStream_TerminationFeed_TinyCross ) {
-
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tiny_cross" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
@@ -56,7 +52,6 @@ TEST( UnitTest, TcpLiveStream_TerminationFeed_TinyCross ) {
 }
 
 TEST( UnitTest, TcpLiveStream_TerminationFeed_Checkerboard ) {
-
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "checkerboard" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
@@ -78,7 +73,6 @@ TEST( UnitTest, TcpLiveStream_TerminationFeed_Checkerboard ) {
 }
 
 TEST( UnitTest, TcpLiveStream_HandshakeFeed_TinyCross ) {
-
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tiny_cross" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
@@ -98,11 +92,9 @@ TEST( UnitTest, TcpLiveStream_HandshakeFeed_TinyCross ) {
 }
 
 TEST( UnitTest, TcpLiveStream_HandshakeFeed_Checkerboard ) {
-
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "checkerboard" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
-
     ntk::tcp_live_stream live_stream( four_tuple );
 
     for ( auto& packet : packet_data ) {
@@ -111,7 +103,6 @@ TEST( UnitTest, TcpLiveStream_HandshakeFeed_Checkerboard ) {
     }
 
     auto& handshake_feed = ntk::tcp_live_stream_friend_helper::handshake_feed( live_stream );
-
     ASSERT_EQ( handshake_feed.m_handshake.syn, packet_data[ to_index( test::checkerboard::SYN ) ] );
     ASSERT_EQ( handshake_feed.m_handshake.syn_ack, packet_data[ to_index( test::checkerboard::SYNACK ) ] );
     ASSERT_EQ( handshake_feed.m_handshake.ack, packet_data[ to_index( test::checkerboard::ACK ) ] );
@@ -122,11 +113,9 @@ TEST( UnitTest, TcpLiveStream_HandshakeFeed_Checkerboard ) {
 // ==============================
 
 TEST( UnitTest, TcpLiveStream_IsComplete_TinyCross ) {
-
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tiny_cross" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
-
     ntk::tcp_live_stream live_stream( four_tuple );
 
     for ( auto& packet : packet_data ) {
@@ -138,11 +127,9 @@ TEST( UnitTest, TcpLiveStream_IsComplete_TinyCross ) {
 }
 
 TEST( UnitTest, TcpLiveStream_IsComplete_Checkerboard ) {
-
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "checkerboard" ] );
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
-
     ntk::tcp_live_stream live_stream( four_tuple );
 
     for ( auto& packet : packet_data ) {

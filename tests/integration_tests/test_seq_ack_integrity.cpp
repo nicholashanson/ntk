@@ -23,13 +23,13 @@ TEST( IntegrationTest, SeqAckIntegrity ) {
     auto& server_acks = ntk::tcp_transfer_friend_helper::server_acks( tls_transfer );
 
     for ( auto& server_packet : server_traffic ) {
-        size_t payload_length = ntk::extract_payload_from_ethernet( server_packet.data() ).size();
-        ntk::tcp_header server_tcp_header = ntk::get_tcp_header( server_packet.data() );
+        size_t payload_length = ntk::get_tcp_payload( server_packet.data() ).size();
+        ntk::tcp_header server_tcp_header = ntk::get_parsed_tcp_header( server_packet.data() );
         uint32_t expected_ack = server_tcp_header.seq_number + static_cast<uint32_t>( payload_length );
 
         bool found = std::any_of( client_acks.begin(), client_acks.end(),
             [&]( const std::vector<uint8_t>& client_packet ) {
-                ntk::tcp_header client_tcp_header = ntk::get_tcp_header( client_packet.data() );
+                ntk::tcp_header client_tcp_header = ntk::get_parsed_tcp_header( client_packet.data() );
                 return client_tcp_header.ack_number == expected_ack;
         });
 
