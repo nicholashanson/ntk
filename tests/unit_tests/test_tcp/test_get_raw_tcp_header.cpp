@@ -1,11 +1,9 @@
-#include <ipv4.hpp>
-#include <tcp.hpp>
+#include <gtest/gtest.h>
 
 #include <vector>
 
-#include <iomanip>
-
-#include <gtest/gtest.h>
+#include <ipv4.hpp>
+#include <tcp.hpp>
 
 #include <test_tcp_handshake_packets.hpp>
 

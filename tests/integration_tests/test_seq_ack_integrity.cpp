@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <span>
 #include <cstdint>
+#include <span>
 
 #include <tls.hpp>
 #include <io.hpp>

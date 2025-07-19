@@ -2,8 +2,8 @@
 
 #include <http.hpp>
 
-#include <test_constants.hpp>
 #include <qt.hpp>
+#include <test_constants.hpp>
 
 TEST( VisualTest, Text ) {
     auto http_payload = ntk::get_tcp_payload( test::http_response_packet );

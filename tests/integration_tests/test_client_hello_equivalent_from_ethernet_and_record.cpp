@@ -4,8 +4,8 @@
 
 #include <tls.hpp>
 
-#include <test_tls_handshake_packets.hpp>
 #include <test_constants.hpp>
+#include <test_tls_handshake_packets.hpp>
 
 TEST( IntegrationTest, ClientHelloEquivalentFromEthernetAndRecord ) {
     auto client_hello_from_ethernet = ntk::get_client_hello_from_ethernet_frame( test_constants::tls_client_hello_packet );

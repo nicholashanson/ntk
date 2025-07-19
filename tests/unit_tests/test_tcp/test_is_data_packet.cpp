@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <span>
 #include <cstdint>
+#include <span>
 
 #include <tcp.hpp>
 #include <io.hpp>
@@ -9,9 +9,7 @@
 #include <test_constants.hpp>
 
 TEST( UnitTest, IsDataPacket_TLSHandshake ) {
-
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
-
     ASSERT_FALSE( ntk::is_data_packet( packet_data[ 0 ] ) );
     ASSERT_FALSE( ntk::is_data_packet( packet_data[ 1 ] ) );
     ASSERT_FALSE( ntk::is_data_packet( packet_data[ 2 ] ) );

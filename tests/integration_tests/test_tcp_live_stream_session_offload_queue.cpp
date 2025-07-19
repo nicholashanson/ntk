@@ -1,11 +1,12 @@
 #include <gtest/gtest.h>
 
-#include <span>
 #include <cstdint>
+#include <span>
 
 #include <tcp.hpp>
 #include <io.hpp>
 #include <spmc_queue.hpp>
+
 #include <test_constants.hpp>
 
 TEST( UnitTest, TcpLiveStreamSession_OffloadQueue ) {

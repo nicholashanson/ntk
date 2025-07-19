@@ -2,14 +2,11 @@
 
 #include <vector>
 
-#include <fstream>
-
 #include <tcp.hpp>
 #include <http.hpp>
 #include <io.hpp>
 
 #include <test_constants.hpp>
-#include <qt.hpp>
 
 TEST( UnitTest, EndsWithZeroChunk ) {
     auto packet_data = ntk::read_packets_from_file( "../packet_data/lena.txt" );

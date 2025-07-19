@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 
-#include <http.hpp>
-#include <io.hpp>
-#include <test_constants.hpp>
-
-#include <qt.hpp>
-
 #include <cstdlib>
 #include <vector>
+
+#include <http.hpp>
+#include <io.hpp>
+
+#include <qt.hpp>
+#include <test_constants.hpp>
 
 TEST( VisualTest, Color ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "color" ] );

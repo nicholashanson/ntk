@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 
-#include <span>
 #include <cstdint>
+#include <span>
 
 #include <tcp.hpp>
 #include <io.hpp>
 
-#include <test_tcp_handshake_packets.hpp>
 #include <test_constants.hpp>
+#include <test_tcp_handshake_packets.hpp>
 
 TEST( UnitTest, GetFourTuples_TLSHandshake ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );

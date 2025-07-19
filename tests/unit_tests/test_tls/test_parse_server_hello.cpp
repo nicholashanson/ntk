@@ -1,14 +1,13 @@
 #include <gtest/gtest.h>
 
-#include <span>
 #include <cstdint>
+#include <span>
 
 #include <tls.hpp>
 #include <io.hpp>
 
-#include <test_tls_handshake_packets.hpp>
-
 #include <test_constants.hpp>
+#include <test_tls_handshake_packets.hpp>
 
 TEST( UnitTest, ParseServerHello ) {
     auto tls_record_span = std::span<const unsigned char>( test_constants::tls_server_hello_packet );;

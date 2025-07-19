@@ -1,6 +1,6 @@
-#include <vector>
-
 #include <gtest/gtest.h>
+
+#include <vector>
 
 #include <http.hpp>
 

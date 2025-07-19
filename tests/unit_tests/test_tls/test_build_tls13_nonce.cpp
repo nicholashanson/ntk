@@ -1,13 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
-#include <span>
 #include <cstdint>
+#include <span>
 
 #include <tls.hpp>
 #include <io.hpp>
-
-#include <test_constants.hpp>
 
 TEST( UnitTest, BuildTls13Nonce ) {
     std::vector<uint8_t> base_iv = { 0x00 ,0x01 ,0x02 ,0x03, 

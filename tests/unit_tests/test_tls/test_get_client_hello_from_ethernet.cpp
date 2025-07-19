@@ -1,18 +1,14 @@
 #include <gtest/gtest.h>
 
-#include <pcap.h>
-
-#include <span>
 #include <cstdint>
+#include <span>
 
-#include <packet_listener.hpp>
 #include <tls.hpp>
-#include <requests.hpp>
 #include <io.hpp>
 
-#include <test_tls_handshake_packets.hpp>
-#include <test_tcp_handshake_packets.hpp>
 #include <test_constants.hpp>
+#include <test_tcp_handshake_packets.hpp>
+#include <test_tls_handshake_packets.hpp>
 
 TEST( UnitTest, GetClientHelloFromEthernetFrame_TlsClientHelloPacket ) {
     auto client_hello = ntk::get_client_hello_from_ethernet_frame( test_constants::tls_client_hello_packet );

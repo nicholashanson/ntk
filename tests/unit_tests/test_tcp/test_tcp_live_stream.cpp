@@ -1,10 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <span>
 #include <cstdint>
+#include <span>
 
 #include <tcp.hpp>
 #include <io.hpp>
+
 #include <test_constants.hpp>
 
 // ==============================
