@@ -2,50 +2,18 @@
 
 namespace ntk {
 
-    tcp_termination& tcp_termination::operator=( const maybe_termination& maybe ) {
-        closing_sequence = fin_ack_fin_ack{ *maybe.initiator_fin, *maybe.responder_ack, *maybe.responder_fin, *maybe.initiator_ack };
-        return *this;
-    }
-
-    void maybe_termination::feed( const std::vector<uint8_t>& packet ) {
-        auto packet_tcp_header = get_tcp_header( packet.data() );
-
-        if ( !initiator_fin && is_fin_ack( packet ) ) {
-            initiator_fin = packet;
-            return;
-        }
-
-        if ( !responder_fin && is_fin_ack( packet ) ) {
-            responder_fin = packet;
-            if ( is_ack_of_seq( *initiator_fin, packet ) ) {
-                responder_ack = packet;
-            }
-            return;
-        }
-
-        if ( initiator_fin && !responder_ack ) {
-            if ( is_ack( packet ) && is_ack_of_seq( *initiator_fin, packet ) ) {
-                responder_ack = packet;
-                return;
-            }
-        }
-
-        if ( responder_fin && !initiator_ack && is_ack( packet ) ) {
-            if ( is_ack_of_seq( *responder_fin, packet ) ) {
-                initiator_ack = packet;
-                return;
-            }
-        }
-    }
-
-    maybe_termination::operator bool() const {
-        return initiator_fin && responder_ack && responder_fin && initiator_ack;
-    }
+    // ==============================
+    //       Get TCP Seq Number
+    // ==============================
 
     uint32_t get_seq_number( const std::vector<uint8_t>& packet ) {
         auto raw_tcp_header = get_raw_tcp_header( packet );
         return read_uint32_be( raw_tcp_header, tcp_header_offset::SEQ_NUMBER ); 
     }
+
+    // ==============================
+    //       Get TCP Ack Number
+    // ==============================
 
     uint32_t get_ack_number( const std::vector<uint8_t>& packet ) {
         auto raw_tcp_header = get_raw_tcp_header( packet );
@@ -109,6 +77,10 @@ namespace ntk {
         std::memcpy( payload.data(), payload_ptr, payload_len );
 
         return payload;
+    }
+
+    std::vector<uint8_t> get_tcp_payload( std::span<const uint8_t> packet ) {
+        return get_tcp_payload( packet.data() );
     }
 
     // ==============================
@@ -176,12 +148,13 @@ namespace ntk {
     }
 
     tcp_header get_parsed_tcp_header( const unsigned char* ethernet_frame ) {
-        ipv4_header header = get_ipv4_header( ethernet_frame );
-        return parse_tcp_header( extract_tcp_header( ethernet_frame, header.ihl ) );
+        auto raw_tcp_header = get_raw_tcp_header( ethernet_frame );
+        return get_parsed_tcp_header( std::span<const uint8_t>( raw_tcp_header ) );
     }
 
     tcp_header get_parsed_tcp_header( const std::vector<uint8_t>& packet ) {
-        return get_tcp_header( packet.data() );
+        auto raw_tcp_header = get_raw_tcp_header( packet );
+        return get_parsed_tcp_header( std::span<const uint8_t>( raw_tcp_header ) );
     }
 
     // ==============================
@@ -192,8 +165,8 @@ namespace ntk {
         std::vector<raw_tcp_frame> tcp_stream;
 
         for ( auto& packet : tcp_session ) {
-            auto header = extract_raw_tcp_header( packet_data );
-            auto body = extract_tcp_payload( packet_data );
+            auto header = get_raw_tcp_header( packet );
+            auto body = get_tcp_payload( packet );
 
             if ( body.empty() ) {
                 continue;
@@ -216,18 +189,15 @@ namespace ntk {
 
     tcp_stream get_tcp_stream( const std::vector<raw_tcp_frame>& raw_stream ) {
         tcp_stream stream;
-
         for ( auto& tcp_frame : raw_stream ) {
-            auto parsed_tcp_header = parse_tcp_header( tcp_frame.header );
+            auto parsed_tcp_header = get_parsed_tcp_header( std::span<const uint8_t>( tcp_frame.header ) );
             stream[ parsed_tcp_header.seq_number ] = tcp_frame.body;
         }
-
         return stream;
     } 
 
     bool is_non_overlapping_stream( const tcp_stream& stream ) {
         if ( stream.empty() ) return true;
-
         uint32_t last_end_seq = 0;
         bool first = true;
 
@@ -272,7 +242,7 @@ namespace ntk {
     // ==============================
 
     tcp_stream get_merged_tcp_stream( const session& packet_data ) {
-        auto raw_stream = extract_raw_tcp_stream( packet_data );
+        auto raw_stream = get_raw_tcp_stream( packet_data );
         auto tcp_stream = get_tcp_stream( raw_stream );
         auto merged_tcp_stream = merge_tcp_stream_non_overlapping( tcp_stream );
         return merged_tcp_stream;
@@ -283,7 +253,7 @@ namespace ntk {
     // ==============================
 
     bool is_tcp( const unsigned char* packet ) {
-        auto header = get_ipv4_header( packet );
+        auto header = get_parsed_ipv4_header( packet );
         return static_cast<protocol>( header.protocol ) == protocol::TCP;
     }
 
@@ -299,18 +269,19 @@ namespace ntk {
     //     Is Same TCP Connection
     // ==============================
 
-    bool is_same_connection( const ipv4_header& packet_ip_header, const tcp_header& packet_tcp_header, const four_tuple& four )  { 
-        bool ip_match = ( packet_ip_header.source_ip_addr == four.client_ip || packet_ip_header.destination_ip_addr == four.client_ip ) &&
-                        ( packet_ip_header.source_ip_addr == four.server_ip || packet_ip_header.destination_ip_addr == four.server_ip );
-        bool port_match = ( packet_tcp_header.src_port == four.client_port || packet_tcp_header.dest_port == four.client_port ) &&
-                          ( packet_tcp_header.src_port == four.server_port || packet_tcp_header.dest_port == four.server_port );
-        return ip_match && port_match;
+    bool is_same_connection(const four_tuple& lhs, const four_tuple& rhs )  { 
+        return lhs == rhs || lhs == flip_four( rhs );
     }
 
     bool is_same_connection( const std::vector<uint8_t>& packet, const four_tuple& four ) {
-        tcp_header packet_tcp_header = get_parsed_tcp_header( packet );
-        ipv4_header packet_ip_header = get_parsed_ipv4_header( packet );
-        return is_same_connection( packet_ip_header, packet_tcp_header, four );
+        auto packet_four = get_four_from_ethernet( packet );
+        return is_same_connection( packet_four, four );
+    }
+
+    bool is_same_connection( const std::vector<uint8_t>& lhs, const std::vector<uint8_t>& rhs ) {
+        auto lhs_four = get_four_from_ethernet( lhs );
+        auto rhs_four = get_four_from_ethernet( rhs );
+        return is_same_connection( lhs_four, rhs_four );
     }
 
     // ==============================
@@ -323,7 +294,7 @@ namespace ntk {
     }
 
     bool is_syn( const std::vector<uint8_t>& packet ) {
-        tcp_header header = get_tcp_header( packet.data() );
+        auto header = get_parsed_tcp_header( packet );
         return is_syn( header );
     }
 
@@ -336,7 +307,7 @@ namespace ntk {
     }
 
     bool is_ack( const std::vector<uint8_t>& packet ) {
-        tcp_header header = get_tcp_header( packet.data() );
+        auto header = get_parsed_tcp_header( packet );
         return is_ack( header );
     }
 
@@ -350,7 +321,7 @@ namespace ntk {
     }
 
     bool is_syn_ack( const std::vector<uint8_t>& packet ) {
-        tcp_header header = get_tcp_header( packet.data() );
+        auto header = get_parsed_tcp_header( packet );
         return is_syn_ack( header );
     }
 
@@ -359,9 +330,7 @@ namespace ntk {
     // ==============================
 
     bool is_syn_of( const std::vector<uint8_t>& packet, const four_tuple& four ) {
-        tcp_header packet_tcp_header = get_tcp_header( packet.data() );
-        ipv4_header packet_ip_header = get_ipv4_header( packet.data() );
-        return is_syn( packet_tcp_header ) && is_same_connection( packet_ip_header, packet_tcp_header, four );
+        return is_syn( packet ) && is_same_connection( packet, four );
     }
 
     // ==============================
@@ -369,9 +338,7 @@ namespace ntk {
     // ==============================
 
     bool is_syn_ack_of( const std::vector<uint8_t>& packet, const four_tuple& four ) {
-        tcp_header packet_tcp_header = get_tcp_header( packet.data() );
-        ipv4_header packet_ip_header = get_ipv4_header( packet.data() );
-        return is_syn_ack( packet_tcp_header ) && is_same_connection( packet_ip_header, packet_tcp_header, four );
+        return is_syn_ack( packet ) && is_same_connection( packet, four );
     }
 
     // ==============================
@@ -379,9 +346,7 @@ namespace ntk {
     // ==============================
 
     bool is_ack_of( const std::vector<uint8_t>& packet, const four_tuple& four ) {
-        tcp_header packet_tcp_header = get_tcp_header( packet.data() );
-        ipv4_header packet_ip_header = get_ipv4_header( packet.data() );
-        return is_ack( packet_tcp_header ) && is_same_connection( packet_ip_header, packet_tcp_header, four );
+        return is_ack( packet ) && is_same_connection( packet, four );
     }
 
     // ==============================
@@ -391,7 +356,7 @@ namespace ntk {
     bool is_ack_of_seq( const std::vector<uint8_t>& data_sender_packet, const std::vector<uint8_t>& data_reciever_packet ) {
         auto seq_number = get_seq_number( data_sender_packet );
         auto ack_number = get_ack_number( data_reciever_packet );
-        return is_ack_of_seq( ack_number, seq_number );
+        return is_ack_of_seq( seq_number, ack_number );
     }
 
     bool is_ack_of_seq( const tcp_header& data_sender_header, const tcp_header& data_reciever_header ) {
@@ -407,7 +372,7 @@ namespace ntk {
     // ==============================
 
     bool is_fin_ack( const std::vector<uint8_t>& packet ) {
-        auto packet_tcp_header = ntk::get_tcp_header( packet.data() );
+        auto packet_tcp_header = ntk::get_parsed_tcp_header( packet );
         return flags_contains( packet_tcp_header.flags, ntk::tcp_flags::FIN_ACK );
     };
 
@@ -424,7 +389,7 @@ namespace ntk {
     // ==============================
 
     bool is_reset( const std::vector<uint8_t>& packet ) {
-        tcp_header packet_tcp_header = get_tcp_header( packet.data() );
+        auto packet_tcp_header = get_parsed_tcp_header( packet );
         return flags_contains( packet_tcp_header.flags, tcp_flags::RST );
     }
 
@@ -433,15 +398,14 @@ namespace ntk {
     // ==============================
 
     std::optional<tcp_handshake> get_handshake( const four_tuple& four, const session& packets ) {
-        auto connection_packets = std::views::filter( packets, [&]( const auto& packet ) {
-            return is_same_connection( packet, four );
-        });
+        session connection_packets = packets | std::views::filter( [ & ] ( const auto& packet ) { return is_same_connection( packet, four ); } ) 
+                                             | std::ranges::to<std::vector>();
         return get_handshake( connection_packets ); 
     }
 
     std::optional<tcp_handshake> get_handshake( const session& packets ) {
-        tcp_handshake handshake;
-        for ( auto&& [ syn, synack, ack ] : std::views::slide( packets, 3 ) ) {
+        for ( auto&& window : std::views::slide( packets, 3 ) ) {
+            const auto [ syn, synack, ack ] = make_triple( window );
             if ( is_valid_handshake( syn, synack, ack ) ) {
                 return tcp_handshake{ syn, synack, ack };
             }
@@ -450,15 +414,15 @@ namespace ntk {
     }
 
     std::vector<tcp_handshake> get_handshakes( const four_tuple& four, const session& packets ) {
-        auto connection_packets = std::views::filter( packets, [&]( const auto& packet ) {
-            return is_same_connection( packet, four );
-        });
-        return get_handshake( connection_packets ); 
+        session connection_packets = packets | std::views::filter( [ & ] ( const auto& packet ) { return is_same_connection( packet, four ); } ) 
+                                             | std::ranges::to<std::vector>();
+        return get_handshakes( connection_packets ); 
     }
         
     std::vector<tcp_handshake> get_handshakes( const session& packets ) {        
         std::vector<tcp_handshake> handshakes;
-        for ( auto&& [ syn, synack, ack ] : std::views::slide( packets, 3 ) ) {
+        for ( auto&& window : std::views::slide( packets, 3 ) ) {
+            const auto [ syn, synack, ack ] = make_triple( window );
             if ( is_valid_handshake( syn, synack, ack ) ) {
                 handshakes.emplace_back( syn, synack, ack );
             }
@@ -467,7 +431,8 @@ namespace ntk {
     }
 
     const std::vector<uint8_t>* get_end_of_handshake( const session& packets, const tcp_handshake& handshake ) {   
-        for ( auto&& [ maybe_syn, maybe_synack, maybe_ack ] : std::views::slide( packets, 3 ) ) {
+        for ( auto&& window : std::views::slide( packets, 3 ) ) {
+            const auto [ maybe_syn, maybe_synack, maybe_ack ] = make_triple( window );
             if ( have_same_sequence_number( handshake.syn, maybe_syn ) && is_valid_handshake( maybe_syn, maybe_synack, maybe_ack ) ) {
                 return &maybe_ack;
             }
@@ -488,7 +453,7 @@ namespace ntk {
     }
 
     bool is_valid_handshake( const std::vector<uint8_t>& syn, const std::vector<uint8_t>& synack, const std::vector<uint8_t>& ack ) {
-        return is_ack_of_seq( syn, syn_ack ) && is_ack_of_seq( synack, ack );
+        return is_ack_of_seq( syn, synack ) && is_ack_of_seq( synack, ack );
     }
 
     // ==============================
@@ -496,7 +461,7 @@ namespace ntk {
     // ==============================
 
     bool tcp_handshake_feed::feed_packet( const std::vector<uint8_t>& packet ) {
-        auto packet_tcp_header = get_tcp_header( packet.data() );
+        auto packet_tcp_header = get_parsed_tcp_header( packet );
 
         if ( is_syn( packet ) ) {
             reset();
@@ -505,13 +470,13 @@ namespace ntk {
         }
 
         if ( m_syn && !m_syn_ack && is_syn_ack( packet ) &&
-             packet_tcp_header.ack_number == get_tcp_header( m_syn.value().data() ).seq_number + 1 ) {
+             packet_tcp_header.ack_number == get_parsed_tcp_header( m_syn.value().data() ).seq_number + 1 ) {
             m_syn_ack = packet;
             return true;
         }
 
         if ( m_syn_ack && is_ack( packet ) &&
-             packet_tcp_header.ack_number == get_tcp_header( m_syn_ack.value().data() ).seq_number + 1 )  {
+             packet_tcp_header.ack_number == get_parsed_tcp_header( m_syn_ack.value().data() ).seq_number + 1 )  {
             m_ack = packet;
             return true;
         }
@@ -536,11 +501,64 @@ namespace ntk {
     };
 
     // ==============================
+    //        TCP Termination 
+    // ==============================
+
+    tcp_termination::tcp_termination( const maybe_termination& maybe ) {
+        *this = maybe;
+    }
+
+    tcp_termination& tcp_termination::operator=( const maybe_termination& maybe ) {
+        closing_sequence = fin_ack_fin_ack{ *maybe.initiator_fin, *maybe.responder_ack, *maybe.responder_fin, *maybe.initiator_ack };
+        return *this;
+    }
+
+    // ==============================
+    //        Maybe Termination 
+    // ==============================
+
+    bool maybe_termination::feed( const std::vector<uint8_t>& packet ) {
+        auto packet_tcp_header = get_parsed_tcp_header( packet );
+        if ( !initiator_fin && is_fin_ack( packet ) ) {
+            initiator_fin = packet;
+            return true;
+        }
+        if ( !responder_fin && is_fin_ack( packet ) ) {
+            responder_fin = packet;
+            if ( is_ack_of_seq( *initiator_fin, packet ) ) {
+                responder_ack = packet;
+            }
+            return true;
+        }
+        if ( initiator_fin && !responder_ack ) {
+            if ( is_ack( packet ) && is_ack_of_seq( *initiator_fin, packet ) ) {
+                responder_ack = packet;
+                return true;
+            }
+        }
+        if ( responder_fin && !initiator_ack && is_ack( packet ) ) {
+            if ( is_ack_of_seq( *responder_fin, packet ) ) {
+                initiator_ack = packet;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    maybe_termination::operator bool() const {
+        return initiator_fin && responder_ack && responder_fin && initiator_ack;
+    }
+
+    void maybe_termination::reset() {
+        initiator_fin = responder_ack = responder_fin = initiator_ack = std::nullopt;
+    }
+
+
+    // ==============================
     //      Get TCP Termination
     // ==============================
 
     std::optional<tcp_termination> get_termination( const four_tuple& four, const session& packets ) {
-
         std::vector<std::vector<uint8_t>> connection_packets;
 
         for ( const auto& packet : packets ) {
@@ -563,9 +581,7 @@ namespace ntk {
 
         for ( const auto& packet : connection_packets ) {
             if ( is_reset( packet ) ) { 
-                return tcp_termination {
-                    .closing_sequence = packet
-                };
+                return tcp_termination { rst{ packet } };
             }
         }
 
@@ -573,9 +589,7 @@ namespace ntk {
     }
 
     std::vector<tcp_termination> get_terminations( const four_tuple& four, const session& packets ) {
-
         std::vector<tcp_termination> terminations;
-
         std::vector<std::vector<uint8_t>> connection_packets;
 
         for ( const auto& packet : packets ) {
@@ -584,54 +598,21 @@ namespace ntk {
             }
         }
 
-        std::optional<std::vector<uint8_t>> fin_1;
-        std::optional<std::vector<uint8_t>> ack_1; 
-        std::optional<std::vector<uint8_t>> fin_2; 
-        std::optional<std::vector<uint8_t>> ack_2;
-
-        uint32_t fin_1_seq_number = std::numeric_limits<uint32_t>::max();
-        uint32_t fin_2_seq_number = std::numeric_limits<uint32_t>::max();
-
-        auto is_fin_ack = [&]( const auto& packet_tcp_header ) {
-            return ( packet_tcp_header.flags & static_cast<uint8_t>( tcp_flags::FIN_ACK ) ) == static_cast<uint8_t>( tcp_flags::FIN_ACK );
-        };
-
-        auto is_ack_of_fin_ack = [&]( const auto& tcp_header, uint32_t fin_ack_seq_number ) {
-            return tcp_header.ack_number == fin_ack_seq_number + 1;
-        };
+        maybe_termination termination;
 
         for ( const auto& packet : connection_packets ) {
-    
-            auto packet_tcp_header = get_tcp_header( packet.data() );
-
-            if ( !fin_1 && is_fin_ack( packet_tcp_header ) ) {
-                fin_1 = packet;
-                fin_1_seq_number = packet_tcp_header.seq_number;
-            } else if ( !fin_2 && is_fin_ack( packet_tcp_header ) ) {
-                if ( packet_tcp_header.seq_number == fin_1_seq_number ) continue;
-                fin_2 = packet;
-                fin_2_seq_number = packet_tcp_header.seq_number;
-            } else if ( fin_1 && !ack_1 && is_ack( packet_tcp_header ) && is_ack_of_fin_ack( packet_tcp_header, fin_1_seq_number ) ) {
-                ack_1 = packet;
-            } else if ( fin_2 && !ack_2 && is_ack( packet_tcp_header ) && is_ack_of_fin_ack( packet_tcp_header, fin_2_seq_number ) ) {
-                ack_2 = packet;
-            }
-
-            if ( fin_1 && ack_1 && fin_2 && ack_2 ) {
-                terminations.push_back( tcp_termination {
-                    .closing_sequence = fin_ack_fin_ack{ *fin_1, *ack_1, *fin_2, *ack_2 }
-                } );
-                fin_1 = ack_1 = fin_2 = ack_2 = std::nullopt;
-                fin_1_seq_number = fin_2_seq_number = std::numeric_limits<uint32_t>::max();
+            auto packet_tcp_header = get_parsed_tcp_header( packet );
+            termination.feed( packet );
+            if ( termination ) {
+                terminations.push_back( termination );
+                termination.reset();
             }
         }
 
         for ( const auto& packet : connection_packets ) {
             if ( is_reset( packet ) ) { 
-                terminations.push_back( tcp_termination {
-                    .closing_sequence = packet
-                } );
-            }
+                terminations.push_back( tcp_termination{ rst { packet} } );
+             }
         }
 
         return terminations;
@@ -642,23 +623,22 @@ namespace ntk {
     // ==============================
 
     const std::vector<uint8_t>* get_start_of_termination( const session& packets, const tcp_termination& termination ) {
-        if ( std::holds_alternative<fin_ack_fin_ack>( termination.closing_sequence ) ) {
-            const fin_ack_fin_ack& seq = std::get<fin_ack_fin_ack>( termination.closing_sequence );        
-            for ( auto& packet : packets ) {
-                if ( have_same_sequence_number( packet, seq.initiator_fin ) ) {
-                    return &packet;
+        return std::visit( [ & ] ( const auto& closing ) -> const std::vector<uint8_t>* {
+            if constexpr ( std::is_same_v<std::decay_t<decltype( closing )>, fin_ack_fin_ack> ) {
+                for ( const auto& packet : packets ) {
+                    if ( have_same_sequence_number( packet, closing.initiator_fin ) ) {
+                        return &packet;
+                    }
                 }
-            }   
-        } else if ( std::holds_alternative<rst>( termination.closing_sequence ) ) {
-            const rst& reset = std::get<rst>( termination.closing_sequence );
-            for ( auto& packet : packets ) {
-                if ( have_same_sequence_number( packet, reset ) ) {
-                    return &packet;
+            } else if constexpr ( std::is_same_v<std::decay_t<decltype( closing )>, rst> ) {
+                for ( const auto& packet : packets ) {
+                    if (have_same_sequence_number( packet, closing ) ) {
+                        return &packet;
+                    }
                 }
-            }   
-        } else {
+            } 
             return nullptr;
-        }
+        }, termination.closing_sequence );
     }
 
     // ==============================
@@ -687,8 +667,8 @@ namespace ntk {
         bool accepted = feed_packet( packet );
         if ( !accepted ) return false;
         
-        if ( m_fin_1 && m_ack_1 && m_fin_2 && m_ack_2 ) {
-            m_termination.closing_sequence = fin_ack_fin_ack{ *m_fin_1, *m_ack_1, *m_fin_2, *m_ack_2 };
+        if ( m_maybe_termination ) {
+            m_termination = m_maybe_termination;
             m_complete = true;
         }
 
@@ -696,42 +676,7 @@ namespace ntk {
     }
 
     bool tcp_termination_feed::feed_packet( const std::vector<uint8_t>& packet ) {
-
-        auto packet_tcp_header = get_tcp_header( packet.data() );
-
-        if ( !m_fin_1 && is_fin_ack( packet ) ) {
-            m_fin_1 = packet;
-            m_fin_1_seq_number = packet_tcp_header.seq_number;
-            return true;
-        }
-
-        if ( !m_fin_2 && is_fin_ack( packet ) ) {
-            if ( packet_tcp_header.seq_number == m_fin_1_seq_number ) return false;
-            m_fin_2 = packet;
-            m_fin_2_seq_number = packet_tcp_header.seq_number;
-            
-            if ( packet_tcp_header.ack_number == m_fin_1_seq_number + 1 ) {
-                m_ack_1 = packet;
-            }
-            return true;
-        }
-
-        if ( m_fin_1 && !m_ack_1 ) {
-            if ( is_ack( packet_tcp_header ) &&
-                 packet_tcp_header.ack_number == m_fin_1_seq_number + 1 ) {
-                m_ack_1 = packet;
-                return true;
-            }
-        }
-
-        if ( m_fin_2 && !m_ack_2 && is_ack( packet_tcp_header ) ) {
-            if ( packet_tcp_header.ack_number == m_fin_2_seq_number + 1 ) {
-                m_ack_2 = packet;
-                return true;
-            }
-        }
-
-        return false;
+        return m_maybe_termination.feed( packet );
     }
 
     // ==============================
@@ -742,25 +687,21 @@ namespace ntk {
             : m_four( four ) {} 
 
     void tcp_transfer::load( const session& packet_data ) {
-
-        tcp_handshake handshake = get_handshake( m_four, packet_data );
+        tcp_handshake handshake = *get_handshake( m_four, packet_data );
         tcp_termination termination = *get_termination( m_four, packet_data );
-
         m_handshake = handshake;
         m_termination = termination;
-
         split_stream( packet_data );
     }
 
     void tcp_transfer::split_stream( const session& packet_data ) {
+        auto syn_header = get_parsed_tcp_header( m_handshake.syn.data() );
+        auto syn_ack_header = get_parsed_tcp_header( m_handshake.syn_ack.data() );
 
-        auto syn_header = get_tcp_header( m_handshake.syn.data() );
-        auto syn_ack_header = get_tcp_header( m_handshake.syn_ack.data() );
-
-        auto handshake_ack_ptr = get_end_of_handshake( packet_data, m_four, m_handshake );
+        auto handshake_ack_ptr = get_end_of_handshake( packet_data, m_handshake );
         handshake_ack_ptr++;
 
-        auto termination_ptr = get_start_of_termination( packet_data, m_four, m_termination );
+        auto termination_ptr = get_start_of_termination( packet_data, m_termination );
 
         auto size = static_cast<size_t>( termination_ptr - handshake_ack_ptr );
 
@@ -800,10 +741,8 @@ namespace ntk {
     }
 
     bool tcp_live_stream::feed( const std::vector<uint8_t>& packet ) {
-
         if ( is_complete() ) return false;
         if ( !is_same_connection( packet, m_four ) ) return false;
-
         bool handshake_packet = false;
         bool termination_packet = false;
         
@@ -814,11 +753,10 @@ namespace ntk {
         if ( termination_packet ) return true;
 
         m_traffic.push_back( packet );
-
         return true;
     }
 
-        const four_tuple& tcp_live_stream::get_four_tuple() const {
+    const four_tuple& tcp_live_stream::get_four_tuple() const {
         return m_four;
     }
 
@@ -844,7 +782,6 @@ namespace ntk {
         }
 
         std::vector<tcp_live_stream> updated_streams;
-
         for ( auto& stream : m_live_streams ) {
             bool accepted = stream.feed( packet );
             if ( accepted ) {
@@ -873,7 +810,7 @@ namespace ntk {
     }
 
     // ==============================
-    //         Helper Classes
+    //   TCP Transfer Friend Helper
     // ==============================
 
     const tcp_handshake& tcp_transfer_friend_helper::handshake( const tcp_transfer& t ) {
@@ -904,7 +841,9 @@ namespace ntk {
         return t.m_four;
     }
 
-    // tcp live stream
+    // ==============================
+    //  TCP Live Stream Friend Helper
+    // ==============================
 
     const tcp_handshake_feed& tcp_live_stream_friend_helper::handshake_feed( const tcp_live_stream& t ) {
         return t.m_handshake_feed;
@@ -927,11 +866,9 @@ namespace ntk {
             auto& live_stream_four = tcp_live_stream_friend_helper::four( live_stream );
             return live_stream_four == four;
         });
-
         if ( matched_live_stream == t.m_live_streams.end() ) {
             throw std::runtime_error( "Live stream with given four tuple not found" );
         }
-
         return *matched_live_stream;
     }
 
@@ -944,17 +881,15 @@ namespace ntk {
     }
 
     // ==============================
-    //          Four Tuple 
+    //         Flip Four Tuple
     // ==============================
 
     four_tuple flip_four( const four_tuple& four ) {
         four_tuple flipped;
-
         flipped.client_ip = four.server_ip;
         flipped.server_ip = four.client_ip;
         flipped.server_port = four.client_port;
         flipped.client_port = four.server_port;
-
         return flipped;
     }
 
@@ -963,9 +898,8 @@ namespace ntk {
     }
 
     four_tuple get_four_from_ethernet( const unsigned char* packet ) {
-        tcp_header packet_tcp_header = get_tcp_header( packet );
-        ipv4_header packet_ip_header = get_ipv4_header( packet );
-
+        auto packet_tcp_header = get_parsed_tcp_header( packet );
+        auto packet_ip_header = get_parsed_ipv4_header( packet );
         return four_tuple {
             .client_ip = packet_ip_header.source_ip_addr,      
             .server_ip = packet_ip_header.destination_ip_addr,
@@ -974,9 +908,12 @@ namespace ntk {
         };
     }
 
+    // ==============================
+    //         Get Four Tuples
+    // ==============================
+
     std::unordered_set<four_tuple> get_four_tuples( const session& packets ) {
         std::unordered_set<four_tuple> four_tuples;
-
         for ( auto& packet : packets ) {
             auto four = get_four_from_ethernet( packet );
             auto flipped = flip_four( four );
@@ -985,7 +922,6 @@ namespace ntk {
             }
             four_tuples.insert( four );
         }
-        
         return four_tuples;
     }
 
@@ -995,11 +931,9 @@ namespace ntk {
 
     bool is_data_packet( const std::vector<uint8_t>& packet ) {
         constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
-        
-        auto ipv4_header_len = get_ipv_header_len( packet );
+        auto ipv4_header_len = get_ipv4_header_len( packet );
         const std::size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
         auto tcp_header_len = get_tcp_header_len( packet.data(), tcp_header_offset );
-
         const std::size_t payload_len = packet.size() - tcp_header_offset - tcp_header_len;
         return payload_len > 0;
     }
@@ -1012,29 +946,34 @@ namespace ntk {
         return !is_data_packet( packet ) && is_ack( packet );
     }
 
+    // ==============================
+    //        Extract Payloads
+    // ==============================
+
     std::vector<std::vector<uint8_t>> extract_payloads( const four_tuple& four, const std::vector<std::vector<uint8_t>>& packets ) {
         std::vector<std::vector<uint8_t>> payloads;
         for ( auto& packet : packets ) {
             if ( get_four_from_ethernet( packet ) == four ) {
-                auto payload = extract_tcp_payload( packet );
+                auto payload = get_tcp_payload( packet );
                 if ( payload.size() > 0 ) payloads.push_back( payload );
             }
         }
         return payloads;
     } 
 
+    // ==============================
+    //         Split Payloads
+    // ==============================
+
     std::expected<client_server_payloads,std::string> split_payloads( const session& packets ) {
         client_server_payloads payloads;
-
-        auto handshake = get_handshake( packets );
+        tcp_handshake handshake = *get_handshake( packets );
         if ( handshake.empty() ) return std::unexpected( "No hanshake found" );
 
         auto client_four = get_four_from_ethernet( handshake.syn );
         auto server_four = get_four_from_ethernet( handshake.syn_ack );
-
         payloads.client_payloads = extract_payloads( client_four, packets );
         payloads.server_payloads = extract_payloads( server_four, packets );
-
         return payloads;
     }
 
