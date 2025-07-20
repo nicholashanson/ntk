@@ -393,6 +393,16 @@ namespace ntk {
         return flags_contains( packet_tcp_header.flags, tcp_flags::RST );
     }
 
+    bool has_four( const std::vector<uint8_t>& packet, const four_tuple& four ) {
+        auto packet_four = get_four_from_ethernet( packet );
+        return packet_four == four;
+    }
+
+    bool has_flipped_four( const std::vector<uint8_t>& packet, const four_tuple& four ) {
+        auto packet_four = get_four_from_ethernet( packet );
+        return packet_four == flip_four( four );
+    }
+
     // ==============================
     //         TCP Handshake
     // ==============================
@@ -553,7 +563,6 @@ namespace ntk {
         initiator_fin = responder_ack = responder_fin = initiator_ack = std::nullopt;
     }
 
-
     // ==============================
     //      Get TCP Termination
     // ==============================
@@ -684,7 +693,7 @@ namespace ntk {
     // ==============================
     
     tcp_transfer::tcp_transfer( const four_tuple& four ) 
-            : m_four( four ) {} 
+        : m_four( four ) {} 
 
     void tcp_transfer::load( const session& packet_data ) {
         tcp_handshake handshake = *get_handshake( m_four, packet_data );
@@ -695,32 +704,28 @@ namespace ntk {
     }
 
     void tcp_transfer::split_stream( const session& packet_data ) {
-        auto syn_header = get_parsed_tcp_header( m_handshake.syn.data() );
-        auto syn_ack_header = get_parsed_tcp_header( m_handshake.syn_ack.data() );
-
+        auto syn_header = get_parsed_tcp_header( m_handshake.syn );
+        auto syn_ack_header = get_parsed_tcp_header( m_handshake.syn_ack );
         auto handshake_ack_ptr = get_end_of_handshake( packet_data, m_handshake );
         handshake_ack_ptr++;
-
         auto termination_ptr = get_start_of_termination( packet_data, m_termination );
-
         auto size = static_cast<size_t>( termination_ptr - handshake_ack_ptr );
-
         auto packet_span = std::span{ handshake_ack_ptr, size };
 
         for ( auto& packet : packet_span ) {
-            if ( is_data_packet( packet ) && get_four_from_ethernet( packet ) == m_four ) {
+            if ( is_data_packet( packet ) && has_four( packet, m_four ) ) {
                 m_client_traffic.push_back( packet );
                 continue;
             }
-            if ( is_data_packet( packet ) && get_four_from_ethernet( packet ) == flip_four( m_four ) ) {
+            if ( is_data_packet( packet ) && has_flipped_four( packet, m_four ) ) {
                 m_server_traffic.push_back( packet );
                 continue;
             }
-            if ( is_ack( packet ) && get_four_from_ethernet( packet ) == m_four ) {
+            if ( is_ack( packet ) && has_four( packet, m_four ) ) {
                 m_client_acks.push_back( packet );
                 continue;
             }
-            if ( is_ack( packet ) && get_four_from_ethernet( packet ) == flip_four( m_four ) ) {
+            if ( is_ack( packet ) && has_flipped_four( packet, m_four ) ) {
                 m_server_acks.push_back( packet );
                 continue;
             }

@@ -197,6 +197,10 @@ namespace ntk {
         }
     };
 
+    bool has_four( const std::vector<uint8_t>& packet, const four_tuple& four ); 
+
+    bool has_flipped_four( const std::vector<uint8_t>& packet, const four_tuple& four );
+
 } // namespace ntk
 
 namespace std {
