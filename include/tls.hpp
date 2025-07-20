@@ -128,15 +128,15 @@ namespace ntk {
         }
     };
 
-    client_hello parse_client_hello( const std::span<const uint8_t> client_hello_bytes );
+    std::expected<client_hello,std::string> parse_client_hello( const std::span<const uint8_t> client_hello_bytes );
 
-    client_hello get_client_hello( const std::span<const uint8_t> tcp_payload );
+    std::expected<client_hello,std::string> get_client_hello( const std::span<const uint8_t> tcp_payload );
 
-    client_hello get_client_hello( const tls_record& record );
+    std::expected<client_hello,std::string> get_client_hello( const tls_record& record );
 
-    client_hello get_client_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
+    std::expected<client_hello,std::string> get_client_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
 
-    client_hello get_client_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
+    std::expected<client_hello,std::string> get_client_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
 
     bool is_client_hello( const unsigned char* packet );
 
@@ -190,6 +190,8 @@ namespace ntk {
     // ==============================
 
     std::expected<std::string,std::string> get_sni( const client_hello& hello );
+
+    std::expected<std::string,std::string> parse_sni_list( std::span<const unsigned char>& sni_list );
 
     std::vector<std::string> get_snis( const session& packets, const std::string& host );
 
@@ -281,14 +283,27 @@ namespace ntk {
 
     class tls_live_stream : public tcp_live_stream {
         public:
+            tls_live_stream( const four_tuple& four )
+                : tcp_live_stream( four ), m_client_hello_populated( false ) {} 
             tls_live_stream( const tcp_live_stream& tcp_stream );
             const std::string& get_sni() const;
+            bool feed( const std::vector<uint8_t>& packet );
         private:
+            bool populate_client_hello( const std::vector<uint8_t>& packet ); 
             client_hello m_client_hello;
             server_hello m_server_hello;
+            bool m_client_hello_populated;
             std::string m_sni;
-
+            std::ifstream m_ssl_keys_log;
+            secrets m_tls_secrets;
             friend std::ostream& operator<<( std::ostream& os, const tls_live_stream& live_stream );
+            friend class tls_live_stream_friend_helper;
+    };
+
+    class tls_live_stream_friend_helper {
+        public:
+            static std::optional<std::reference_wrapper<const client_hello>> get_client_hello( const tls_live_stream& t );
+            static const bool client_hello_populated( const tls_live_stream& t );
     };
 
     // ==============================
