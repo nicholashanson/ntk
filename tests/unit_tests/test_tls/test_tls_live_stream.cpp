@@ -27,3 +27,29 @@ TEST( UnitTest, TlsLiveStream_HandshakeFeed_Complete ) {
 	auto handshake_complete = ntk::tcp_live_stream_friend_helper::handshake_feed( live_stream ).m_complete;
 	ASSERT_TRUE( handshake_complete );
 }
+
+TEST( UnitTest, TlsLiveStream_ClientHelloPopulated ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
+	auto& syn = packet_data[ 0 ];
+	auto& synack = packet_data[ 1 ];
+	auto& ack = packet_data[ 2 ];
+	auto& client_hello_packet = packet_data[ 3 ];
+	auto four = ntk::get_four_from_ethernet( client_hello_packet );
+	ntk::tls_live_stream live_stream( four );
+	live_stream.feed( syn );
+	live_stream.feed( synack );
+	live_stream.feed( ack ); 
+	live_stream.feed( client_hello_packet );
+	auto client_hello_populated = ntk::tls_live_stream_friend_helper::client_hello_populated( live_stream );
+	ASSERT_TRUE( client_hello_populated );
+}
+
+TEST( UnitTest, TlsLiveStream_ClientHelloPopulated_CounterCase ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
+	auto& client_hello_packet = packet_data[ 3 ];
+	auto four = ntk::get_four_from_ethernet( client_hello_packet );
+	ntk::tls_live_stream live_stream( four );
+	live_stream.feed( client_hello_packet );
+	auto client_hello_populated = ntk::tls_live_stream_friend_helper::client_hello_populated( live_stream );
+	ASSERT_FALSE( client_hello_populated );
+}
