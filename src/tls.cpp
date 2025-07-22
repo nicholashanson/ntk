@@ -121,51 +121,122 @@ namespace ntk {
     //       Parse Server Hello
     // ==============================
 
-    server_hello parse_server_hello( const std::span<const uint8_t> server_hello_bytes ) {
+    std::expected<server_hello,std::string> parse_server_hello( const std::span<const uint8_t> server_hello_bytes ) {
         constexpr std::size_t version_len = 2;
         constexpr std::size_t random_len = 32;
-        constexpr std::size_t session_id_len_pos = version_len + random_len;
+        constexpr std::size_t session_id_len_pos = version_len + random_len; 
+        constexpr std::size_t min_required = session_id_len_pos + 1; 
+        if ( server_hello_bytes.size() < min_required ) {
+            return std::unexpected( "ServerHello too short for version and random" );
+        }
+
         server_hello s_hello;
         s_hello.server_version = static_cast<tls_version>( read_uint16_be( server_hello_bytes, 0 ) );
-        std::memcpy( s_hello.random.data(), &server_hello_bytes[version_len], random_len );
+        std::memcpy( s_hello.random.data(), &server_hello_bytes[ version_len ], random_len );
 
-        const std::size_t session_id_len = server_hello_bytes[ session_id_len_pos ];
-        s_hello.session_id.resize( session_id_len );
-        std::memcpy( s_hello.session_id.data(), &server_hello_bytes[ session_id_len_pos + 1 ], session_id_len );
+        auto session_id_result = get_server_hello_session_id( server_hello_bytes, s_hello );
+        if ( !session_id_result ) {
+            return std::unexpected( session_id_result.error() );
+        }
 
+        const std::size_t session_id_len = s_hello.session_id.size();
         const std::size_t cipher_suite_pos = session_id_len_pos + 1 + session_id_len;
-        s_hello.cipher_suite = read_uint16_be( server_hello_bytes, cipher_suite_pos );
+        auto cipher_suite_result = get_server_hello_cipher_suite( server_hello_bytes, cipher_suite_pos );
+        if ( cipher_suite_result ) {
+            s_hello.cipher_suite = cipher_suite_result.value();
+        } else {
+            return std::unexpected( cipher_suite_result.error() );
+        }
 
         const std::size_t compression_method_pos = cipher_suite_pos + 2;
+        if ( server_hello_bytes.size() < compression_method_pos + 1 + 2 ) {
+            return std::unexpected( "ServerHello too short for compression method" );
+        }
         s_hello.compression_method = server_hello_bytes[ compression_method_pos ];
 
         const std::size_t extensions_len_pos = compression_method_pos + 1;
+        auto extensions_result = get_server_hello_extensions( server_hello_bytes, s_hello, extensions_len_pos );
+        if ( !extensions_result ) {
+            return std::unexpected( session_id_result.error() );
+        }
+        return s_hello;
+    }
+
+    // ==============================
+    // Get Server Hello Cipher Suite
+    // ==============================
+
+    std::expected<uint16_t,std::string> get_server_hello_cipher_suite( const std::span<const uint8_t>& server_hello_bytes, const std::size_t cipher_suite_pos ) {
+        if ( server_hello_bytes.size() < cipher_suite_pos + 1 + 2 ) {
+            return std::unexpected( "ServerHello too short cipher suite" );
+        }
+        return read_uint16_be( server_hello_bytes, cipher_suite_pos );
+    }
+
+    // ==============================
+    //  Get Server Hello Session ID
+    // ==============================
+
+    std::expected<void,std::string> get_server_hello_session_id( const std::span<const uint8_t>& server_hello_bytes, server_hello& s_hello ) {
+        constexpr std::size_t version_len = 2;
+        constexpr std::size_t random_len = 32;
+        constexpr std::size_t session_id_len_pos = version_len + random_len;
+        const std::size_t session_id_len = server_hello_bytes[ session_id_len_pos ];
+        if ( server_hello_bytes.size() < session_id_len_pos + 1 + session_id_len ) {
+            return std::unexpected( "ServerHello too short for session id" );
+        }
+        s_hello.session_id.resize( session_id_len );
+        std::memcpy( s_hello.session_id.data(), &server_hello_bytes[ session_id_len_pos + 1 ], session_id_len );
+        return {};
+    }
+
+    // ==============================
+    //   Get Server Hello Extensions
+    // ==============================
+
+    std::expected<void,std::string> get_server_hello_extensions( const std::span<const uint8_t>& server_hello_bytes, server_hello s_hello,
+                                                                 const std::size_t extensions_len_pos ) {
         const std::size_t extensions_len = read_uint16_be( server_hello_bytes, extensions_len_pos );
+        if ( server_hello_bytes.size() < extensions_len_pos + 1 + extensions_len ) {
+            return std::unexpected( "ServerHello too short extensions" );
+        }
         s_hello.extensions.resize( extensions_len );
         std::memcpy( s_hello.extensions.data(), &server_hello_bytes[ extensions_len_pos + 2 ], extensions_len );
-
-        return s_hello;
+        return {};
     }
 
     // ==============================
     //        Get Server Hello
     // ==============================
 
-    server_hello get_server_hello( const std::span<const uint8_t> tcp_payload ) {
+    std::expected<server_hello,std::string> get_server_hello( const std::span<const uint8_t> tcp_payload ) {
         auto server_hello_bytes = tcp_payload.subspan( 9 );
         return parse_server_hello( server_hello_bytes );
     }
 
-    server_hello get_server_hello_from_ethernet_frame( const unsigned char* ethernet_frame ) {
-        auto tcp_payload = std::span<const uint8_t>( get_tcp_payload( ethernet_frame ) );
-        return get_server_hello( tcp_payload );
+    std::expected<server_hello,std::string> get_server_hello_from_ethernet_frame( const unsigned char* ethernet_frame ) {
+        auto tcp_payload = get_tcp_payload( ethernet_frame );
+        auto split_result = split_tls_records( tcp_payload );
+        if ( !split_result ) {
+            return std::unexpected( split_result.error() );
+        }
+        auto [ records, offset_reached ] = *split_result;
+        if ( records.empty() ) {
+            return std::unexpected( "The ethernet_frame contains no complete TLS records" );
+        }  
+        auto& server_hello_record = records.front();
+        if ( !is_server_hello( server_hello_record ) ) {
+            return std::unexpected( "The first record found in the ethernet frame is not a valid ServerHello" );
+        }
+        auto server_hello_bytes = std::span<const uint8_t>( server_hello_record.payload ).subspan( 4 );
+        return parse_server_hello( server_hello_bytes );
     }
 
-    server_hello get_server_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame ) {
+    std::expected<server_hello,std::string> get_server_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame ) {
         return get_server_hello_from_ethernet_frame( ethernet_frame.data() );
     }
 
-    server_hello get_server_hello( const tls_record& record ) {
+    std::expected<server_hello,std::string> get_server_hello( const tls_record& record ) {
         auto server_hello_bytes = std::span<const uint8_t>( record.payload ).subspan( 4 );
         return parse_server_hello( server_hello_bytes ); 
     }
@@ -803,16 +874,27 @@ namespace ntk {
     bool tls_live_stream::feed( const std::vector<uint8_t>& packet ) {
         if ( !m_handshake_feed.m_complete ) return tcp_live_stream::feed( packet );
         if ( is_client_hello_v( packet ) ) return populate_client_hello( packet ); 
-        // is client_hello_complete?
+        if ( !m_server_hello_populated ) populate_server_hello( packet );
         // is server hello_complete?
         // are secrets populated?
     }
 
     bool tls_live_stream::populate_client_hello( const std::vector<uint8_t>& packet ) {
-        auto result = parse_client_hello( packet );
+        auto result = get_client_hello_from_ethernet_frame( packet );
         if ( result ) {
             m_client_hello = *result;
             m_client_hello_populated = true;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool tls_live_stream::populate_server_hello( const std::vector<uint8_t>& packet ) {
+        auto result = get_server_hello_from_ethernet_frame( packet );
+        if ( result ) {
+            m_server_hello = *result;
+            m_server_hello_populated = true;
             return true;
         } else {
             return false;
@@ -827,8 +909,20 @@ namespace ntk {
         }
     }
 
+    std::optional<std::reference_wrapper<const server_hello>> tls_live_stream_friend_helper::get_server_hello( const tls_live_stream& t ) {
+        if ( t.m_server_hello_populated ) {
+            return std::cref( t.m_server_hello );
+        } else {
+            return std::nullopt;
+        }
+    }
+
     const bool tls_live_stream_friend_helper::client_hello_populated( const tls_live_stream& t ) {
         return t.m_client_hello_populated;
+    }
+
+    const bool tls_live_stream_friend_helper::server_hello_populated( const tls_live_stream& t ) {
+        return t.m_server_hello_populated;
     }
 
     // ==============================

@@ -157,13 +157,20 @@ namespace ntk {
         std::vector<uint8_t> extensions;
     };
 
-    server_hello parse_server_hello( const std::span<const uint8_t> server_hello_bytes );
+    std::expected<server_hello,std::string> parse_server_hello( const std::span<const uint8_t> server_hello_bytes );
 
-    server_hello get_server_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
+    std::expected<server_hello,std::string> get_server_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
 
-    server_hello get_server_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
+    std::expected<server_hello,std::string> get_server_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
 
-    server_hello get_server_hello( const tls_record& record );
+    std::expected<server_hello,std::string> get_server_hello( const tls_record& record );
+
+    std::expected<uint16_t,std::string> get_server_hello_cipher_suite( const std::span<const uint8_t>& server_hello_bytesm, const std::size_t cipher_suite_pos );
+
+    std::expected<void,std::string> get_server_hello_session_id( const std::span<const uint8_t>& server_hello_bytes, server_hello& s_hello );
+
+    std::expected<void,std::string> get_server_hello_extensions( const std::span<const uint8_t>& server_hello_bytes, server_hello s_hello,
+                                                                 const std::size_t extensions_len_pos );
 
     bool is_server_hello( const unsigned char* packet );
 
@@ -290,9 +297,11 @@ namespace ntk {
             bool feed( const std::vector<uint8_t>& packet );
         private:
             bool populate_client_hello( const std::vector<uint8_t>& packet ); 
+            bool populate_server_hello( const std::vector<uint8_t>& packet );
             client_hello m_client_hello;
             server_hello m_server_hello;
             bool m_client_hello_populated;
+            bool m_server_hello_populated;
             std::string m_sni;
             std::ifstream m_ssl_keys_log;
             secrets m_tls_secrets;
@@ -303,7 +312,9 @@ namespace ntk {
     class tls_live_stream_friend_helper {
         public:
             static std::optional<std::reference_wrapper<const client_hello>> get_client_hello( const tls_live_stream& t );
+            static std::optional<std::reference_wrapper<const server_hello>> get_server_hello( const tls_live_stream& t );
             static const bool client_hello_populated( const tls_live_stream& t );
+            static const bool server_hello_populated( const tls_live_stream& t );
     };
 
     // ==============================
