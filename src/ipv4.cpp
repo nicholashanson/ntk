@@ -14,43 +14,55 @@ namespace ntk {
         return ihl * bytes_per_offset;
     }
 
+    std::size_t get_ipv4_header_len( const std::vector<uint8_t>& packet ) {
+        return get_ipv4_header_len( packet.data() );
+    }
+
     // ==============================
-    //      Extract IPV4 Header
+    //     Get Raw IPV4 Header
     // ==============================
 
-    std::vector<uint8_t> extract_raw_ipv4_header( const unsigned char* ethernet_frame ) {
+    std::vector<uint8_t> get_raw_ipv4_header( const unsigned char* ethernet_frame ) {
         constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
-        std::vector<uint8_t> ip4_header;
-        auto ipv4_header_len = get_ipv4_header_len( eternet_frame );
-        ivp4_header.resize( ipv4_header_len );
+        std::vector<uint8_t> ipv4_header;
+        auto ipv4_header_len = get_ipv4_header_len( ethernet_frame );
+        ipv4_header.resize( ipv4_header_len );
         std::memcpy( ipv4_header.data(), ethernet_frame + ethernet_header_len, ipv4_header_len );
         return ipv4_header;  
     }
 
     // ==============================
-    //      Pa IPV4 Header
+    //     Get Parsed IPV4 Header
     // ==============================
 
-    ipv4_header parse_ipv4_header( const std::vector<uint8_t>& raw_ipv4_header ) {
+    ipv4_header get_parsed_ipv4_header( const std::vector<uint8_t>& raw_ipv4_header ) {
         ipv4_header header;
-        header.ihl = static_cast<uint8_t>( get_ipv4_header_len );
+        header.ihl = get_ipv4_header_len( raw_ipv4_header );
         header.total_length = read_uint16_be( raw_ipv4_header, ipv4_header_offset::TOTAL_LEN );
         header.time_to_live = raw_ipv4_header[ static_cast<std::size_t>( ipv4_header_offset::TIME_TO_LIVE ) ];
         header.protocol = raw_ipv4_header[ static_cast<std::size_t>( ipv4_header_offset::PROTOCOL ) ];
         header.header_checksum = read_uint16_be( raw_ipv4_header, ipv4_header_offset::CHECKSUM );
         header.source_ip_addr = read_uint32_be( raw_ipv4_header, ipv4_header_offset::SRC_IP_ADDR );;
-        header.destination_ip_addr = read_uint16_be( raw_ipv4_header, ipv4_header_offset::DEST_IP_ADDR );;
+        header.destination_ip_addr = read_uint32_be( raw_ipv4_header, ipv4_header_offset::DEST_IP_ADDR );;
         return header;
     }
 
-    ipv4_header get_ipv4_header( const unsigned char* ethernet_frame ) {
-        return parse_ipv4_header( extract_ipv4_header( ethernet_frame ) );
+    ipv4_header get_parsed_ipv4_header( const unsigned char* ethernet_frame ) {
+        return get_parsed_ipv4_header( get_raw_ipv4_header( ethernet_frame ) );
     }
 
+    // ==============================
+    //    Get IPV4 Sender-Reciever
+    // ==============================
+
     sender_reciever get_sender_reciever( const unsigned char* ethernet_frame ) {
-        auto header = parse_ipv4_header( extract_ipv4_header( ethernet_frame ) );
+        auto header = get_parsed_ipv4_header( get_raw_ipv4_header( ethernet_frame ) );
         return std::make_pair( header.source_ip_addr, header.destination_ip_addr );
     }
+
+    // ==============================
+    //    Flip IPV4 Sender-Reciever
+    // ==============================
 
     sender_reciever flip_sender_reciever( const sender_reciever& src_dest ) {
         sender_reciever dest_src;
@@ -58,6 +70,10 @@ namespace ntk {
         dest_src.second = src_dest.first;
         return dest_src;
     }
+
+    // ==============================
+    //         IP To String
+    // ==============================
 
     std::string ip_to_string( uint32_t ip ) {
         auto extract_octet = []( uint32_t ip, int shift ) {
