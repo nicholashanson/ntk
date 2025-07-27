@@ -172,34 +172,34 @@ namespace ntk {
     }
 
     void print_tcp_header( const std::vector<uint8_t>& packet, std::ostream& os ) {
-        tcp_header packet_tcp_header = get_tcp_header( packet );
+        tcp_header packet_tcp_header = get_parsed_tcp_header( packet );
         print_tcp_header( packet_tcp_header, os );
     }
 
     std::ostream& operator<<( std::ostream& os, const tcp_live_stream& live_stream ) {
         os << "===== SYN HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( live_stream.m_handshake_feed.m_handshake.syn.data() ), os );
+        print_tcp_header( get_parsed_tcp_header( live_stream.m_handshake_feed.m_handshake.syn ), os );
         os << "===== SYN HEADER END =====\n";
         os << "===== SYN-ACK HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( live_stream.m_handshake_feed.m_handshake.syn_ack.data() ), os );
+        print_tcp_header( get_parsed_tcp_header( live_stream.m_handshake_feed.m_handshake.syn_ack ), os );
         os << "===== SYN-ACK HEADER END =====\n";
         os << "===== ACK HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( live_stream.m_handshake_feed.m_handshake.ack.data() ), os );
+        print_tcp_header( get_parsed_tcp_header( live_stream.m_handshake_feed.m_handshake.ack ), os );
         os << "===== ACK HEADER END =====\n";
 
         auto& closing_sequence = std::get<fin_ack_fin_ack>( live_stream.m_termination_feed.m_termination.closing_sequence );
 
         os << "===== FIN_1 HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( closing_sequence.initiator_fin.data() ), os );
+        print_tcp_header( get_parsed_tcp_header( closing_sequence.initiator_fin ), os );
         os << "===== FIN_1 HEADER END =====\n";
         os << "===== ACK_1 HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( closing_sequence.responder_ack.data() ), os );
+        print_tcp_header( get_parsed_tcp_header( closing_sequence.responder_ack ), os );
         os << "===== ACK_1 HEADER END =====\n";
         os << "===== FIN_2 HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( closing_sequence.responder_fin.data() ), os );
+        print_tcp_header( get_parsed_tcp_header( closing_sequence.responder_fin ), os );
         os << "===== FIN_2 HEADER END =====\n";
         os << "===== ACK_2 HEADER BEGIN =====\n";
-        print_tcp_header( get_tcp_header( closing_sequence.initiator_ack.data() ), os );
+        print_tcp_header( get_parsed_tcp_header( closing_sequence.initiator_ack ), os );
         os << "===== ACK_2 HEADER END =====\n";
 
         return os;
