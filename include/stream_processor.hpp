@@ -13,20 +13,16 @@ namespace ntk {
     class stream_processor {
 
         public:
-
             using stream_callback = std::function<void(tcp_live_stream&&)>;
-
             stream_processor(
                 transfer_queue_interface<tcp_live_stream>& queue,
                 stream_callback callback
             );
-
             void start();
             void stop();
         private:
             void run();
             void process_stream( tcp_live_stream&& stream );
-
             transfer_queue_interface<tcp_live_stream>& m_queue;
             std::thread m_thread;
             std::atomic<bool> m_stop;
