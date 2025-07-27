@@ -419,6 +419,42 @@ namespace ntk {
         return tls_secrets;
     }
 
+    std::pair<secrets,std::size_t> get_tls_secrets_dynamically( std::ifstream& file_handle, std::array<uint8_t,32> client_random ) {
+        auto client_random_h = client_random_to_hex( client_random );
+        std::size_t line_number = 0;
+        secrets tls_secrets;
+        std::string line;
+
+        while ( std::getline( file_handle, line ) ) {
+            ++line_number;
+            if ( line.empty() || std::all_of( line.begin(), line.end(), isspace ) ) continue;
+            if ( line[ 0 ] == '#' ) continue;
+            std::istringstream iss( line );
+            std::string label;
+            std::string client_random_hex;
+            std::string secret_hex;
+            iss >> label >> client_random_hex >> secret_hex;
+
+            secret_hex.erase( std::remove_if(secret_hex.begin(), secret_hex.end(),
+                [] ( unsigned char c ) {
+                    return !std::isxdigit( c );
+                }), secret_hex.end() );
+
+            std::vector<uint8_t> secret;
+            for ( size_t i = 0; i < secret_hex.size(); i += 2 ) {
+                secret.push_back( std::stoi( secret_hex.substr( i, 2 ), nullptr, 16 ) );
+            }
+
+            if ( client_random_hex == client_random_h ) {
+                tls_secrets[ client_random_hex ][ label ] = secret;
+                if ( is_complete_secrets( tls_secrets[ client_random_hex ] ) )
+                    break;
+            }
+        }
+
+        return { tls_secrets, line_number };
+    }
+
     // ==============================
     //       Is Complete Secrets
     // ==============================
@@ -874,9 +910,21 @@ namespace ntk {
     bool tls_live_stream::feed( const std::vector<uint8_t>& packet ) {
         if ( !m_handshake_feed.m_complete ) return tcp_live_stream::feed( packet );
         if ( is_client_hello_v( packet ) ) return populate_client_hello( packet ); 
-        if ( !m_server_hello_populated ) populate_server_hello( packet );
-        // is server hello_complete?
-        // are secrets populated?
+        if ( !m_server_hello_populated ) { 
+            populate_server_hello( packet );
+            if ( m_server_hello_populated ) { 
+                auto [ tls_secrets, line_reached ] = get_tls_secrets_dynamically( m_ssl_keys_log, m_client_hello.random );
+                std::cout << "about to get secrets" << std::endl;
+                if ( is_complete_secrets( tls_secrets[ client_random_to_hex( m_client_hello.random ) ] ) ) {
+                    m_tls_secrets = tls_secrets;
+                    m_lines_consumed = line_reached;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+        return false;
     }
 
     bool tls_live_stream::populate_client_hello( const std::vector<uint8_t>& packet ) {
@@ -923,6 +971,41 @@ namespace ntk {
 
     const bool tls_live_stream_friend_helper::server_hello_populated( const tls_live_stream& t ) {
         return t.m_server_hello_populated;
+    }
+
+    const std::size_t tls_live_stream_friend_helper::lines_consumed( const tls_live_stream& t ) {
+        return t.m_lines_consumed;
+    } 
+
+    const secrets tls_live_stream_friend_helper::tls_secrets( const tls_live_stream& t ) {
+        return t.m_tls_secrets;
+    }
+
+    const int tls_live_stream_friend_helper::client_traffic_seq_number( const tls_live_stream& t ) {
+        return t.m_client_traffic_seq_number;
+    }
+
+    const int tls_live_stream_friend_helper::server_traffic_seq_number( const tls_live_stream& t ) {
+        return t.m_server_traffic_seq_number;
+    }
+
+    // ==============================
+    //        Log File Trimmer
+    // ==============================
+
+    void log_file_trimmer::start() {
+        m_thread = std::thread( &log_file_trimmer::run, this );
+    }
+
+    void log_file_trimmer::stop() {
+        m_stop = true;
+        if ( m_thread.joinable() ) m_thread.join();
+    }
+
+    void log_file_trimmer::run() {
+        while ( !m_stop ) {
+            //trim_file;
+        }
     }
 
     // ==============================
