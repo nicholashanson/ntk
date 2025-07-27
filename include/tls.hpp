@@ -220,6 +220,8 @@ namespace ntk {
 
     secrets get_tls_secrets( const std::string& filename, std::array<uint8_t,32> client_random );
 
+    std::pair<secrets,std::size_t> get_tls_secrets_dynamically( std::ifstream& file_handle, std::array<uint8_t,32> client_random );
+
     std::vector<uint8_t> get_traffic_secret( const secrets& session_keys,
                                              const std::array<uint8_t,32>& client_random,
                                              const std::string& label );
@@ -291,7 +293,17 @@ namespace ntk {
     class tls_live_stream : public tcp_live_stream {
         public:
             tls_live_stream( const four_tuple& four )
-                : tcp_live_stream( four ), m_client_hello_populated( false ) {} 
+                : tcp_live_stream( four ), 
+                  m_client_hello_populated( false ), 
+                  m_server_hello_populated( false ) {} 
+            tls_live_stream( const four_tuple& four, const std::string ssl_keys_log )
+                : tcp_live_stream( four ), 
+                  m_lines_consumed( 0 ), 
+                  m_ssl_keys_log( ssl_keys_log ), 
+                  m_client_hello_populated( false ), 
+                  m_server_hello_populated( false ),
+                  m_client_traffic_seq_number( 0 ),
+                  m_server_traffic_seq_number( 0 ) {}
             tls_live_stream( const tcp_live_stream& tcp_stream );
             const std::string& get_sni() const;
             bool feed( const std::vector<uint8_t>& packet );
@@ -305,6 +317,9 @@ namespace ntk {
             std::string m_sni;
             std::ifstream m_ssl_keys_log;
             secrets m_tls_secrets;
+            std::size_t m_lines_consumed;
+            int m_client_traffic_seq_number;
+            int m_server_traffic_seq_number;
             friend std::ostream& operator<<( std::ostream& os, const tls_live_stream& live_stream );
             friend class tls_live_stream_friend_helper;
     };
@@ -315,6 +330,27 @@ namespace ntk {
             static std::optional<std::reference_wrapper<const server_hello>> get_server_hello( const tls_live_stream& t );
             static const bool client_hello_populated( const tls_live_stream& t );
             static const bool server_hello_populated( const tls_live_stream& t );
+            static const std::size_t lines_consumed( const tls_live_stream& t );
+            static const secrets tls_secrets( const tls_live_stream& t );
+            static const int client_traffic_seq_number( const tls_live_stream& t );
+            static const int server_traffic_seq_number( const tls_live_stream& t );
+    };
+
+    class log_file_trimmer {
+        public:
+            log_file_trimmer( std::string log_file ) : m_log_file( log_file ) {}
+            void start();
+            void stop();
+        private:
+            void run();
+            std::string m_log_file;
+            std::thread m_thread;
+            std::atomic<bool> m_stop;
+    };
+
+    class tls_live_stream_session : public tcp_live_stream_session {
+        private:
+            log_file_trimmer m_log_file_trimmer;
     };
 
     // ==============================
