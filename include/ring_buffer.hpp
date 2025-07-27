@@ -5,9 +5,12 @@
 
 namespace ntk {
 
+    // ==============================
+    //        Ring Buffer Class
+    // ==============================
+
     template<typename T,size_t N> 
     class ring_buffer {
-
         public:
             ring_buffer();
             bool push( const T& item );
@@ -22,6 +25,10 @@ namespace ntk {
     ring_buffer<T,N>::ring_buffer()
         : m_head( 0 ), m_tail( 0 ) {}
 
+    // ==============================
+    //        RingBuffer::Push
+    // ==============================
+
     template<typename T,size_t N>
     bool ring_buffer<T,N>::push( const T& item ) {
         size_t head = m_head.load( std::memory_order_relaxed );
@@ -32,6 +39,10 @@ namespace ntk {
         m_head.store( next_head, std::memory_order_release );
         return true;
     }
+
+    // ==============================
+    //         RingBuffer::Pop
+    // ==============================
 
     template<typename T,size_t N>
     bool ring_buffer<T,N>::pop( T& item ) {
