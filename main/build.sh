@@ -28,7 +28,7 @@ mkdir -p "$BUILD_DIR/obj" "$BUILD_DIR/test_obj"
 
 # Compiler and flags
 CXX=g++
-CXXFLAGS="-g -O0 -std=c++23 -fPIC"
+CXXFLAGS="-g -O0 -std=c++23 -fPIC" 
 INCLUDES="-I$INCLUDE_DIR -I$TEST_DIR"
 CFLAGS=$(pkg-config --cflags Qt5Widgets Qt5Multimedia Qt5MultimediaWidgets || echo "")
 LIBS=$(pkg-config --libs Qt5Widgets Qt5Multimedia Qt5MultimediaWidgets || echo "")
