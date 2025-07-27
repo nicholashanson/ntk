@@ -13,7 +13,7 @@ TEST( UnitTest_, TlsTransfer_Load ) {
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
 
-    size_t data_packet_count = std::count_if( packet_data.begin(), packet_data.end(), ntk::is_data_packet );
+    std::size_t data_packet_count = std::count_if( packet_data.begin(), packet_data.end(), ntk::is_data_packet );
 
     ntk::tls_over_tcp tls_transfer( four_tuple );
     tls_transfer.load( packet_data );
@@ -23,7 +23,7 @@ TEST( UnitTest_, TlsTransfer_Load ) {
     auto& client_acks = ntk::tcp_transfer_friend_helper::client_acks( tls_transfer );
     auto& server_acks = ntk::tcp_transfer_friend_helper::server_acks( tls_transfer );
 
-    const size_t number_of_resets = 2;
+    const std::size_t number_of_resets = 2;
 
     EXPECT_EQ( client_traffic.size(), 3 );
     EXPECT_EQ( server_traffic.size(), data_packet_count - 3 - number_of_resets );

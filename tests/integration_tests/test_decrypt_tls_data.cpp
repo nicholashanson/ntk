@@ -30,10 +30,10 @@ TEST( IntegrationTest, DecryptTlsData ) {
     auto tls_client_hello_bytes = ntk::get_tcp_payload( tls_client_hello_packet.data() );
     auto tls_record_span = std::span<const unsigned char>( tls_client_hello_bytes );
     auto client_hello_span = tls_record_span.subspan( 9 );
-    auto client_hello = ntk::parse_client_hello( client_hello_span );
+    auto client_hello = *ntk::parse_client_hello( client_hello_span );
 
     tls_record_span = std::span<const unsigned char>( first_records[ 0 ].payload ).subspan( 4 );
-    auto server_hello = ntk::parse_server_hello( tls_record_span );
+    auto server_hello = *ntk::parse_server_hello( tls_record_span );
 
     auto decrypted_records = ntk::decrypt_tls_data( client_hello.random, server_hello.random, server_hello.server_version, 
         server_hello.cipher_suite, second_records, session_keys );
@@ -43,9 +43,9 @@ TEST( IntegrationTest, DecryptTlsData ) {
 TEST( IntegrationTest, DecryptTlsData_TlsAlert ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
     auto& tls_client_hello = packet_data[ 3 ];
-    auto client_hello = ntk::get_client_hello_from_ethernet_frame( tls_client_hello );
+    auto client_hello = *ntk::get_client_hello_from_ethernet_frame( tls_client_hello );
     auto& tls_server_hello = packet_data[ 5 ];
-    auto server_hello = ntk::get_server_hello_from_ethernet_frame( tls_server_hello );
+    auto server_hello = *ntk::get_server_hello_from_ethernet_frame( tls_server_hello );
     
     auto [ records, offset_reached ] = *ntk::split_tls_records( test_constants::tls_alert_packet ); 
     ASSERT_EQ( offset_reached, sizeof( test_constants::tls_alert_packet ) );
@@ -76,8 +76,8 @@ TEST( IntegrationTest, DecryptTlsData_ShortStream ) {
     auto server_payloads = ntk::extract_payloads( ntk::flip_four( four ), packet_data );
     auto client_tls_records = ntk::extract_tls_records( client_payloads ).records;
     auto server_tls_records = ntk::extract_tls_records( server_payloads ).records;
-    auto client_hello = ntk::get_client_hello( client_tls_records[ 0 ] );
-    auto server_hello = ntk::get_server_hello( server_tls_records[ 0 ] );
+    auto client_hello = *ntk::get_client_hello( client_tls_records[ 0 ] );
+    auto server_hello = *ntk::get_server_hello( server_tls_records[ 0 ] );
     auto secrets = ntk::get_tls_secrets( "sslkeys.log", client_hello.random );
     
     auto decrypted_record_1 = ntk::decrypt_record(
@@ -107,8 +107,8 @@ TEST( IntegrationTest, DecryptTlsData_LongStream ) {
     auto server_payloads = ntk::extract_payloads( ntk::flip_four( four ), packet_data );
     auto client_tls_records = ntk::extract_tls_records( client_payloads ).records;
     auto server_tls_records = ntk::extract_tls_records( server_payloads ).records;
-    auto client_hello = ntk::get_client_hello( client_tls_records[ 0 ] );
-    auto server_hello = ntk::get_server_hello( server_tls_records[ 0 ] );
+    auto client_hello = *ntk::get_client_hello( client_tls_records[ 0 ] );
+    auto server_hello = *ntk::get_server_hello( server_tls_records[ 0 ] );
 
     std::vector<ntk::tls_record> client_records_to_decrypt( client_tls_records.begin() + 3, client_tls_records.end() );
     std::vector<ntk::tls_record> server_records_to_decrypt( server_tls_records.begin() + 3, server_tls_records.end() );

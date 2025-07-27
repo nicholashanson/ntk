@@ -12,9 +12,9 @@
 TEST( IntegrationTest, DecryptRecord_TlsApplicationData_Client ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
     auto& tls_client_hello = packet_data[ 3 ];
-    auto client_hello = ntk::get_client_hello_from_ethernet_frame( tls_client_hello );
+    auto client_hello = *ntk::get_client_hello_from_ethernet_frame( tls_client_hello );
     auto& tls_server_hello = packet_data[ 5 ];
-    auto server_hello = ntk::get_server_hello_from_ethernet_frame( tls_server_hello );
+    auto server_hello = *ntk::get_server_hello_from_ethernet_frame( tls_server_hello );
     auto session_keys = ntk::get_tls_secrets( "tls_session_keys.log" );
 
     auto& tls_record = packet_data[ 15 ];
@@ -37,9 +37,9 @@ TEST( IntegrationTest, DecryptRecord_TlsApplicationData_Client ) {
 TEST( IntegrationTest, DecrytRecod_TlsApplicationData_Server ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
     auto& tls_client_hello = packet_data[ 3 ];
-    auto client_hello = ntk::get_client_hello_from_ethernet_frame( tls_client_hello );
+    auto client_hello = *ntk::get_client_hello_from_ethernet_frame( tls_client_hello );
     auto& tls_server_hello = packet_data[ 5 ];
-    auto server_hello = ntk::get_server_hello_from_ethernet_frame( tls_server_hello );
+    auto server_hello = *ntk::get_server_hello_from_ethernet_frame( tls_server_hello );
     auto session_keys = ntk::get_tls_secrets( "tls_session_keys.log" );
     auto& tls_record = packet_data[ 11 ];
 

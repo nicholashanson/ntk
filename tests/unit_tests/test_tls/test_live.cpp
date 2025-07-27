@@ -202,7 +202,6 @@ TEST( SystemTest, FireFoxEarthCamSNIFilter ) {
     }
 
     listener.stop();
-
     ASSERT_FALSE( offload_queue.empty() );
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );

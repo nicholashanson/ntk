@@ -16,5 +16,5 @@ TEST( UnitTest, GetFourFromEthernet ) {
         .client_port = 0xac18,
         .server_port = 0x0bb8
     };
-    ASSERT_EQ( expected_four, expected_four );
+    ASSERT_EQ( actual_four, expected_four );
 }

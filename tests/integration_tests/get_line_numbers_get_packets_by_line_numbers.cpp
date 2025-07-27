@@ -20,7 +20,7 @@ TEST( UnitTest, GetLineNumbers_GetPacketsByLineNumbers ) {
     std::vector<ntk::client_hello> client_hellos;
     for ( auto& client_hello_packet : client_hello_packets ) {
         auto tcp_payload = ntk::get_tcp_payload( client_hello_packet.data() );
-        auto client_hello = ntk::get_client_hello( tcp_payload );
+        auto client_hello = *ntk::get_client_hello( tcp_payload );
         client_hellos.push_back( client_hello );
     }
 }

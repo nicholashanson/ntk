@@ -15,7 +15,7 @@ TEST( UnitTest, SniContains ) {
 
     std::vector<ntk::client_hello> client_hellos;
     for ( auto& client_hello_packet : client_hello_packets ) {
-        auto client_hello = ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
+        auto client_hello = *ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
         client_hellos.push_back( client_hello );
     }
     ASSERT_TRUE( !client_hellos.empty() );

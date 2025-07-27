@@ -20,7 +20,7 @@ TEST( UnitTest, ParseClientHello ) {
 
     auto tls_record_span = std::span<const uint8_t>( tls_client_hello_bytes );
     auto client_hello_span = tls_record_span.subspan( 9 );
-    auto client_hello = ntk::parse_client_hello( client_hello_span );
+    auto client_hello = *ntk::parse_client_hello( client_hello_span );
 
     ntk::tls_version expected_tls_version = ntk::tls_version::TLS_1_2;
     std::size_t expected_session_id_size = 32;

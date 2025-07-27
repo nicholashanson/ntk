@@ -15,7 +15,6 @@ TEST( UnitTest, GetStartOfTermination_TinyCross ) {
 
     auto tcp_termination = *ntk::get_termination( four_tuple, packet_data );
     auto start_of_termination_ptr = ntk::get_start_of_termination( packet_data, tcp_termination );
-    
     ASSERT_NE( start_of_termination_ptr, nullptr );
 }
 

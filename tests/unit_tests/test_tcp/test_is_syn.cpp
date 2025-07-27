@@ -10,5 +10,5 @@
 
 TEST( UnitTest, IsSyn_CheckerBoard ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "checkerboard" ] );
-    ASSERT_TRUE( ntk::is_syn( packet_data[ 0 ] ) );
+    ASSERT_TRUE( ntk::is_syn( packet_data.front() ) );
 }

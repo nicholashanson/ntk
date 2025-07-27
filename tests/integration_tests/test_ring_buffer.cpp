@@ -9,7 +9,6 @@ TEST( IntegrationTest, RingBuffer_PushAndPop ) {
     int val;
     EXPECT_TRUE( buf.pop( val ) );
     EXPECT_EQ( val, 10 );
-
 }
 
 TEST( IntegrationTest, RingBuffer_FIFOOrder ) {

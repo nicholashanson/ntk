@@ -14,7 +14,7 @@ TEST( IntegrationTest, DeriveTlsKeyIv ) {
     auto tls_client_hello_bytes = ntk::get_tcp_payload( tls_client_hello_packet.data() );
     auto tls_record_span = std::span<const unsigned char>( tls_client_hello_bytes );
     auto client_hello_span = tls_record_span.subspan( 9 );
-    auto client_hello = ntk::parse_client_hello( client_hello_span );
+    auto client_hello = *ntk::parse_client_hello( client_hello_span );
     auto session_keys = ntk::get_tls_secrets( "tls_session_keys.log" );
     auto secret = ntk::get_traffic_secret( session_keys, client_hello.random, "CLIENT_TRAFFIC_SECRET_0" );    
 

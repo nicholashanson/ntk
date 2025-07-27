@@ -17,12 +17,10 @@ TEST( UnitTest, SplitTlsRecrods ) {
         // partial record 3 ( incomplete, only 2 of 4 payload bytes )
         0x16, 0x03, 0x03, 0x00, 0x04, 0xcc, 0xdd  // 7 bytes ( only first 2 payload bytes )
     };
-
     const unsigned char second_packet[] = {
         // remaining 2 payload bytes for record 3
         0xee, 0xff
     };
-
     auto [ first_records, first_offset ] = *ntk::split_tls_records( std::span( first_packet, sizeof( first_packet ) ) );
     ASSERT_EQ( first_records.size(), 2 );
     ASSERT_EQ( first_offset, 12 );
