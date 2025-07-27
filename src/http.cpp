@@ -2,29 +2,41 @@
 
 namespace ntk {
 
+    // ==============================
+    //             Trim 
+    // ==============================
+
     std::string trim( const std::string& str ) {
-        
         size_t start = str.find_first_not_of(" \t\r\n" );
         size_t end = str.find_last_not_of(" \t\r\n" );
-
         return ( start == std::string::npos || end == std::string::npos )
             ? ""
             : str.substr( start, end - start + 1 );
     }
 
+    bool ends_with_zero_chunk( const tcp_stream& stream ) {
+        const auto& [ seq, data ] = *stream.rbegin();
+        std::vector<uint8_t> zero_chunk_pattern = { '\r', '\n', '\r', '\n' };
+        return std::equal( zero_chunk_pattern.rbegin(), zero_chunk_pattern.rend(), data.rbegin() );
+    };
+
+    // ==============================
+    //           Is HTTP
+    // ==============================
+
     bool is_http( const std::vector<uint8_t>& maybe_http_payload ) {
-
         std::string first_five( maybe_http_payload.begin(), maybe_http_payload.begin() + 5 );
-
         if ( first_five.compare( 0, 5, "HTTP/" ) == 0 || first_five.compare( 0, 3, "GET" ) == 0 ) {
             return true;
         }
-        
         return false;
     }
 
-    http_type get_http_type( const std::vector<uint8_t>& http_payload ) {
+    // ==============================
+    //         Get HTTP Type
+    // ==============================
 
+    http_type get_http_type( const std::vector<uint8_t>& http_payload ) {
         std::string first_five( http_payload.begin(), http_payload.begin() + 5 );
 
         if ( first_five.compare( 0, 5, "HTTP/" ) == 0 ) {
@@ -36,37 +48,8 @@ namespace ntk {
         }
     }
 
-    std::vector<uint8_t> extract_http_payload_from_ethernet( const unsigned char* ethernet_frame ) {
-        
-        const size_t ethernet_header_len = 14;
-
-        uint8_t ihl = ethernet_frame[ ethernet_header_len ] & 0x0F;
-        size_t ipv4_header_len = ihl * 4;
-
-        uint16_t total_length = ( ethernet_frame[ ethernet_header_len + 2 ] << 8 ) |
-                                  ethernet_frame[ ethernet_header_len + 3 ];
-
-        size_t tcp_header_offset = ethernet_header_len + ipv4_header_len;
-
-        uint8_t data_offset_byte = ethernet_frame[ tcp_header_offset + 12 ];
-        size_t tcp_header_len = ( ( data_offset_byte >> 4 ) & 0x0F ) * 4;
-
-        uint16_t src_port = ( ethernet_frame[ tcp_header_offset ] << 8 ) | ethernet_frame[ tcp_header_offset + 1 ];
-        uint16_t dst_port = ( ethernet_frame[ tcp_header_offset + 2 ] << 8 ) | ethernet_frame[ tcp_header_offset + 3 ];
-
-        size_t http_payload_len = total_length - ipv4_header_len - tcp_header_len;
-
-        const uint8_t* http_payload_ptr = ethernet_frame + tcp_header_offset + tcp_header_len;
-
-        std::vector<uint8_t> http_payload( http_payload_len );
-        std::memcpy( http_payload.data(), http_payload_ptr, http_payload_len );
-
-        return http_payload;
-    }
-
     std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::vector<uint8_t>>
     split_http_payload( const std::vector<uint8_t>& payload ) {
-
         auto begin = payload.begin();
         auto end = payload.end();
 
@@ -84,30 +67,28 @@ namespace ntk {
     }
 
     http_request_line parse_http_request_line( const std::vector<uint8_t>& request_line_bytes ) {
-
         std::string request_line_string( request_line_bytes.begin(), request_line_bytes.end() );
         std::stringstream request_line_stream( request_line_string );
         http_request_line r_line;
-
         request_line_stream >> r_line.method_token >> r_line.path >> r_line.http_version;
-        
         return r_line;
     }
+
+    // ==============================
+    //      Contains HTTP Header
+    // ==============================
 
     bool contains_http_header( const http_headers& headers, const std::string& header_name  ) {
         return headers.contains( header_name );
     }  
 
     http_headers parse_http_headers(const std::vector<uint8_t>& header_bytes) {
-        
         std::string headers_string( header_bytes.begin(), header_bytes.end() );
         http_headers headers;
-
-        size_t pos = 0;
+        std::size_t pos = 0;
 
         while ( pos < headers_string.size() ) {
-            
-            size_t line_end = headers_string.find( "\r\n", pos );
+            std::size_t line_end = headers_string.find( "\r\n", pos );
             std::string line;
 
             if ( line_end == std::string::npos ) {
@@ -118,10 +99,9 @@ namespace ntk {
                 pos = line_end + 2; 
             }
 
-            size_t colon_pos = line.find( ':' );
+            std::size_t colon_pos = line.find( ':' );
             std::string key = trim( line.substr( 0, colon_pos ) );
             std::string value = trim( line.substr( colon_pos + 1 ) );
-
             headers[ key ] = value;
         }
 
@@ -134,7 +114,6 @@ namespace ntk {
     }
 
     http_response_status_line parse_http_status_line( const std::vector<uint8_t>& status_line_bytes ) {
-
         std::string line( status_line_bytes.begin(), status_line_bytes.end() );
         std::istringstream stream(line);
         
@@ -148,8 +127,7 @@ namespace ntk {
         std::string reason_phrase;
         std::getline( stream, reason_phrase );
 
-        status_line.reason_phrase = trim(reason_phrase);
-
+        status_line.reason_phrase = trim( reason_phrase );
         return status_line;
     }
 
@@ -161,25 +139,21 @@ namespace ntk {
     }
 
     std::vector<uint8_t> decode_chunked_http_body( const std::vector<uint8_t>& chunked_body ) {
-            
         std::vector<uint8_t> decoded;
-        size_t pos = 0;
+        std::size_t pos = 0;
 
-        while (pos < chunked_body.size()) {
-
+        while ( pos < chunked_body.size() ) {
             auto crlf = std::search( chunked_body.begin() + pos, chunked_body.end(), "\r\n", "\r\n" + 2 );
             if ( crlf == chunked_body.end() ) break;
 
             std::string chunk_size_str( chunked_body.begin() + pos, crlf );
-            size_t chunk_size = std::stoul( chunk_size_str, nullptr, 16 );
-            
+            std::size_t chunk_size = std::stoul( chunk_size_str, nullptr, 16 );
             pos = crlf - chunked_body.begin() + 2;
 
             if ( chunk_size == 0 ) break;
             if ( pos + chunk_size > chunked_body.size() ) break;
             
             decoded.insert( decoded.end(), chunked_body.begin() + pos, chunked_body.begin() + pos + chunk_size );
-            
             pos += chunk_size + 2;  
         }
 
@@ -187,10 +161,9 @@ namespace ntk {
     }
 
     std::vector<uint8_t> get_first_http_respone( const session& packet_data ) {
-
-        auto raw_tcp_stream = extract_raw_tcp_stream( packet_data );
+        auto raw_tcp_stream = get_raw_tcp_stream( packet_data );
         auto tcp_stream = get_tcp_stream( raw_tcp_stream ); 
-
+        std::cout << "hi" << std::endl;
         auto response = *std::find_if( tcp_stream.begin(), tcp_stream.end(), 
             []( const auto& pair ) { 
                 auto& [ unused, http_payload ] = pair;
@@ -202,7 +175,6 @@ namespace ntk {
     }   
 
     std::vector<uint8_t> get_http_response_data( const tcp_stream& stream ) {
-
         auto response_pos = std::find_if( stream.begin(), stream.end(), 
             []( const auto& pair ) { 
                 auto& [ unused, http_payload ] = pair;
@@ -213,7 +185,6 @@ namespace ntk {
         auto response = *response_pos;
         auto http_headers = get_http_headers_from_payload( response.second );
         auto response_data = std::get<2>( split_http_payload( response.second ) );
-
         auto it = std::next( response_pos );
 
         while ( it != stream.end() ) {
@@ -230,25 +201,19 @@ namespace ntk {
     }
 
     http_request get_http_request( const std::vector<uint8_t>& http_payload ) {
-
         http_request request;
-
         auto [ request_line_bytes, header_bytes, unused_bytes ] = split_http_payload( http_payload );
         request.request_line = parse_http_request_line( request_line_bytes );
         request.headers = parse_http_headers( header_bytes );
-
         return request;
     }
 
     http_response get_http_response( const std::vector<uint8_t>& http_payload ) {
-
         http_response response;
-
         auto [ status_line_bytes, header_bytes, body_bytes ] = split_http_payload( http_payload );
         response.status_line = parse_http_status_line( status_line_bytes );
         response.headers = parse_http_headers( header_bytes );
         response.body = body_bytes;
-
         return response;
     }
 

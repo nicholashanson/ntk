@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <cstring>
-
 #include <unordered_map>
 #include <string>
 #include <vector>
@@ -20,7 +19,7 @@ namespace ntk {
     std::string trim( const std::string& str );
 
     // ==============================
-    //           HTTP TYPE
+    //           HTTP Type
     // ==============================
 
     enum class http_type {
@@ -30,13 +29,15 @@ namespace ntk {
     };
 
     // ==============================
-    //          PREDICATES
+    //          Predicates
     // ==============================
 
     bool is_http( const std::vector<uint8_t>& maybe_http_payload );
 
+    bool ends_with_zero_chunk( const tcp_stream& stream );
+
     // ==============================
-    //         HTTP HEADERS
+    //         HTTP Headers
     // ==============================
 
     using http_headers = std::unordered_map<std::string,std::string>;
@@ -48,7 +49,7 @@ namespace ntk {
     http_type get_http_type( const std::vector<uint8_t>& http_payload );
 
     // ==============================
-    //        HTTP REQUEST
+    //        HTTP Request
     // ==============================
 
     struct http_request_line {
@@ -69,7 +70,7 @@ namespace ntk {
     std::vector<uint8_t> get_first_http_respone( const session& packet_data );
 
     // ==============================
-    //        HTTP RESPONSE
+    //        HTTP Response
     // ==============================
 
     struct http_response_status_line {
@@ -84,6 +85,15 @@ namespace ntk {
         std::vector<uint8_t> body;
     };
 
+    struct incomplete_http_response {
+        std::size_t content_length;
+        std::vector<uint8_t> body;
+
+        bool http_response_complete() {
+            return content_length == body.size();
+        }
+    };
+
     http_response_status_line parse_http_status_line( const std::vector<uint8_t>& status_line_bytes );
 
     http_response get_http_response( const std::vector<uint8_t>& http_payload );
@@ -91,23 +101,16 @@ namespace ntk {
     std::vector<uint8_t> get_http_response_data( const tcp_stream& stream );
 
     // ==============================
-    //        HTTP EXTRACTION
+    //       Split HTTP Payload
     // ==============================
 
-    std::vector<uint8_t> extract_http_payload_from_ethernet( const unsigned char* ethernet_frame );
-
-    std::vector<uint8_t> extract_http_payload_from_tcp( const std::vector<uint8_t> tcp_frame );
-
-    // ==============================
-    //       SPLIT HTTP PAYLOAD
-    // ==============================
     std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::vector<uint8_t>>
     split_http_payload( const std::vector<uint8_t>& payload );
 
     bool contains_http_header( const http_headers& headers, const std::string& header_name );
    
     // ==============================
-    //        CHUNK DECODING
+    //        Chunk Decoding
     // ==============================
 
     std::vector<uint8_t> decode_single_chunk( const std::vector<uint8_t>& chunked_body );
