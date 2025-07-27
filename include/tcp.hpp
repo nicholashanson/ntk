@@ -177,8 +177,6 @@ namespace ntk {
 
     bool is_ack_of_seq( const uint32_t seq_number, const uint32_t ack_number );
 
-    bool is_same_connection( const std::vector<uint8_t>& lhs, const std::vector<uint8_t>& rhs );
-
     // ==============================
     //         Four Tuple
     // ==============================
@@ -200,6 +198,16 @@ namespace ntk {
     bool has_four( const std::vector<uint8_t>& packet, const four_tuple& four ); 
 
     bool has_flipped_four( const std::vector<uint8_t>& packet, const four_tuple& four );
+
+    // ==============================
+    //       Is Same Connection
+    // ==============================
+
+    bool is_same_connection(const four_tuple& lhs, const four_tuple& rhs );
+
+    bool is_same_connection( const std::vector<uint8_t>& packet, const four_tuple& four );
+
+    bool is_same_connection( const std::vector<uint8_t>& lhs, const std::vector<uint8_t>& rhs );
 
 } // namespace ntk
 
@@ -412,13 +420,14 @@ namespace ntk {
             bool traffic_contains( Predicate predicate ) const {
                 return std::any_of( m_traffic.begin(), m_traffic.end(), predicate );
             }
-        private:
+        protected:
             tcp_handshake_feed m_handshake_feed;
+        private:
             tcp_termination_feed m_termination_feed;
         protected:
             std::vector<std::vector<uint8_t>> m_traffic;
-        private:
             four_tuple m_four;
+        private:
             friend class tcp_live_stream_friend_helper;
             friend std::ostream& operator<<( std::ostream& os, const tcp_live_stream& live_stream );
             friend void output_stream_to_file( const std::string& filename, const tcp_live_stream& live_stream );
