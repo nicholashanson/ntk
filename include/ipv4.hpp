@@ -90,17 +90,19 @@ namespace ntk {
 
     std::size_t get_ipv4_header_len( const unsigned char* ethernet_frame );
 
-    std::vector<uint8_t> extract_raw_ipv4_header( const unsigned char* ethernet_frame );
+     std::size_t get_ipv4_header_len( const std::vector<uint8_t>& packet );
 
-    ipv4_header parse_ipv4_header( const std::vector<uint8_t>& raw_ipv4_header );
+    std::vector<uint8_t> get_raw_ipv4_header( const unsigned char* ethernet_frame );
 
-    ipv4_header get_ipv4_header( const unsigned char* ethernet_frame );
+    ipv4_header get_parsed_ipv4_header( const std::vector<uint8_t>& raw_ipv4_header );
+
+    ipv4_header get_parsed_ipv4_header( const unsigned char* ethernet_frame );
 
     struct ipv4_filter {
         uint32_t ip_addr;
 
         bool operator()( const std::vector<uint8_t>& packet ) const {
-            auto header = get_ipv4_header( packet.data() );
+            auto header = get_parsed_ipv4_header( packet );
             return ( header.source_ip_addr == ip_addr ) || ( header.destination_ip_addr == ip_addr );
         }
     };
