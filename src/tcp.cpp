@@ -765,6 +765,14 @@ namespace ntk {
         return m_four;
     }
 
+    bool tcp_live_stream::is_client_packet( const std::vector<uint8_t>& packet ) const { 
+        return has_four( packet, m_four ); 
+    }
+
+    bool tcp_live_stream::is_server_packet( const std::vector<uint8_t>& packet ) const { 
+        return has_flipped_four( packet, m_four ); 
+    }
+
     tcp_live_stream_session::tcp_live_stream_session() 
         : m_offload_queue( nullptr ) {}
 
@@ -864,6 +872,14 @@ namespace ntk {
 
     const four_tuple& tcp_live_stream_friend_helper::four( const tcp_live_stream& t ) {
         return t.m_four;
+    }
+
+    bool tcp_live_stream_friend_helper::is_client_packet( const tcp_live_stream& t, const std::vector<uint8_t>& packet ) {
+        return t.is_client_packet( packet );
+    }
+
+    bool tcp_live_stream_friend_helper::is_server_packet( const tcp_live_stream& t, const std::vector<uint8_t>& packet ) {
+        return t.is_server_packet( packet );
     }
 
     const tcp_live_stream& tcp_live_stream_session_friend_helper::get_live_stream( const tcp_live_stream_session& t, const four_tuple& four ) {

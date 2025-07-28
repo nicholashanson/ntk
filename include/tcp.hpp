@@ -425,6 +425,8 @@ namespace ntk {
         private:
             tcp_termination_feed m_termination_feed;
         protected:
+            bool is_client_packet( const std::vector<uint8_t>& packet ) const;
+            bool is_server_packet( const std::vector<uint8_t>& packet ) const;
             std::vector<std::vector<uint8_t>> m_traffic;
             four_tuple m_four;
         private:
@@ -439,6 +441,8 @@ namespace ntk {
             static const tcp_termination_feed& termination_feed( const tcp_live_stream& t );
             static const std::vector<std::vector<uint8_t>>& traffic( const tcp_live_stream& t );
             static const four_tuple& four( const tcp_live_stream& t );
+            static bool is_client_packet( const tcp_live_stream& t, const std::vector<uint8_t>& packet );
+            static bool is_server_packet( const tcp_live_stream& t, const std::vector<uint8_t>& packet );
     };
 
     struct four_tuple_filter {

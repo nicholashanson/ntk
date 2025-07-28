@@ -120,3 +120,20 @@ TEST( UnitTest, TcpLiveStream_IsComplete_Checkerboard ) {
     }
     ASSERT_TRUE( live_stream.is_complete() );
 }
+
+TEST( UnitTest, TcpLiveStream_IsClientPacket ) {
+    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "checkerboard" ] );
+    auto syn_packet = packet_data[ 0 ];
+    auto four = ntk::get_four_from_ethernet( syn_packet );
+    ntk::tcp_live_stream live_stream( four );
+    ASSERT_TRUE( ntk::tcp_live_stream_friend_helper::is_client_packet( live_stream, syn_packet ) );
+}
+
+TEST( UnitTest, TcpLiveStream_IsServerPacket ) {
+    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "checkerboard" ] );
+    auto syn_packet = packet_data[ 0 ];
+    auto synack_packet = packet_data[ 1 ];
+    auto four = ntk::get_four_from_ethernet( syn_packet );
+    ntk::tcp_live_stream live_stream( four );
+    ASSERT_TRUE( ntk::tcp_live_stream_friend_helper::is_server_packet( live_stream, synack_packet ) );
+}
