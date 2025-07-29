@@ -222,7 +222,7 @@ namespace ntk {
         }
         auto [ records, offset_reached ] = *split_result;
         if ( records.empty() ) {
-            return std::unexpected( "The ethernet_frame contains no complete TLS records" );
+            return std::unexpected( "The ethernet frame contains no complete TLS records" );
         }  
         auto& server_hello_record = records.front();
         if ( !is_server_hello( server_hello_record ) ) {
@@ -254,25 +254,52 @@ namespace ntk {
         std::vector<tls_record> records;
 
         while ( !tls_payload.empty() ) {
-            const uint8_t& first_byte = tls_payload[ 0 ];
-            tls_record rec;
-            rec.content_type = static_cast<tls_content_type>( first_byte );
-            tls_version version = static_cast<tls_version>( ( tls_payload[ 1 ] << 8 ) | tls_payload[ 2 ] );
-            uint16_t record_len = ( tls_payload[ 3 ] << 8 ) | tls_payload[ 4 ];
-            rec.version = version;
+            if ( tls_payload.size() < 5 ) {
+                return std::unexpected( "TLS payload too short for record header" ); 
+            }
+            uint16_t record_len = read_uint16_be( tls_payload, 3 );
+            std::size_t full_record_len = 5 + record_len;
 
-            if ( 5 + record_len <= tls_payload.size() ) {
-                rec.payload.assign( tls_payload.begin() + 5, tls_payload.begin() + 5 + record_len );
-                records.push_back( rec );
-                offset_reached += 5 + record_len;
-            } else {
+            if ( tls_payload.size() < full_record_len ) {
                 break;
             }
-
-            tls_payload = tls_payload.subspan( 5 + record_len );
+            auto record_span = tls_payload.first( full_record_len );
+            auto result = get_parsed_tls_record( record_span );
+            if ( !result ) {
+                return std::unexpected( "Failed to parse TLS record: " + result.error() );
+            }
+            records.push_back( std::move( result.value() ) );
+            offset_reached += full_record_len;
+            tls_payload = tls_payload.subspan( full_record_len );
         }
-
         return std::make_tuple( records, offset_reached );
+    }
+
+    std::expected<
+        std::tuple<std::vector<tls_record>,size_t>,
+        std::string
+    > get_tls_records_from_ethernet( std::span<const uint8_t> packet ) {
+        auto tls_payload = get_tcp_payload( packet );
+        return split_tls_records( tls_payload );
+    }
+
+    // ==============================
+    //      Get Parsed TLS Record 
+    // ==============================
+
+    std::expected<tls_record,std::string> get_parsed_tls_record( std::span<const uint8_t> raw_tls_record ) {
+        if ( raw_tls_record.size() < 5 ) {
+            return std::unexpected("TLS record too short to contain header");
+        }
+        tls_record record;
+        record.content_type = static_cast<tls_content_type>( raw_tls_record[ 0 ] );
+        record.version = static_cast<tls_version>( read_uint16_be( raw_tls_record, 1 ) );
+        uint16_t record_len = read_uint16_be( raw_tls_record, 3 );
+        if ( raw_tls_record.size() < 5 + record_len ) {
+            return std::unexpected( "TLS record payload length exceeds buffer size" );
+        }
+        record.payload.assign( raw_tls_record.begin() + 5, raw_tls_record.begin() + 5 + record_len );
+        return record;
     }
 
     // ==============================
@@ -283,10 +310,8 @@ namespace ntk {
         if ( !is_tls( packet ) ) return false;
         auto tls_record = get_tcp_payload( packet );
         if ( tls_record.size() < 6 ) return false;
-
         uint8_t content_type = tls_record[ 0 ];
         if ( content_type != 22 ) return false;
-
         uint8_t handshake_t = tls_record[ 5 ];
         return static_cast<handshake_type>( handshake_t ) == handshake_type::SERVER_HELLO; 
     }
@@ -308,27 +333,32 @@ namespace ntk {
 
     bool is_tls_alert( const unsigned char* packet ) {
         if ( !is_tls( packet ) ) return false;
-
         auto tls_record = get_tcp_payload( packet );
-
         if ( tls_record.size() < 7 ) return false; 
-
         uint8_t content_type = tls_record[ 0 ];
         if ( content_type != 20 ) return false; 
-
         uint16_t length = ( tls_record[ 3 ] << 8 ) | tls_record[ 4 ];
         if ( length < 2 ) return false; 
-
         uint8_t alert_level = tls_record[ 5 ];       
         uint8_t alert_description = tls_record[ 6 ];
-
         if ( alert_level != 1 && alert_level != 2 ) return false;
-
         return true;
     }
 
     bool is_tls_alert_v( const std::vector<uint8_t>& packet ) {
         return is_tls_alert( packet.data() );
+    }
+
+    bool is_tls_alert( const tls_record& record ) {
+        return record.content_type == tls_content_type::ALERT;
+    }
+
+    // ==============================
+    //  Change Cipher Spec Predicates
+    // ==============================
+
+    bool is_change_cipher_spec( const tls_record& record ) {
+        return record.content_type == tls_content_type::CHANGE_CIPHER_SPEC;    
     }
 
     // ==============================
@@ -693,10 +723,8 @@ namespace ntk {
         if ( !is_tcp( packet ) ) return false;
         auto tcp_payload = get_tcp_payload( packet );
         if ( tcp_payload.size() == 0 ) return false;
-
         uint8_t content_type = tcp_payload[ 0 ];
         uint8_t major_version = tcp_payload[ 1 ];
-
         if ( content_type < 20 || content_type > 23 ) return false; 
         if ( major_version != 3 ) return false;
         return true;
@@ -918,11 +946,33 @@ namespace ntk {
                 if ( is_complete_secrets( tls_secrets[ client_random_to_hex( m_client_hello.random ) ] ) ) {
                     m_tls_secrets = tls_secrets;
                     m_lines_consumed = line_reached;
-                    return true;
-                } else {
-                    return false;
                 }
+                return true; 
             }
+        }
+        if ( is_data_packet( packet ) && is_client_packet( packet ) ) {
+            auto result = get_tls_record_from_ethernet( packet );
+            if ( !result ) {
+                return false;
+            }
+            auto& encrypted_record = result.value();
+            if ( is_change_cipher_spec( encrypted_record ) ) return false;
+            auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
+                                                    m_tls_secrets, "CLIENT_TRAFFIC_SECRET_0", m_client_traffic_seq_number );
+            ++m_client_traffic_seq_number;
+            return true;
+        }
+        if ( is_data_packet( packet ) && is_server_packet( packet ) ) {
+            if ( !is_tls_v( packet ) ) return false;
+            auto result = get_tls_record_from_ethernet( packet );
+            if ( !result ) {
+                return false;
+            }
+            auto& encrypted_record = result.value();
+            auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
+                                                    m_tls_secrets, "SERVER_TRAFFIC_SECRET_0", m_server_traffic_seq_number );
+            ++m_server_traffic_seq_number;
+            return true;
         }
         return false;
     }
@@ -987,6 +1037,10 @@ namespace ntk {
 
     const int tls_live_stream_friend_helper::server_traffic_seq_number( const tls_live_stream& t ) {
         return t.m_server_traffic_seq_number;
+    }
+
+    std::optional<tls_record> tls_live_stream_friend_helper::decrypted_record( const tls_live_stream& t ) {
+        return t.m_decrypted_record;
     }
 
     // ==============================
