@@ -936,6 +936,7 @@ namespace ntk {
     }
 
     bool tls_live_stream::feed( const std::vector<uint8_t>& packet ) {
+        m_decrypted_record = std::nullopt;
         if ( !m_handshake_feed.m_complete ) return tcp_live_stream::feed( packet );
         if ( is_client_hello_v( packet ) ) return populate_client_hello( packet ); 
         if ( !m_server_hello_populated ) { 
@@ -959,6 +960,7 @@ namespace ntk {
             if ( is_change_cipher_spec( encrypted_record ) ) return false;
             auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
                                                     m_tls_secrets, "CLIENT_TRAFFIC_SECRET_0", m_client_traffic_seq_number );
+            m_decrypted_record = std::move( decrypted_record );
             ++m_client_traffic_seq_number;
             return true;
         }
@@ -971,6 +973,7 @@ namespace ntk {
             auto& encrypted_record = result.value();
             auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
                                                     m_tls_secrets, "SERVER_TRAFFIC_SECRET_0", m_server_traffic_seq_number );
+            m_decrypted_record = std::move( decrypted_record );
             ++m_server_traffic_seq_number;
             return true;
         }

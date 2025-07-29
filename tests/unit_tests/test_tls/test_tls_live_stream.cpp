@@ -134,3 +134,65 @@ TEST( UnitTest, TLSLiveStream_GetTlsSecretsDynamically ) {
 	auto lines_consumed = ntk::tls_live_stream_friend_helper::lines_consumed( live_stream );
 	ASSERT_EQ( lines_consumed, 10 );
 }
+
+TEST( UnitTest, TlsLiveStream_ClientTrafficSeqNumber ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::tls_live_stream live_stream( four, ssl_keys_log );
+	const std::size_t read_packets_to = 12;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto client_traffic_seq_number = ntk::tls_live_stream_friend_helper::client_traffic_seq_number( live_stream );
+	ASSERT_EQ( client_traffic_seq_number, 1 );
+}
+
+TEST( UnitTest, TlsLiveStream_ServerTrafficSeqNumber ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::tls_live_stream live_stream( four, ssl_keys_log );
+	const std::size_t read_packets_to = 14;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto server_traffic_seq_number = ntk::tls_live_stream_friend_helper::server_traffic_seq_number( live_stream );
+	ASSERT_EQ( server_traffic_seq_number, 1 );
+}
+
+TEST( UnitTest, TlsLiveStream_Initialization_DecryptedRecord ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake"] );
+	auto& tcp_syn_packet = packet_data.front();
+	auto four = ntk::get_four_from_ethernet( tcp_syn_packet );
+	std::string ssl_keys_log = "tls_session_keys.log";
+	ntk::tls_live_stream live_stream( four, ssl_keys_log );
+	auto decrypted_record = ntk::tls_live_stream_friend_helper::decrypted_record( live_stream );
+	ASSERT_FALSE( decrypted_record );
+}
+
+TEST( UnitTest, TlsLiveStream_DecryptedRecord ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::tls_live_stream live_stream( four, ssl_keys_log );
+	const std::size_t read_packets_to = 12;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto decrypted_record = ntk::tls_live_stream_friend_helper::decrypted_record( live_stream );
+	ASSERT_TRUE( decrypted_record );
+}
+
+TEST( UnitTest, TlsLiveStream_DecryptedRecord_Reset ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::tls_live_stream live_stream( four, ssl_keys_log );
+	const std::size_t read_packets_to = 13;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto decrypted_record = ntk::tls_live_stream_friend_helper::decrypted_record( live_stream );
+	ASSERT_FALSE( decrypted_record );
+}
