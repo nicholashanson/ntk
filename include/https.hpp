@@ -8,7 +8,7 @@ namespace ntk {
 
     struct incomplete_request_response {
         std::optional<http_request> request;
-	    std::optional<incomplete_http_response> response;
+        std::optional<incomplete_http_response> response;
     };
 
     class https_live_stream : public tls_live_stream {
