@@ -24,7 +24,7 @@ namespace ntk {
 
     class https_live_stream_friend_helper {
         public:
-        static incomplete_request_response get_incomplete_request_response( const https_live_stream& h );
+            static incomplete_request_response get_incomplete_request_response( const https_live_stream& h );
     };
 
 } // namespace ntk
