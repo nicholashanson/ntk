@@ -34,6 +34,10 @@ namespace ntk {
 
     bool is_http( const std::vector<uint8_t>& maybe_http_payload );
 
+    bool is_http_request( std::span<const unsigned char> packet );
+
+    bool is_http_response( std::span<const unsigned char> packet );
+
     bool ends_with_zero_chunk( const tcp_stream& stream );
 
     // ==============================

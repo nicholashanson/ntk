@@ -33,6 +33,24 @@ namespace ntk {
     }
 
     // ==============================
+    //        Is HTTP Request
+    // ==============================
+
+    bool is_http_request( std::span<const unsigned char> packet ) {
+        auto payload = get_tcp_payload( packet );
+        return get_http_type( payload ) == http_type::REQUEST; 
+    }
+
+    // ==============================
+    //        Is HTTP Response
+    // ==============================
+
+    bool is_http_response( std::span<const unsigned char> packet ) {
+        auto payload = get_tcp_payload( packet );
+        return get_http_type( payload ) == http_type::RESPONSE; 
+    }
+
+    // ==============================
     //         Get HTTP Type
     // ==============================
 
@@ -145,7 +163,6 @@ namespace ntk {
         while ( pos < chunked_body.size() ) {
             auto crlf = std::search( chunked_body.begin() + pos, chunked_body.end(), "\r\n", "\r\n" + 2 );
             if ( crlf == chunked_body.end() ) break;
-
             std::string chunk_size_str( chunked_body.begin() + pos, crlf );
             std::size_t chunk_size = std::stoul( chunk_size_str, nullptr, 16 );
             pos = crlf - chunked_body.begin() + 2;
