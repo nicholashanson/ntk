@@ -36,18 +36,26 @@ namespace ntk {
     //        Is HTTP Request
     // ==============================
 
-    bool is_http_request( std::span<const unsigned char> packet ) {
+    bool is_http_request_packet( std::span<const unsigned char> packet ) {
         auto payload = get_tcp_payload( packet );
-        return get_http_type( payload ) == http_type::REQUEST; 
+        return is_http_request( payload );
+    }
+
+    bool is_http_request( const std::vector<uint8_t>& tcp_payload ) {
+        return get_http_type( tcp_payload ) == http_type::REQUEST;
     }
 
     // ==============================
     //        Is HTTP Response
     // ==============================
 
-    bool is_http_response( std::span<const unsigned char> packet ) {
+    bool is_http_response_packet( std::span<const unsigned char> packet ) {
         auto payload = get_tcp_payload( packet );
-        return get_http_type( payload ) == http_type::RESPONSE; 
+        return is_http_response( payload );
+    }
+
+    bool is_http_response( const std::vector<uint8_t>& tcp_payload ) {
+        return get_http_type( tcp_payload ) == http_type::RESPONSE; 
     }
 
     // ==============================

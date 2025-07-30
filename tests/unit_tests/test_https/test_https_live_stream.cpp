@@ -34,7 +34,7 @@ TEST( UnitTest, HttpsLiveStream_TlsSecrets ) {
 	ASSERT_TRUE( ntk::is_complete_secrets( tls_secrets[ client_random_hex ] ) );
 }
 
-TEST( UnitTest, HttpLiveSteam_IncompleteRequestRespomse_HttpRequest ) {
+TEST( UnitTest, HttpLiveStream_IncompleteRequestResponse_HttpRequest ) {
 	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
 	std::string ssl_keys_log = "sslkeys.log";
 	auto four = ntk::get_four_from_ethernet( packet_data.front() );

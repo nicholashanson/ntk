@@ -34,9 +34,13 @@ namespace ntk {
 
     bool is_http( const std::vector<uint8_t>& maybe_http_payload );
 
-    bool is_http_request( std::span<const unsigned char> packet );
+    bool is_http_request_packet( std::span<const unsigned char> packet );
 
-    bool is_http_response( std::span<const unsigned char> packet );
+    bool is_http_request( const std::vector<uint8_t>& tcp_payload );
+
+    bool is_http_response_packet( std::span<const unsigned char> packet );
+
+    bool is_http_response( const std::vector<uint8_t>& tcp_payload );
 
     bool ends_with_zero_chunk( const tcp_stream& stream );
 
@@ -56,6 +60,7 @@ namespace ntk {
     //        HTTP Request
     // ==============================
 
+    // TODO: change "path" to "request_target"
     struct http_request_line {
         std::string method_token;
         std::string path;
