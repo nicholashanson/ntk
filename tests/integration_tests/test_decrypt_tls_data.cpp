@@ -47,8 +47,8 @@ TEST( IntegrationTest, DecryptTlsData_TlsAlert ) {
     auto& tls_server_hello = packet_data[ 5 ];
     auto server_hello = *ntk::get_server_hello_from_ethernet_frame( tls_server_hello );
     
-    auto [ records, offset_reached ] = *ntk::split_tls_records( test_constants::tls_alert_packet ); 
-    ASSERT_EQ( offset_reached, sizeof( test_constants::tls_alert_packet ) );
+    auto [ records, offset_reached ] = *ntk::split_tls_records( test_constants::tls_combined_records ); 
+    ASSERT_EQ( offset_reached, sizeof( test_constants::tls_combined_records ) );
     ASSERT_EQ( records.size(), 2 );
 
     auto session_keys = ntk::get_tls_secrets( "tls_session_keys.log" );
@@ -142,3 +142,32 @@ TEST( IntegrationTest, DecryptTlsData_LongStream ) {
     }
     ntk::write_payload_to_file( response.body, "segment.ts" );
 }
+
+TEST( IntegrationTest, DecryptTlsData_HttpRequest ) {
+    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+    auto http_reqeust_record = packet_data[ 11 ];
+    auto four = *ntk::get_four_tuples( packet_data ).begin();
+    auto client_payloads = ntk::extract_payloads( four, packet_data );
+    auto server_payloads = ntk::extract_payloads( ntk::flip_four( four ), packet_data );
+    auto client_tls_records = ntk::extract_tls_records( client_payloads ).records;
+    auto server_tls_records = ntk::extract_tls_records( server_payloads ).records;
+    auto client_hello = *ntk::get_client_hello( client_tls_records[ 0 ] );
+    auto server_hello = *ntk::get_server_hello( server_tls_records[ 0 ] );
+
+    std::vector<ntk::tls_record> client_records_to_decrypt( client_tls_records.begin() + 3, client_tls_records.end() );
+    auto secrets = ntk::get_tls_secrets( "sslkeys.log", client_hello.random );
+    
+    auto decrypted_client_tls_records = ntk::decrypt_tls_data(
+        client_hello.random,
+        server_hello.random,
+        server_hello.server_version,
+        server_hello.cipher_suite,
+        client_records_to_decrypt,
+        secrets,
+        "CLIENT_TRAFFIC_SECRET_0" );
+
+    ntk::print_vector( decrypted_client_tls_records.front().payload );
+
+    ASSERT_TRUE( ntk::is_http_request( decrypted_client_tls_records.front().payload )  );
+}
+
