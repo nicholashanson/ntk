@@ -40,7 +40,7 @@ TEST( IntegrationTest, DecryptTlsData ) {
     ASSERT_EQ( decrypted_records.size(), 1 );
 }
 
-TEST( IntegrationTest, DecryptTlsData_TlsAlert ) {
+TEST( IntegrationTest, DecryptTlsData_TlsCombinedRecords ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
     auto& tls_client_hello = packet_data[ 3 ];
     auto client_hello = *ntk::get_client_hello_from_ethernet_frame( tls_client_hello );
