@@ -15,6 +15,10 @@
 
 namespace ntk {
 
+    enum class mime_type : uint8_t {
+        VIDEO_MP2T
+    };
+
     enum class file_extension : uint8_t {
         M3U8
     };
