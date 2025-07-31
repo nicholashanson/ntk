@@ -19,12 +19,14 @@ namespace ntk {
         private:
             std::vector<std::pair<http_request,http_response>> m_request_response;
             incomplete_request_response m_incomplete_request_response;
+            std::optional<mime_type> m_expected_data;
             friend class https_live_stream_friend_helper;
     };
 
     class https_live_stream_friend_helper {
         public:
             static incomplete_request_response get_incomplete_request_response( const https_live_stream& h );
+            static std::optional<mime_type> expected_data( const https_live_stream& h );
     };
 
 } // namespace ntk
