@@ -15,6 +15,10 @@
 
 namespace ntk {
 
+    enum class file_extension : uint8_t {
+        M3U8
+    };
+
     // TODO: check http rules on whitespace in headers
     std::string trim( const std::string& str );
 
@@ -63,7 +67,7 @@ namespace ntk {
     // TODO: change "path" to "request_target"
     struct http_request_line {
         std::string method_token;
-        std::string path;
+        std::string request_target;
         std::string http_version;
     };
 
@@ -74,7 +78,7 @@ namespace ntk {
 
     http_request_line parse_http_request_line( const std::vector<uint8_t>& request_line_bytes );
 
-    http_request get_http_request( const std::vector<uint8_t>& http_payload );
+    http_request get_http_request( std::span<const unsigned char> http_payload );
 
     std::vector<uint8_t> get_first_http_respone( const session& packet_data );
 
@@ -114,7 +118,7 @@ namespace ntk {
     // ==============================
 
     std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::vector<uint8_t>>
-    split_http_payload( const std::vector<uint8_t>& payload );
+    split_http_payload( std::span<const unsigned char> payload );
 
     bool contains_http_header( const http_headers& headers, const std::string& header_name );
    
@@ -125,6 +129,22 @@ namespace ntk {
     std::vector<uint8_t> decode_single_chunk( const std::vector<uint8_t>& chunked_body );
 
     std::vector<uint8_t> decode_chunked_http_body( const std::vector<uint8_t>& chunked_body );
+
+    std::optional<file_extension> extract_file_extension( const std::string& path );
+
+    std::string get_path( const std::string& request_target );
+
+    std::optional<file_extension> string_to_file_extension( const std::string& file_extension_string );
+
+    template<file_extension F>
+    bool is_request_for( const http_request& request ) {
+        auto path = get_path( request.request_line.request_target );
+        auto file_extension = extract_file_extension( path );
+        if ( !file_extension ) {
+            return false;
+        }
+        return file_extension == F; 
+    }
 
 } // namespace ntk
 

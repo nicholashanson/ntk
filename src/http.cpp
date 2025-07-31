@@ -75,7 +75,7 @@ namespace ntk {
     }
 
     std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::vector<uint8_t>>
-    split_http_payload( const std::vector<uint8_t>& payload ) {
+    split_http_payload( std::span<const unsigned char> payload ) {
         auto begin = payload.begin();
         auto end = payload.end();
 
@@ -96,7 +96,7 @@ namespace ntk {
         std::string request_line_string( request_line_bytes.begin(), request_line_bytes.end() );
         std::stringstream request_line_stream( request_line_string );
         http_request_line r_line;
-        request_line_stream >> r_line.method_token >> r_line.path >> r_line.http_version;
+        request_line_stream >> r_line.method_token >> r_line.request_target >> r_line.http_version;
         return r_line;
     }
 
@@ -225,7 +225,7 @@ namespace ntk {
         }
     }
 
-    http_request get_http_request( const std::vector<uint8_t>& http_payload ) {
+    http_request get_http_request( std::span<const unsigned char> http_payload ) {
         http_request request;
         auto [ request_line_bytes, header_bytes, unused_bytes ] = split_http_payload( http_payload );
         request.request_line = parse_http_request_line( request_line_bytes );
@@ -240,6 +240,21 @@ namespace ntk {
         response.headers = parse_http_headers( header_bytes );
         response.body = body_bytes;
         return response;
+    }
+
+    std::optional<file_extension> extract_file_extension( const std::string& path ) {
+        auto last_dot = path.rfind( '.' );
+        if ( last_dot == std::string::npos ) return std::nullopt;
+        return string_to_file_extension( path.substr( last_dot + 1 ) );
+    }
+
+    std::string get_path( const std::string& request_target ) {
+        return request_target.substr( 0, request_target.find( '?' ) );
+    }
+
+    std::optional<file_extension> string_to_file_extension( const std::string& file_extension_string ) {
+        if ( file_extension_string == "m3u8" ) return file_extension::M3U8;
+        return std::nullopt;
     }
 
 } // namespace ntk
