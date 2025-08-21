@@ -21,7 +21,6 @@ TEST( UnitTest, ExtractTlsRecords ) {
         // remaining 2 payload bytes for record 3
         0xee, 0xff
     };
-
     std::vector<std::vector<uint8_t>> tls_payloads = { first_payload, second_payload };
     auto result = ntk::extract_tls_records( tls_payloads );
     ASSERT_EQ( result.records.size(), 3 );
