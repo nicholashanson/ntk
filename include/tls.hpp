@@ -54,14 +54,14 @@ namespace ntk {
     // ==============================
 
     enum class tls_content_type : uint8_t {
-        CHANGE_CIPHER_SEC = 0x14,
-        ALERT,           // 0x15
-        HANDSHAKE,       // 0x16
-        APPLICATION_DATA // 0x17
+        CHANGE_CIPHER_SPEC = 0x14,
+        ALERT,            // 0x15
+        HANDSHAKE,        // 0x16
+        APPLICATION_DATA  // 0x17
     };
 
     static const std::unordered_map<tls_content_type,std::string> tls_content_type_names = {
-        { tls_content_type::CHANGE_CIPHER_SEC, "ChangeCipherSpec" },
+        { tls_content_type::CHANGE_CIPHER_SPEC, "ChangeCipherSpec" },
         { tls_content_type::ALERT, "Alert" },
         { tls_content_type::HANDSHAKE, "Handshake" },
         { tls_content_type::APPLICATION_DATA, "Application Data" }
@@ -96,6 +96,13 @@ namespace ntk {
         std::tuple<std::vector<tls_record>,size_t>, 
         std::string
     > split_tls_records( std::span<const uint8_t> tls_payload );
+
+    std::expected<
+        std::tuple<std::vector<tls_record>,size_t>,
+        std::string
+    > get_tls_records_from_ethernet( std::span<const uint8_t> packet );
+
+    std::expected<tls_record,std::string> get_parsed_tls_record( std::span<const uint8_t> raw_tls_record );
 
     // ==============================
     //      TLS Handshake Type
@@ -185,6 +192,14 @@ namespace ntk {
     bool is_tls_alert( const unsigned char* packet );
     
     bool is_tls_alert_v( const std::vector<uint8_t>& packet );
+
+    bool is_tls_alert( const tls_record& record );
+
+    // ==============================
+    //        Change Cipher Spec
+    // ==============================
+
+    bool is_change_cipher_spec( const tls_record& record );
 
     // ==============================
     //        Application Data
@@ -303,7 +318,8 @@ namespace ntk {
                   m_client_hello_populated( false ), 
                   m_server_hello_populated( false ),
                   m_client_traffic_seq_number( 0 ),
-                  m_server_traffic_seq_number( 0 ) {}
+                  m_server_traffic_seq_number( 0 ),
+                  m_decrypted_record( std::nullopt ) {}
             tls_live_stream( const tcp_live_stream& tcp_stream );
             const std::string& get_sni() const;
             bool feed( const std::vector<uint8_t>& packet );
@@ -320,6 +336,9 @@ namespace ntk {
             std::size_t m_lines_consumed;
             int m_client_traffic_seq_number;
             int m_server_traffic_seq_number;
+        protected:
+            std::optional<tls_record> m_decrypted_record;
+        private:
             friend std::ostream& operator<<( std::ostream& os, const tls_live_stream& live_stream );
             friend class tls_live_stream_friend_helper;
     };
@@ -334,6 +353,7 @@ namespace ntk {
             static const secrets tls_secrets( const tls_live_stream& t );
             static const int client_traffic_seq_number( const tls_live_stream& t );
             static const int server_traffic_seq_number( const tls_live_stream& t );
+            static std::optional<tls_record> decrypted_record( const tls_live_stream& t );
     };
 
     class log_file_trimmer {
