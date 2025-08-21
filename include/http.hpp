@@ -15,6 +15,11 @@
 
 namespace ntk {
 
+    enum class http_parse_error {
+        MISSING_START_LINE,
+        MISSING_HEADERS
+    };
+
     enum class mime_type : uint8_t {
         VIDEO_MP2T
     };
@@ -22,6 +27,12 @@ namespace ntk {
     enum class file_extension : uint8_t {
         M3U8,
         TS
+    };
+
+    struct split_http_message {
+        std::vector<uint8_t> start_line;
+        std::vector<uint8_t> headers;
+        std::vector<uint8_t> body;
     };
 
     // TODO: check http rules on whitespace in headers
@@ -61,7 +72,7 @@ namespace ntk {
 
     http_headers parse_http_headers( const std::vector<uint8_t>& header_bytes );
 
-    http_headers get_http_headers_from_payload( const std::vector<uint8_t>& http_payload_bytes );
+    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( const std::vector<uint8_t>& http_payload_bytes );
 
     http_type get_http_type( const std::vector<uint8_t>& http_payload );
 
@@ -83,7 +94,7 @@ namespace ntk {
 
     http_request_line parse_http_request_line( const std::vector<uint8_t>& request_line_bytes );
 
-    http_request get_http_request( std::span<const unsigned char> http_payload );
+    std::expected<http_request,http_parse_error> get_http_request( std::span<const unsigned char> http_payload );
 
     std::vector<uint8_t> get_first_http_respone( const session& packet_data );
 
@@ -114,16 +125,15 @@ namespace ntk {
 
     http_response_status_line parse_http_status_line( const std::vector<uint8_t>& status_line_bytes );
 
-    http_response get_http_response( const std::vector<uint8_t>& http_payload );
+    std::expected<http_response,http_parse_error> get_http_response( const std::vector<uint8_t>& http_payload );
 
-    std::vector<uint8_t> get_http_response_data( const tcp_stream& stream );
+    std::expected<std::vector<uint8_t>,http_parse_error> get_http_response_data( const tcp_stream& stream );
 
     // ==============================
     //       Split HTTP Payload
     // ==============================
 
-    std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::vector<uint8_t>>
-    split_http_payload( std::span<const unsigned char> payload );
+    std::expected<split_http_message,http_parse_error> split_http_payload( std::span<const unsigned char> payload );
 
     bool contains_http_header( const http_headers& headers, const std::string& header_name );
    

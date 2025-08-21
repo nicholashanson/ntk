@@ -74,22 +74,24 @@ namespace ntk {
         }
     }
 
-    std::tuple<std::vector<uint8_t>, std::vector<uint8_t>, std::vector<uint8_t>>
-    split_http_payload( std::span<const unsigned char> payload ) {
+    std::expected<split_http_message,http_parse_error> split_http_payload( std::span<const unsigned char> payload ) {
         auto begin = payload.begin();
         auto end = payload.end();
-
-        auto request_line_end = std::search( begin, end, "\r\n", "\r\n" + 2 );
-        std::vector<uint8_t> request_line( begin, request_line_end );
-
-        auto headers_start = request_line_end + 2; 
+        auto start_line_end = std::search( begin, end, "\r\n", "\r\n" + 2 );
+        if ( start_line_end == end ) {
+            return std::unexpected( http_parse_error::MISSING_START_LINE );
+        } 
+        auto headers_start = start_line_end + 2; 
         auto headers_end = std::search( headers_start, end, "\r\n\r\n", "\r\n\r\n" + 4 );
-        std::vector<uint8_t> headers( headers_start, headers_end );
-        
+        if ( headers_end == end ) {
+            return std::unexpected( http_parse_error::MISSING_HEADERS );
+        }
         auto body_start = headers_end + 4; 
-        std::vector<uint8_t> body( body_start, end );
-
-        return { request_line, headers, body };
+        return split_http_message {
+            { begin, start_line_end },
+            { headers_start, headers_end },
+            { body_start, end }
+        };
     }
 
     http_request_line parse_http_request_line( const std::vector<uint8_t>& request_line_bytes ) {
@@ -134,9 +136,12 @@ namespace ntk {
         return headers;
     }
 
-    http_headers get_http_headers_from_payload( const std::vector<uint8_t>& http_payload_bytes ) {
-        auto http_header_bytes = std::get<1>( split_http_payload( http_payload_bytes ) );
-        return parse_http_headers( http_header_bytes );
+    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( const std::vector<uint8_t>& http_payload_bytes ) {
+        auto split_result = split_http_payload( http_payload_bytes );
+        if ( !split_result ) {
+            return std::unexpected( split_result.error() );
+        }
+        return parse_http_headers( split_result->headers );
     }
 
     http_response_status_line parse_http_status_line( const std::vector<uint8_t>& status_line_bytes ) {
@@ -199,17 +204,24 @@ namespace ntk {
         return response.second;
     }   
 
-    std::vector<uint8_t> get_http_response_data( const tcp_stream& stream ) {
+    std::expected<std::vector<uint8_t>,http_parse_error> get_http_response_data( const tcp_stream& stream ) {
         auto response_pos = std::find_if( stream.begin(), stream.end(), 
             []( const auto& pair ) { 
                 auto& [ unused, http_payload ] = pair;
                 return ntk::get_http_type( http_payload ) == ntk::http_type::RESPONSE;
             } 
         );
-
         auto response = *response_pos;
-        auto http_headers = get_http_headers_from_payload( response.second );
-        auto response_data = std::get<2>( split_http_payload( response.second ) );
+        auto get_headers_result = get_http_headers_from_payload( response.second );
+        if ( !get_headers_result ) {
+            return std::unexpected( get_headers_result.error() );
+        }
+        auto http_headers = get_headers_result.value();
+        auto split_result = split_http_payload( response.second );
+        if ( !split_result ) {
+            return std::unexpected( split_result.error() );
+        }
+        auto response_data = std::move( split_result->body );
         auto it = std::next( response_pos );
 
         while ( it != stream.end() ) {
@@ -217,7 +229,6 @@ namespace ntk {
                 it->second.begin(), it->second.end() );
             ++it;
         }
-
         if ( contains_http_header( http_headers, "Content-Length" ) ) {
             return response_data;
         } else {
@@ -225,20 +236,26 @@ namespace ntk {
         }
     }
 
-    http_request get_http_request( std::span<const unsigned char> http_payload ) {
+    std::expected<http_request,http_parse_error> get_http_request( std::span<const unsigned char> http_payload ) {
+        auto split_result = split_http_payload( http_payload );
+        if ( !split_result ) {
+            return std::unexpected( split_result.error() );
+        }
         http_request request;
-        auto [ request_line_bytes, header_bytes, unused_bytes ] = split_http_payload( http_payload );
-        request.request_line = parse_http_request_line( request_line_bytes );
-        request.headers = parse_http_headers( header_bytes );
+        request.request_line = parse_http_request_line( split_result->start_line );
+        request.headers = parse_http_headers( split_result->headers );
         return request;
     }
 
-    http_response get_http_response( const std::vector<uint8_t>& http_payload ) {
+    std::expected<http_response,http_parse_error> get_http_response( const std::vector<uint8_t>& http_payload ) {
         http_response response;
-        auto [ status_line_bytes, header_bytes, body_bytes ] = split_http_payload( http_payload );
-        response.status_line = parse_http_status_line( status_line_bytes );
-        response.headers = parse_http_headers( header_bytes );
-        response.body = body_bytes;
+        auto split_result = split_http_payload( http_payload );
+        if ( !split_result ) {
+            return std::unexpected( split_result.error() );
+        }
+        response.status_line = parse_http_status_line( split_result->start_line );
+        response.headers = parse_http_headers( split_result->headers );
+        response.body = split_result->body;
         return response;
     }
 
