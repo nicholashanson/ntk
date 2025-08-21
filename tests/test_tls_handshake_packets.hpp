@@ -152,6 +152,9 @@ namespace test_constants {
     };
 
     inline const unsigned char tls_server_hello[] = {
+        /* Handshake Header */                          /* Handshake Header */
+        0x02,                                           // Handshake Type: Server Hello (2)
+        0x00, 0x00, 0x76,                               // Length: 118 bytes
         /* Server Version */                            /* Server Version */
         0x03, 0x03,                                     // TLS Version: 1.2
         /* Random (32 bytes) */
@@ -186,12 +189,72 @@ namespace test_constants {
         0x03, 0x04                                      // Supported Version: TLS 1.3
     };
 
-    const unsigned char tls_alert_packet[] = {
-        /* tls alert record */                          /* tls alert record */
-        0x14,                                           // content-type: alert
+    inline const unsigned char tls_server_hello_body[] = {
+        /* Server Version */                            /* Server Version */
+        0x03, 0x03,                                     // TLS Version: 1.2
+        /* Random (32 bytes) */
+        0x97, 0xbd, 0xc7, 0x2e, 0x7c, 0x09, 0xb9, 0x89,
+        0x41, 0x85, 0x30, 0x56, 0x88, 0xc2, 0x53, 0xa1,
+        0x19, 0x71, 0x59, 0xdf, 0xc3, 0x5e, 0x56, 0xbf,
+        0x35, 0x29, 0x80, 0xfe, 0x55, 0xc1, 0x4e, 0x31,
+        /* Session ID */                                /* Session ID */
+        0x20,                                           // Session ID length: 32
+        0x73, 0xa6, 0xf6, 0x97, 0x70, 0x49, 0xaf, 0x51,
+        0x60, 0x80, 0x1e, 0x62, 0x21, 0xd2, 0x5c, 0x8e,
+        0x4a, 0x50, 0x2f, 0x7e, 0xdc, 0xdd, 0xae, 0x57,
+        0x12, 0xb9, 0x0c, 0xbc, 0xde, 0x75, 0xd0, 0x9a,
+        /* Cipher Suite */                              /* Cipher Suite */
+        0x13, 0x02,                                     // TLS_AES_256_GCM_SHA384 (0x1302)
+        /* Compression Method */                        /* Compression Method */
+        0x00,                                           // Compression: null
+        /* Extensions Length */                         /* Extensions Length */
+        0x00, 0x2e,                                     // Extensions length: 46 bytes
+        /* Extension: Supported Versions */             /* Extension: Supported Versions */
+        0x00, 0x33,                                     // Extension Type: Supported Versions (0x0033)
+        0x00, 0x24,                                     // Extension Length: 36
+        0x00, 0x1d,                                     // Group: x25519 (0x001d)
+        0x00, 0x20,                                     // Key Exchange Length: 32
+        0xd0, 0x88, 0x75, 0x9b, 0xf6, 0x40, 0xbe, 0x95,
+        0x01, 0x47, 0xde, 0xa7, 0x79, 0xe0, 0x08, 0x96,
+        0x03, 0xfb, 0x39, 0x84, 0xb3, 0x42, 0x64, 0x1e,
+        0x91, 0xcb, 0x8b, 0x7d, 0x43, 0x19, 0x86, 0x7f,
+        /* Extension: Supported Groups (GREASE) */      /* Extension: Supported Groups (GREASE) */
+        0x00, 0x2b,                                     // Extension Type: Supported Groups (0x002b)
+        0x00, 0x02,                                     // Extension Length: 2
+        0x03, 0x04                                      // Supported Version: TLS 1.3
+    };
+
+    const unsigned char tls_change_cipher_spec_record[] = {
+        /* tls ChangeCipherSpec record */               /* tls ChangeCipherSpec record */
+        0x14,                                           // content-type: ChangeCipherSpec
         0x03, 0x03,                                     // TLS version: 1.2
         0x00, 0x01,                                     // length: 1 byte
-        0x01,                                           // alert: close notify ( level: warning or fatal )
+        0x01                                            // message: ChangeCipherSpec
+    };
+
+    const unsigned char tls_application_data_record[] = {
+        /* tls application data record */               /* tls application data record */
+        0x17,                                           // content-type: application data
+        0x03, 0x03,                                     // TLS version: 1.2
+        0x00, 0x45,                                     // length: 69 bytes
+        /* encrypted application data */
+        0xbf, 0xbd, 0xe9, 0xb5, 0x36, 0x3f, 0x63, 0xe7,
+        0x84, 0x2e, 0xc4, 0x84, 0x38, 0x44, 0x7a, 0x99,
+        0x16, 0xf2, 0x0d, 0xa8, 0x83, 0xce, 0xa7, 0xb2,
+        0x7c, 0xab, 0x02, 0xe6, 0x70, 0xab, 0x2f, 0x23,
+        0xbb, 0x3f, 0x97, 0x9c, 0xfc, 0xeb, 0xc8, 0xd2,
+        0xbe, 0xec, 0x27, 0x1b, 0xa5, 0x5a, 0x7d, 0xb0,
+        0x1e, 0x10, 0x78, 0x90, 0x0c, 0x96, 0xc7, 0x55,
+        0xdc, 0xd3, 0x0f, 0xc4, 0xef, 0x88, 0xfb, 0xd9,
+        0xda, 0x8f, 0x12, 0x88, 0x8d                 
+    };
+
+    const unsigned char tls_combined_records[] = {
+        /* tls ChangeCipherSpec record */               /* tls ChangeCipherSpec record */
+        0x14,                                           // content-type: ChangeCipherSpec
+        0x03, 0x03,                                     // TLS version: 1.2
+        0x00, 0x01,                                     // length: 1 byte
+        0x01,                                           // message: ChangeCipherSpec
         /* tls application data record */               /* tls application data record */
         0x17,                                           // content-type: application data
         0x03, 0x03,                                     // TLS version: 1.2
