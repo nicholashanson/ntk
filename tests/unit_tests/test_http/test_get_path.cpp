@@ -5,6 +5,8 @@
 #include <test_constants.hpp>
 
 TEST( UnitTest, GetPath ) {
-	auto request = ntk::get_http_request( test::http_request_for_m3u8 );
+	auto maybe_request = ntk::get_http_request( test::http_request_for_m3u8 );
+	ASSERT_TRUE( maybe_request );
+	auto request = *maybe_request;
 	ASSERT_EQ( ntk::get_path( request.request_line.request_target ), "/fecnetwork/13518.flv/playlist.m3u8" );
 } 

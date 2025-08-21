@@ -34,7 +34,7 @@ TEST( UnitTest, HttpsLiveStream_TlsSecrets ) {
 	ASSERT_TRUE( ntk::is_complete_secrets( tls_secrets[ client_random_hex ] ) );
 }
 
-TEST( UnitTest, HttpLiveStream_IncompleteRequestResponse_HttpRequest ) {
+TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_HttpRequest ) {
 	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
 	std::string ssl_keys_log = "sslkeys.log";
 	auto four = ntk::get_four_from_ethernet( packet_data.front() );
@@ -67,4 +67,17 @@ TEST( UnitTest, HttpsLiveStream_ExpectedData ) {
 	}
 	auto expected_data = ntk::https_live_stream_friend_helper::expected_data( live_stream );	
 	ASSERT_TRUE( expected_data );
+}
+
+TEST( UnitTest, HttpsLiveStream_ExpectedData_MimeType ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+	const std::size_t read_packets_to = 12;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto expected_data = ntk::https_live_stream_friend_helper::expected_data( live_stream );	
+	ASSERT_EQ( expected_data, ntk::mime_type::VIDEO_MP2T );
 }

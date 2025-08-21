@@ -7,7 +7,7 @@ namespace ntk {
 		bool result = tls_live_stream::feed( packet );
 		if ( m_decrypted_record ) {
 			if ( is_http_request( m_decrypted_record.value().payload ) ) {
-				m_incomplete_request_response.request = get_http_request( m_decrypted_record.value().payload );
+				m_incomplete_request_response.request = *get_http_request( m_decrypted_record.value().payload );
 				if ( is_request_for<file_extension::M3U8>( m_incomplete_request_response.request.value() ) ) {
 					m_expected_data = mime_type::VIDEO_MP2T;
 				}
