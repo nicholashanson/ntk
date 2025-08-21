@@ -20,7 +20,8 @@ namespace ntk {
     };
 
     enum class file_extension : uint8_t {
-        M3U8
+        M3U8,
+        TS
     };
 
     // TODO: check http rules on whitespace in headers
