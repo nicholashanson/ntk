@@ -32,7 +32,7 @@ namespace ntk {
 
     void print_vector( const std::vector<uint8_t>& data ) {
         for ( auto byte : data ) {
-            std::cout << std::hex << std::setw( 2 ) << std::setfill( '0' ) << static_cast<int>( byte ) << " ";
+            std::cout << std::hex << std::setw( 2 ) << std::setfill( '0' ) << ( static_cast<int>( byte ) & 0xff ) << " ";
         }
         std::cout << std::dec << std::endl;
     }
@@ -345,7 +345,7 @@ namespace ntk {
         os << std::left << std::setfill(' ');
         os << "===== HTTP REQUEST BEGIN =====\n";
         os << request.request_line.method_token << " "
-           << request.request_line.path << " "
+           << request.request_line.request_target << " "
            << request.request_line.http_version << "\n\n";
 
         if ( request.headers.empty() ) {
