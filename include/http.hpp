@@ -17,11 +17,14 @@ namespace ntk {
 
     enum class http_parse_error {
         MISSING_START_LINE,
-        MISSING_HEADERS
+        MISSING_HEADERS,
+        UNRECOGNIZED_MIME_TYPE
     };
 
     enum class mime_type : uint8_t {
-        VIDEO_MP2T
+        VIDEO_MP2T,
+        APPLICATION_VND_APPLE_MPEGURL,
+        TEXT_PLAIN
     };
 
     enum class file_extension : uint8_t {
@@ -72,9 +75,13 @@ namespace ntk {
 
     http_headers parse_http_headers( const std::vector<uint8_t>& header_bytes );
 
-    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( const std::vector<uint8_t>& http_payload_bytes );
+    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( std::span<const unsigned char> http_payload_bytes );
 
     http_type get_http_type( const std::vector<uint8_t>& http_payload );
+
+    std::expected<mime_type,http_parse_error> get_mime_type_from_ethernet( std::span<const unsigned char> ethernet_frame );
+
+    std::optional<mime_type> string_to_mime_type( const std::string& mime_type_string );
 
     // ==============================
     //        HTTP Request
