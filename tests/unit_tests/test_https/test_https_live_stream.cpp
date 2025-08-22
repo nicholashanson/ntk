@@ -81,3 +81,21 @@ TEST( UnitTest, HttpsLiveStream_ExpectedData_MimeType ) {
 	auto expected_data = ntk::https_live_stream_friend_helper::expected_data( live_stream );	
 	ASSERT_EQ( expected_data, ntk::mime_type::VIDEO_MP2T );
 }
+
+TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+	const std::size_t read_packets_to = 14;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto incomplete_request_response = ntk::https_live_stream_friend_helper::get_incomplete_request_response( live_stream );
+	auto decrypted_data = ntk::tls_live_stream_friend_helper::decrypted_record( live_stream ); 
+	ntk::print_vector( decrypted_data.value().payload );
+	ASSERT_TRUE( incomplete_request_response.response );
+	ASSERT_EQ( ( *incomplete_request_response.response ).body.size(), 15848 );
+	ASSERT_EQ( ( *incomplete_request_response.response ).content_length, 384836 );
+	ASSERT_FALSE( ( *incomplete_request_response.response ).http_response_complete() );
+}
