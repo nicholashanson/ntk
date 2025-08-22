@@ -288,7 +288,7 @@ namespace test {
     };    
 
     inline const unsigned char http_response_packet[] = {
-        /* rthernet header */                                           /* ethernet header */
+        /* ethernet header */                                           /* ethernet header */
         0x42, 0x8b, 0x4e, 0x1a, 0xce, 0xd9,                             // destination mac address
         0x14, 0xf6, 0xd8, 0xaa, 0x69, 0xfa,                             // source mac address
         0x08, 0x00,                                                     // ether-type
