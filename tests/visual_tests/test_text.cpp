@@ -7,8 +7,10 @@
 
 TEST( VisualTest, Text ) {
     auto http_payload = ntk::get_tcp_payload( test::http_response_packet );
-    auto http_sections = ntk::split_http_payload( http_payload );
-    auto http_content = std::get<2>( http_sections ); 
+    auto maybe_split_http_message = ntk::split_http_payload( http_payload );
+    ASSERT_TRUE( maybe_split_http_message );
+    auto split_http_message = *maybe_split_http_message;
+    auto http_content = split_http_message.body; 
     EXPECT_FALSE( http_content.empty() );
     auto dechunked_http_content = ntk::decode_single_chunk( http_content ); 
     std::string http_content_string( dechunked_http_content.begin(), dechunked_http_content.end() );

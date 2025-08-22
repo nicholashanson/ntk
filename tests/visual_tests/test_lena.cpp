@@ -12,16 +12,15 @@ TEST( VisualTest, Lena ) {
     auto raw_stream = ntk::get_raw_tcp_stream( packet_data );
     auto tcp_stream = ntk::get_tcp_stream( raw_stream );
     auto merged_tcp_stream = ntk::merge_tcp_stream_non_overlapping( tcp_stream );
-
     std::vector<uint8_t> lena_image;
-
     for ( auto& [ sequence_number, tcp_body ] : merged_tcp_stream ) {
         if ( ntk::get_http_type( tcp_body ) == ntk::http_type::REQUEST ) {
             continue;
         }
         if ( ntk::get_http_type( tcp_body ) == ntk::http_type::RESPONSE ) {
-            auto [ status_line, headers, body ] = ntk::split_http_payload( tcp_body );
-            tcp_body = body;
+            auto maybe_split_http_message = ntk::split_http_payload( tcp_body );
+            ASSERT_TRUE( maybe_split_http_message );
+            tcp_body = ( *maybe_split_http_message ).body;
         } 
         lena_image.insert( lena_image.end(), tcp_body.begin(), tcp_body.end() );
     } 
