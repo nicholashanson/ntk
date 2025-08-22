@@ -136,7 +136,7 @@ namespace ntk {
         return headers;
     }
 
-    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( const std::vector<uint8_t>& http_payload_bytes ) {
+    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( std::span<const unsigned char> http_payload_bytes ) {
         auto split_result = split_http_payload( http_payload_bytes );
         if ( !split_result ) {
             return std::unexpected( split_result.error() );
@@ -271,6 +271,26 @@ namespace ntk {
 
     std::optional<file_extension> string_to_file_extension( const std::string& file_extension_string ) {
         if ( file_extension_string == "m3u8" ) return file_extension::M3U8;
+        return std::nullopt;
+    }
+
+    std::expected<mime_type,http_parse_error> get_mime_type_from_ethernet( std::span<const unsigned char> ethernet_frame ) {
+        auto maybe_headers = get_http_headers_from_payload( ethernet_frame );
+        if ( !maybe_headers ) {
+            return std::unexpected( maybe_headers.error() );
+        }
+        auto headers = *maybe_headers;
+        auto maybe_mime_type = string_to_mime_type( headers[ "Content-Type" ] );
+        if ( !maybe_mime_type ) {
+            return std::unexpected( http_parse_error::UNRECOGNIZED_MIME_TYPE );
+        }
+        return maybe_mime_type.value();
+    }
+
+    std::optional<mime_type> string_to_mime_type( const std::string& mime_type_string ) {
+        std::cout << mime_type_string << std::endl;
+        if ( mime_type_string == "text/plain" ) return mime_type::TEXT_PLAIN;
+        if ( mime_type_string == "application/vnd.apple.mpegurl" ) return mime_type::APPLICATION_VND_APPLE_MPEGURL;
         return std::nullopt;
     }
 
