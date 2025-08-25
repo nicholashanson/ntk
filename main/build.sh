@@ -14,14 +14,24 @@ LIB_DIR="$SCRIPT_DIR/../lib"
 MAIN_BIN="$SCRIPT_DIR/ntk"
 TEST_BIN="$SCRIPT_DIR/ntk_tests"
 
-# Clean option
-if [[ "$1" == "--clean" ]]; then
-    echo "Cleaning build artifacts..."
-    rm -rf "$BUILD_DIR"
-    rm -f "$MAIN_BIN" "$TEST_BIN"
-    echo "✅ Clean complete."
-    exit 0
-fi
+# Flags
+SANITIZE=false
+
+# Check for options
+for arg in "$@"; do
+    case $arg in
+        --clean)
+            echo "Cleaning build artifacts..."
+            rm -rf "$BUILD_DIR"
+            rm -f "$MAIN_BIN" "$TEST_BIN"
+            echo "✅ Clean complete."
+            exit 0
+            ;;
+        --asan)
+            SANITIZE=true
+            ;;
+    esac
+done
 
 # Create build dirs
 mkdir -p "$BUILD_DIR/obj" "$BUILD_DIR/test_obj"
@@ -32,6 +42,15 @@ CXXFLAGS="-g -O0 -std=c++23 -fPIC"
 INCLUDES="-I$INCLUDE_DIR -I$TEST_DIR"
 CFLAGS=$(pkg-config --cflags Qt5Widgets Qt5Multimedia Qt5MultimediaWidgets || echo "")
 LIBS=$(pkg-config --libs Qt5Widgets Qt5Multimedia Qt5MultimediaWidgets || echo "")
+
+# Enable sanitizers if requested
+if $SANITIZE; then
+    echo "⚠️  Building with AddressSanitizer"
+    CXXFLAGS="$CXXFLAGS -fsanitize=address,undefined -fno-omit-frame-pointer"
+    LDFLAGS="-fsanitize=address,undefined"
+else
+    LDFLAGS=""
+fi
 
 # Compile .cpp to .o if changed
 compile_objects() {
@@ -69,14 +88,14 @@ fi
 # Link main binary
 echo "Linking main binary..."
 $CXX $CXXFLAGS "${SRC_OBJS[@]}" "$MAIN_OBJ" \
-    $INCLUDES -L"$LIB_DIR" \
+    $INCLUDES -L"$LIB_DIR" $LDFLAGS \
     -o "$MAIN_BIN" \
     -lpcap -lssl -lcrypto -lcurl -lz
 
 # Link test binary
 echo "Linking test binary..."
 $CXX $CXXFLAGS "${SRC_OBJS[@]}" "${TEST_OBJS[@]}" \
-    $INCLUDES $CFLAGS -L"$LIB_DIR" \
+    $INCLUDES $CFLAGS -L"$LIB_DIR" $LDFLAGS \
     -o "$TEST_BIN" \
     -lgtest -lgtest_main -lpcap -lssl -lcrypto $LIBS -lcurl -lz
 
