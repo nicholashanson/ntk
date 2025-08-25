@@ -302,6 +302,11 @@ namespace ntk {
         return record;
     }
 
+    std::expected<tls_record,std::string> get_parsed_tls_record_from_ethernet( std::span<const unsigned char> packet ) {
+        auto payload = get_tcp_payload( packet );
+        return get_parsed_tls_record( payload );
+    }
+
     // ==============================
     //    Server Hello Predicates
     // ==============================
@@ -684,7 +689,6 @@ namespace ntk {
             default:
                 throw std::runtime_error( "Unsupported cipher suite" );
         }
-
         auto secret = get_traffic_secret( session_keys, client_random, secret_label );
         auto key_material = derive_tls_key_iv( secret, hash_fn, key_len, 12 );
         auto nonce = build_tls13_nonce( key_material.iv, seq_num );
@@ -718,6 +722,15 @@ namespace ntk {
     // ==============================
     //      TLS Record Predicates
     // ==============================
+
+    bool is_complete_record( std::span<const unsigned char> record_bytes ) {
+        if ( record_bytes.size() < 5 ) {
+            return false;
+        }
+        uint16_t record_len = ( static_cast<uint16_t>( record_bytes[ 3 ] ) << 8 ) | record_bytes[ 4 ];
+        std::size_t total_len = 5 + record_len;
+        return record_bytes.size() == total_len;
+    }
 
     bool is_tls( const unsigned char* packet ) {
         if ( !is_tcp( packet ) ) return false;
@@ -936,14 +949,13 @@ namespace ntk {
     }
 
     bool tls_live_stream::feed( const std::vector<uint8_t>& packet ) {
-        m_decrypted_record = std::nullopt;
+        m_decrypted_records = std::nullopt;
         if ( !m_handshake_feed.m_complete ) return tcp_live_stream::feed( packet );
         if ( is_client_hello_v( packet ) ) return populate_client_hello( packet ); 
         if ( !m_server_hello_populated ) { 
             populate_server_hello( packet );
             if ( m_server_hello_populated ) { 
                 auto [ tls_secrets, line_reached ] = get_tls_secrets_dynamically( m_ssl_keys_log, m_client_hello.random );
-                std::cout << "about to get secrets" << std::endl;
                 if ( is_complete_secrets( tls_secrets[ client_random_to_hex( m_client_hello.random ) ] ) ) {
                     m_tls_secrets = tls_secrets;
                     m_lines_consumed = line_reached;
@@ -960,22 +972,67 @@ namespace ntk {
             if ( is_change_cipher_spec( encrypted_record ) ) return false;
             auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
                                                     m_tls_secrets, "CLIENT_TRAFFIC_SECRET_0", m_client_traffic_seq_number );
-            m_decrypted_record = std::move( decrypted_record );
+            m_decrypted_records.emplace();
+            m_decrypted_records->push_back( std::move( decrypted_record ) );
             ++m_client_traffic_seq_number;
             return true;
         }
         if ( is_data_packet( packet ) && is_server_packet( packet ) ) {
-            if ( !is_tls_v( packet ) ) return false;
-            auto result = get_tls_record_from_ethernet( packet );
-            if ( !result ) {
+            if ( !is_tls_v( packet ) && !m_incomplete_record ) {
                 return false;
             }
-            auto& encrypted_record = result.value();
-            auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
-                                                    m_tls_secrets, "SERVER_TRAFFIC_SECRET_0", m_server_traffic_seq_number );
-            m_decrypted_record = std::move( decrypted_record );
-            ++m_server_traffic_seq_number;
-            return true;
+            std::optional<std::vector<tls_record>> encrypted_records; 
+            std::variant<tls_record,incomplete_tls_record> record_variant;
+            auto payload = get_tcp_payload( packet );
+            std::span<uint8_t> payload_span( payload.data(), payload.size() ); 
+            while ( !payload_span.empty() ) {
+                if ( m_incomplete_record ) {
+                    std::size_t payload_size_before = m_incomplete_record.value().record.payload.size();
+                    auto record_variant = append_to_incomplete_record( m_incomplete_record.value(), packet );
+                    if ( std::holds_alternative<tls_record>( record_variant ) ) {
+                        if ( !encrypted_records ) encrypted_records.emplace();
+                        std::size_t payload_size_after = std::get<tls_record>( record_variant ).payload.size();
+                        encrypted_records->push_back( std::move( std::get<tls_record>( record_variant ) ) );
+                        std::size_t bytes_consumed = payload_size_after - payload_size_before;
+                        payload_span = payload_span.subspan( bytes_consumed );
+                        m_incomplete_record.reset();
+                    } else {
+                        m_incomplete_record.value().record.payload.insert( m_incomplete_record.value().record.payload.end(), payload_span.begin(), payload_span.end() );
+                        payload_span = payload_span.subspan( 0, 0 );
+                    }
+                } else {
+                    auto split_result = split_tls_records( payload_span );
+                    if ( !split_result ) {
+                        return false;
+                    } else {
+                        auto [ records, offset_reached ] = split_result.value();
+                        if ( records.empty() ) {
+                            auto record_header = get_tls_record_header_from_payload( payload_span );
+                            auto empty_record = get_empty_tls_record_from_payload( payload_span );
+                            empty_record.payload.assign( payload_span.begin() + 5, payload_span.end() );
+                            m_incomplete_record = incomplete_tls_record {
+                                empty_record,
+                                record_header.payload_length
+                            };
+                            payload_span = payload_span.subspan( 0, 0 ); 
+                        } else {
+                            if ( !encrypted_records ) encrypted_records.emplace();
+                            encrypted_records->insert( encrypted_records->end(), records.begin(), records.end() );
+                            payload_span = payload_span.subspan( offset_reached );
+                        }
+                    } 
+                }
+            }
+            if ( encrypted_records ) {
+                for ( auto& encrypted_record : encrypted_records.value() ) {
+                    auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
+                                                            m_tls_secrets, "SERVER_TRAFFIC_SECRET_0", m_server_traffic_seq_number );
+                    if ( !m_decrypted_records ) m_decrypted_records.emplace();
+                    m_decrypted_records->push_back( std::move( decrypted_record ) );
+                    ++m_server_traffic_seq_number;
+                }
+                return true;
+            }
         }
         return false;
     }
@@ -1042,8 +1099,16 @@ namespace ntk {
         return t.m_server_traffic_seq_number;
     }
 
-    std::optional<tls_record> tls_live_stream_friend_helper::decrypted_record( const tls_live_stream& t ) {
-        return t.m_decrypted_record;
+    std::optional<std::vector<tls_record>> tls_live_stream_friend_helper::decrypted_records( const tls_live_stream& t ) {
+        return t.m_decrypted_records;
+    }
+
+    std::vector<uint8_t> tls_live_stream_friend_helper::partial_record_buffer( const tls_live_stream& t ) {
+        return t.m_partial_record_buffer;
+    }
+
+    std::optional<incomplete_tls_record> tls_live_stream_friend_helper::get_incomplete_record( const tls_live_stream& t ) {
+        return t.m_incomplete_record;
     }
 
     // ==============================
@@ -1096,7 +1161,6 @@ namespace ntk {
             }
             return false;
         };
-
         return stream.traffic_contains( has_matching_sni );
     }
 
@@ -1111,18 +1175,20 @@ namespace ntk {
             std::vector<uint8_t> cumulative_payload;
             cumulative_payload.insert( cumulative_payload.end(), remainder.begin(), remainder.end() );
             cumulative_payload.insert( cumulative_payload.end(), payload.begin(), payload.end() );
-
             auto [ complete_records, offset_reached ] = *split_tls_records( cumulative_payload );
             result.records.insert( result.records.end(), complete_records.begin(), complete_records.end() );
             remainder.assign( cumulative_payload.begin() + offset_reached, cumulative_payload.end() );
         }
-
         result.has_remainder = !remainder.empty();
         return result;
     }
 
     std::expected<tls_record,std::string> get_tls_record_from_ethernet( std::span<const uint8_t> packet ) {
         auto payload = get_tcp_payload( packet );
+        return get_tls_record_from_payload( payload );
+    }
+
+    std::expected<tls_record,std::string> get_tls_record_from_payload( std::span<const uint8_t> payload ) {
         auto result = split_tls_records( payload );
         if ( result.has_value() ) {
             auto [ records, offset_reached ] = result.value();
@@ -1132,6 +1198,74 @@ namespace ntk {
         } else {
             return std::unexpected( result.error() );
         }
+    }
+
+    std::variant<tls_record,incomplete_tls_record> append_to_incomplete_record( incomplete_tls_record incomplete_record, std::span<const unsigned char> packet ) {
+        if ( incomplete_record.record.payload.size() == incomplete_record.expected_payload_length ) return incomplete_record.record;
+        if ( packet.size() == 0 ) return incomplete_record;
+
+        std::size_t bytes_required = incomplete_record.expected_payload_length - incomplete_record.record.payload.size();
+        auto payload = get_tcp_payload( packet );
+        if ( bytes_required <= payload.size() ) {
+            auto complete_record = tls_record { incomplete_record.record.content_type, incomplete_record.record.version, incomplete_record.record.payload };
+            complete_record.payload.insert( complete_record.payload.end(), payload.begin(), payload.begin() + bytes_required );
+            return complete_record;
+        }
+        if ( bytes_required > payload.size() ) {
+            incomplete_record.record.payload.insert( incomplete_record.record.payload.end(), payload.begin(), payload.end() );
+            return incomplete_record;
+        }
+    }
+
+    std::variant<tls_record,incomplete_tls_record> get_complete_or_incomplete_record( std::span<const unsigned char> packet ) {
+        constexpr std::size_t recorder_header_length = 5;
+        auto record = get_parsed_tls_record_from_ethernet( packet );
+        if ( !record ) {
+            auto empty_record = get_empty_tls_record_from_ethernet( packet );
+            auto record_header = get_tls_record_header_from_ethernet( packet );
+            auto payload = get_tcp_payload( packet );
+            empty_record.payload.assign( payload.begin() + recorder_header_length, payload.end() );
+            incomplete_tls_record incomplete_record{ empty_record, record_header.payload_length };
+            return incomplete_record;
+        } else {
+            return record.value();
+        }
+    }
+
+    tls_record get_empty_tls_record_from_ethernet( std::span<const unsigned char> packet ) {
+        tls_record record;
+        auto record_header = get_tls_record_header_from_ethernet( packet );
+        record.content_type = record_header.content_type;
+        record.version = record_header.version;
+        return record;
+    }
+
+    tls_record get_empty_tls_record_from_payload( std::span<const unsigned char> payload ) {
+        tls_record record;
+        auto record_header = get_tls_record_header_from_payload( payload );
+        record.content_type = record_header.content_type;
+        record.version = record_header.version;
+        return record;
+    }
+
+    tls_record_header get_tls_record_header( const std::array<uint8_t,5> record_header_bytes ) {
+        tls_record_header header;
+        header.content_type = static_cast<tls_content_type>( record_header_bytes[ 0 ] );
+        uint16_t version_raw = read_uint16_be( record_header_bytes, 1 );
+        header.version = static_cast<tls_version>( version_raw );
+        header.payload_length = read_uint16_be( record_header_bytes, 3 );
+        return header;
+    }
+
+    tls_record_header get_tls_record_header_from_ethernet( std::span<const unsigned char> packet ) {
+        auto payload = get_tcp_payload( packet );
+        return get_tls_record_header_from_payload( payload );
+    }
+
+    tls_record_header get_tls_record_header_from_payload( std::span<const unsigned char> payload ) {
+        std::array<uint8_t,5> record_header_bytes;
+        std::copy_n( payload.begin(), record_header_bytes.size(), record_header_bytes.begin() );
+        return get_tls_record_header( record_header_bytes );
     }
 
 } // namespace ntk
