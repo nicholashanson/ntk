@@ -2,6 +2,7 @@
 #define TLS_HPP
 
 #include <array>
+#include <algorithm>
 #include <map>
 #include <vector>
 #include <ranges>
@@ -12,6 +13,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <variant>
 
 #include <cstdint>
 #include <cstddef>
@@ -75,6 +77,12 @@ namespace ntk {
         tls_content_type content_type;
         tls_version version;
         std::vector<uint8_t> payload;
+
+        bool operator==( const tls_record& other ) const {
+            return content_type == other.content_type &&
+                   version == other.version &&
+                   payload == other.payload;
+        }
     };
 
     struct tls_record_extraction_result {
@@ -82,9 +90,44 @@ namespace ntk {
         bool has_remainder;
     };
 
+    struct incomplete_tls_record {
+        tls_record record;
+        std::size_t expected_payload_length;
+    };
+
+    struct tls_record_header {
+        tls_content_type content_type;
+        tls_version version;
+        uint16_t payload_length;
+
+        bool operator==( const tls_record_header& other ) const {
+            return content_type == other.content_type &&
+                   version == other.version &&
+                   payload_length == other.payload_length;
+        }
+    };
+
     tls_record_extraction_result extract_tls_records( const std::vector<std::vector<uint8_t>>& payloads );
 
     std::expected<tls_record,std::string> get_tls_record_from_ethernet( std::span<const uint8_t> packet );
+
+    std::expected<tls_record,std::string> get_tls_record_from_payload( std::span<const uint8_t> payload );
+
+    std::variant<tls_record,incomplete_tls_record> append_to_incomplete_record( incomplete_tls_record record, std::span<const unsigned char> packet );
+
+    std::variant<tls_record,incomplete_tls_record> get_complete_or_incomplete_record( std::span<const unsigned char> packet );
+
+    tls_record get_empty_tls_record_from_ethernet( std::span<const unsigned char> packet );
+
+    tls_record get_empty_tls_record_from_payload( std::span<const unsigned char> payload );
+
+    tls_record_header get_tls_record_header( const std::array<uint8_t,5> record_header_bytes );
+
+    tls_record_header get_tls_record_header_from_ethernet( std::span<const unsigned char> packet );
+
+    tls_record_header get_tls_record_header_from_payload( std::span<const unsigned char> payload );
+
+    bool is_complete_record( std::span<const unsigned char> record_bytes );
 
     bool is_tls( const unsigned char* packet );
 
@@ -103,6 +146,8 @@ namespace ntk {
     > get_tls_records_from_ethernet( std::span<const uint8_t> packet );
 
     std::expected<tls_record,std::string> get_parsed_tls_record( std::span<const uint8_t> raw_tls_record );
+
+    std::expected<tls_record,std::string> get_parsed_tls_record_from_ethernet( std::span<const unsigned char> packet );    
 
     // ==============================
     //      TLS Handshake Type
@@ -319,7 +364,7 @@ namespace ntk {
                   m_server_hello_populated( false ),
                   m_client_traffic_seq_number( 0 ),
                   m_server_traffic_seq_number( 0 ),
-                  m_decrypted_record( std::nullopt ) {}
+                  m_decrypted_records( std::nullopt ) {}
             tls_live_stream( const tcp_live_stream& tcp_stream );
             const std::string& get_sni() const;
             bool feed( const std::vector<uint8_t>& packet );
@@ -336,8 +381,10 @@ namespace ntk {
             std::size_t m_lines_consumed;
             int m_client_traffic_seq_number;
             int m_server_traffic_seq_number;
+            std::vector<uint8_t> m_partial_record_buffer;
+            std::optional<incomplete_tls_record> m_incomplete_record;
         protected:
-            std::optional<tls_record> m_decrypted_record;
+            std::optional<std::vector<tls_record>> m_decrypted_records;
         private:
             friend std::ostream& operator<<( std::ostream& os, const tls_live_stream& live_stream );
             friend class tls_live_stream_friend_helper;
@@ -353,7 +400,9 @@ namespace ntk {
             static const secrets tls_secrets( const tls_live_stream& t );
             static const int client_traffic_seq_number( const tls_live_stream& t );
             static const int server_traffic_seq_number( const tls_live_stream& t );
-            static std::optional<tls_record> decrypted_record( const tls_live_stream& t );
+            static std::optional<std::vector<tls_record>> decrypted_records( const tls_live_stream& t );
+            static std::vector<uint8_t> partial_record_buffer( const tls_live_stream& t );
+            static std::optional<incomplete_tls_record> get_incomplete_record( const tls_live_stream& t );
     };
 
     class log_file_trimmer {
