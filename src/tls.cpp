@@ -598,6 +598,34 @@ namespace ntk {
     }
 
     // ==============================
+    //   TLS Encryption - AES-GCM
+    // ==============================
+
+    std::vector<uint8_t> encrypt_aes_gcm( const std::vector<uint8_t>& key,
+                                          const std::vector<uint8_t>& nonce,
+                                          const std::vector<uint8_t>& aad,
+                                          const std::vector<uint8_t>& plain_text,
+                                          const EVP_CIPHER* cipher ) {
+        std::vector<uint8_t> cipher_text_with_tag( plain_text.size() + 16 );
+        
+        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+        EVP_EncryptInit_ex( ctx, cipher, nullptr, nullptr, nullptr );
+        EVP_CIPHER_CTX_ctrl( ctx, EVP_CTRL_GCM_SET_IVLEN, nonce.size(), nullptr );
+        EVP_EncryptInit_ex( ctx, nullptr, nullptr, key.data(), nonce.data() );
+
+        int len = 0;
+        EVP_EncryptUpdate( ctx, nullptr, &len, aad.data(), aad.size() );
+        int out_len = 0;
+        EVP_EncryptUpdate( ctx, cipher_text_with_tag.data(), &out_len, plain_text.data(), plain_text.size() );
+        int final_len = 0;
+        EVP_EncryptFinal_ex( ctx, nullptr, &final_len );
+        EVP_CIPHER_CTX_ctrl( ctx, EVP_CTRL_GCM_GET_TAG, 16, cipher_text_with_tag.data() + plain_text.size() );
+
+        EVP_CIPHER_CTX_free( ctx );
+        return cipher_text_with_tag;
+    }
+
+    // ==============================
     //   TLS Decryption - Build AAD
     // ==============================
 
@@ -696,6 +724,51 @@ namespace ntk {
         auto decrypted_payload = decrypt_aes_gcm( key_material.key, nonce, aad, record.payload, cipher );
         tls_record result { record.content_type, record.version, decrypted_payload };
         return result;
+    }
+
+    // ==============================
+    //        Decrypt Record
+    // ==============================
+
+    tls_record encrypt_record( const std::array<uint8_t,32>& client_random,
+                               const std::array<uint8_t,32>& server_random,
+                               const tls_version version,
+                               const uint16_t cipher_suite_id,
+                               const tls_record& record,
+                               const secrets& session_keys,
+                               const std::string& secret_label,
+                               uint64_t seq_num ) {
+        const cipher_suite suite = static_cast<cipher_suite>( cipher_suite_id );
+        const EVP_MD* hash_fn = nullptr;
+        const EVP_CIPHER* cipher = nullptr;
+        std::size_t key_len = 0;
+
+        switch ( suite ) {
+            case cipher_suite::TLS_AES_128_GCM_SHA256:
+                hash_fn = EVP_sha256();
+                cipher = EVP_aes_128_gcm();
+                key_len = 16;
+                break;
+            case cipher_suite::TLS_AES_256_GCM_SHA384:
+                hash_fn = EVP_sha384();
+                cipher = EVP_aes_256_gcm();
+                key_len = 32;
+                break;
+            default:
+                throw std::runtime_error( "Unsupported cipher suite" );
+        }
+        auto secret = get_traffic_secret( session_keys, client_random, secret_label );
+        auto key_material = derive_tls_key_iv( secret, hash_fn, key_len, 12 );
+        std::vector<uint8_t> plain_text = record.payload;
+        auto nonce = build_tls13_nonce( key_material.iv, seq_num );
+        std::size_t expected_cipher_len = plain_text.size() + 16;
+        auto aad = build_tls13_aad( record.content_type, record.version, static_cast<uint16_t>( expected_cipher_len ) );
+        auto cipher_text_with_tag = encrypt_aes_gcm( key_material.key, nonce, aad, plain_text, cipher );
+        return tls_record {
+            record.content_type,
+            record.version,
+            cipher_text_with_tag
+        };
     }
 
     // ==============================
