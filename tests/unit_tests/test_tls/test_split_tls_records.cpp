@@ -8,7 +8,7 @@
 
 #include <test_constants.hpp>
 
-TEST( UnitTest, SplitTlsRecrods ) {
+TEST( UnitTest, SplitTlsRecords ) {
     const unsigned char first_packet[] = {
         // record 1
         0x16, 0x03, 0x03, 0x00, 0x01, 0xaa,       // 6 bytes
@@ -32,7 +32,7 @@ TEST( UnitTest, SplitTlsRecrods ) {
     ASSERT_EQ( second_offset, 9 );
 }
 
-TEST( UnitTest, SplitTlsRecrods_TlsHandshake ) {
+TEST( UnitTest, SplitTlsRecords_TlsHandshake ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
     auto merged_stream = ntk::get_merged_tcp_stream( packet_data );
     auto first_packet_pos = merged_stream.begin();
