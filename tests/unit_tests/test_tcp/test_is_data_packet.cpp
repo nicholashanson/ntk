@@ -8,7 +8,7 @@
 
 #include <test_constants.hpp>
 
-TEST( UnitTest, IsDataPacket_TLSHandshake ) {
+TEST( UnitTest, IsDataPacket_TlsHandshake ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
     ASSERT_FALSE( ntk::is_data_packet( packet_data[ 0 ] ) );
     ASSERT_FALSE( ntk::is_data_packet( packet_data[ 1 ] ) );
@@ -28,3 +28,8 @@ TEST( UnitTest, IsDataPacket_TLSHandshake ) {
     ASSERT_TRUE( ntk::is_data_packet( packet_data[ 15 ] ) );
 }
 
+TEST( UnitTest, IsDataPacket_LongStream ) {
+    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream"] );
+    auto data_packet = packet_data[ 20 ];
+    ASSERT_TRUE( ntk::is_data_packet( data_packet ) ); 
+}
