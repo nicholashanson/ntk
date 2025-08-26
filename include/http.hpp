@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <fstream>
 
 #include <constants.hpp>
 #include <tcp.hpp>
@@ -158,6 +159,8 @@ namespace ntk {
 
     std::optional<file_extension> string_to_file_extension( const std::string& file_extension_string );
 
+    std::optional<std::string> file_extension_to_string( file_extension extension );
+
     template<file_extension F>
     bool is_request_for( const http_request& request ) {
         auto path = get_path( request.request_line.request_target );
@@ -167,6 +170,8 @@ namespace ntk {
         }
         return file_extension == F; 
     }
+
+    std::string write_to_file( const std::vector<uint8_t>& data, file_extension extension );
 
 } // namespace ntk
 

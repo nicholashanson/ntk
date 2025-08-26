@@ -274,6 +274,11 @@ namespace ntk {
         return std::nullopt;
     }
 
+    std::optional<std::string> file_extension_to_string( file_extension extension ) {
+        if ( extension == file_extension::TS ) return "ts";
+        return std::nullopt;
+    }
+
     std::expected<mime_type,http_parse_error> get_mime_type_from_ethernet( std::span<const unsigned char> ethernet_frame ) {
         auto maybe_headers = get_http_headers_from_payload( ethernet_frame );
         if ( !maybe_headers ) {
@@ -292,6 +297,21 @@ namespace ntk {
         if ( mime_type_string == "text/plain" ) return mime_type::TEXT_PLAIN;
         if ( mime_type_string == "application/vnd.apple.mpegurl" ) return mime_type::APPLICATION_VND_APPLE_MPEGURL;
         return std::nullopt;
+    }
+
+    std::string write_to_file( const std::vector<uint8_t>& data, file_extension extension ) {
+        auto now = std::chrono::system_clock::now();
+        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>( now.time_since_epoch() ).count();
+        std::ostringstream oss;
+        oss << now_ms << "." << file_extension_to_string( extension ).value();
+        std::string filename = oss.str();
+        std::ofstream out( filename, std::ios::binary );
+        if ( !out ) {
+            throw std::runtime_error( "Failed to open file for writing: " + filename );
+        }
+        out.write( reinterpret_cast<const char*>( data.data()), data.size() );
+        out.close();
+        return filename; 
     }
 
 } // namespace ntk
