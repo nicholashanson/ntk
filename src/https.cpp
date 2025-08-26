@@ -8,7 +8,7 @@ namespace ntk {
 		bool result = tls_live_stream::feed( packet );
 		if ( m_decrypted_records ) {
 			if ( m_decrypted_records.value().size() == 1 ) {
-				auto& decrypted_record = m_decrypted_records.value().front();
+				auto& decrypted_record = m_decrypted_records->front();
 				if ( is_http_request( decrypted_record.payload ) ) {
 					m_incomplete_request_response.request = *get_http_request( decrypted_record.payload );
 					if ( is_request_for<file_extension::M3U8>( m_incomplete_request_response.request.value() ) ) {
@@ -26,9 +26,9 @@ namespace ntk {
 						return true;
 					}
 					m_incomplete_request_response.response.emplace();
-					m_incomplete_request_response.response.value().content_length = static_cast<std::size_t>( std::stoull( headers[ "Content-Length" ] ) );
-					m_incomplete_request_response.response.value().body.insert(
-						m_incomplete_request_response.response.value().body.end(),
+					m_incomplete_request_response.response->content_length = static_cast<std::size_t>( std::stoull( headers[ "Content-Length" ] ) );
+					m_incomplete_request_response.response->body.insert(
+						m_incomplete_request_response.response->body.end(),
 						body.begin(), body.end()
 					);
 					if ( m_incomplete_request_response.response->http_response_complete() ) {
@@ -42,8 +42,8 @@ namespace ntk {
 				for ( auto& decrypted_record : m_decrypted_records.value() ) {
 					auto body = decrypted_record.payload;
 					body.pop_back();
-					m_incomplete_request_response.response.value().body.insert(
-						m_incomplete_request_response.response.value().body.end(),
+					m_incomplete_request_response.response->body.insert(
+						m_incomplete_request_response.response->body.end(),
 						body.begin(), body.end()
 					);
 					if ( m_incomplete_request_response.response->http_response_complete() ) {
