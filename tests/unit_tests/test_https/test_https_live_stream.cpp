@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
+#include <fstream>
+
 #include <https.hpp>
 #include <io.hpp>
 
@@ -56,6 +59,15 @@ TEST( UnitTest, HttpsLiveStream_Initialization_ExpectedData ) {
 	ASSERT_FALSE( expected_data );
 }
 
+TEST( UnitTest, HttpsLiveStream_Initialization_NameOfWrittenFile ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+	auto name_of_written_file = ntk::https_live_stream_friend_helper::name_of_written_file( live_stream );	
+	ASSERT_FALSE( name_of_written_file );
+}
+
 TEST( UnitTest, HttpsLiveStream_ExpectedData ) {
 	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
 	std::string ssl_keys_log = "sslkeys.log";
@@ -87,15 +99,106 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse
 	std::string ssl_keys_log = "sslkeys.log";
 	auto four = ntk::get_four_from_ethernet( packet_data.front() );
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 14;
+	const std::size_t read_packets_to = 27;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
 	auto incomplete_request_response = ntk::https_live_stream_friend_helper::get_incomplete_request_response( live_stream );
-	auto decrypted_data = ntk::tls_live_stream_friend_helper::decrypted_record( live_stream ); 
-	ntk::print_vector( decrypted_data.value().payload );
+	auto decrypted_records = ntk::tls_live_stream_friend_helper::decrypted_records( live_stream ); 
+	ASSERT_TRUE( decrypted_records );
+	ASSERT_TRUE( decrypted_records.value().size() );
 	ASSERT_TRUE( incomplete_request_response.response );
 	ASSERT_EQ( ( *incomplete_request_response.response ).body.size(), 15848 );
 	ASSERT_EQ( ( *incomplete_request_response.response ).content_length, 384836 );
 	ASSERT_FALSE( ( *incomplete_request_response.response ).http_response_complete() );
+}
+
+TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse_HttpResponseComplete ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+	for ( auto& packet : packet_data ) {
+		live_stream.feed( packet );
+	}
+	auto incomplete_request_response = ntk::https_live_stream_friend_helper::get_incomplete_request_response( live_stream );
+	ASSERT_TRUE( ( *incomplete_request_response.response ).http_response_complete() );
+}
+
+TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse_ContentLength ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+	const std::size_t read_packets_to = 27;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto incomplete_request_response = ntk::https_live_stream_friend_helper::get_incomplete_request_response( live_stream );
+	ASSERT_EQ( ( *incomplete_request_response.response ).content_length, 384836 );
+	ASSERT_FALSE( ( *incomplete_request_response.response ).body.empty() );
+}
+
+TEST( UnitTest, HttpsLiveStream_NameOfWrittenFile ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+	std::size_t read_packets_to = 97;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto name_of_written_file = ntk::https_live_stream_friend_helper::name_of_written_file( live_stream );
+	ASSERT_TRUE( name_of_written_file );
+}
+
+TEST( UnitTest, HttpsLiveStream_FileWrittenToDisk ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+	std::size_t read_packets_to = 97;
+	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
+		live_stream.feed( packet_data[ i ] );
+	}
+	auto output_file = ntk::https_live_stream_friend_helper::name_of_written_file( live_stream );
+	ASSERT_TRUE( std::filesystem::exists( output_file.value() ) );
+    ASSERT_GT( std::filesystem::file_size( output_file.value() ), 0u );
+    std::filesystem::remove( output_file.value() );
+}
+
+TEST( UnitTest, HttpsLiveStream_NameOfWrittenFile_BecomesNullOpt ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+	for ( auto& packet : packet_data ) {
+		live_stream.feed( packet );
+	}
+	auto name_of_written_file = ntk::https_live_stream_friend_helper::name_of_written_file( live_stream );
+	ASSERT_FALSE( name_of_written_file );
+}
+
+TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_Response_BecomesNullOpt ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+		for ( auto& packet : packet_data ) {
+		live_stream.feed( packet );
+	}
+	auto incomplete_request_response = ntk::https_live_stream_friend_helper::get_incomplete_request_response( live_stream );
+	ASSERT_FALSE( incomplete_request_response.response );
+}
+
+TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_Request_BecomesNullOpt ) {
+	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+	std::string ssl_keys_log = "sslkeys.log";
+	auto four = ntk::get_four_from_ethernet( packet_data.front() );
+	ntk::https_live_stream live_stream( four, ssl_keys_log );
+		for ( auto& packet : packet_data ) {
+		live_stream.feed( packet );
+	}
+	auto incomplete_request_response = ntk::https_live_stream_friend_helper::get_incomplete_request_response( live_stream );
+	ASSERT_FALSE( incomplete_request_response.request );
 }
