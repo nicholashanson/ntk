@@ -3,6 +3,7 @@
 namespace ntk {
 
 	bool https_live_stream::feed( const std::vector<uint8_t>& packet ) {
+		m_name_of_written_file = std::nullopt;
 		if ( !is_same_connection( packet, m_four ) ) return false;
 		bool result = tls_live_stream::feed( packet );
 		if ( m_decrypted_records ) {
@@ -21,7 +22,7 @@ namespace ntk {
 					auto headers = parse_http_headers( split_http_message.headers );
 					auto body = std::move( split_http_message.body );
 					body.pop_back();
-					if ( headwers[ "Content-Type" ] == "application/vnd.apple.mpegurl" ) { 
+					if ( headers[ "Content-Type" ] == "application/vnd.apple.mpegurl" ) { 
 						return true;
 					}
 					m_incomplete_request_response.response.emplace();
@@ -30,6 +31,10 @@ namespace ntk {
 						m_incomplete_request_response.response.value().body.end(),
 						body.begin(), body.end()
 					);
+					if ( m_incomplete_request_response.response->http_response_complete() ) {
+						m_name_of_written_file = write_to_file( m_incomplete_request_response.response.value().body, file_extension::TS );
+						m_incomplete_request_response.reset();
+					}
 					return true;
 				}
 			}
@@ -41,6 +46,10 @@ namespace ntk {
 						m_incomplete_request_response.response.value().body.end(),
 						body.begin(), body.end()
 					);
+					if ( m_incomplete_request_response.response->http_response_complete() ) {
+						m_name_of_written_file = write_to_file( m_incomplete_request_response.response.value().body, file_extension::TS );
+						m_incomplete_request_response.reset();
+					}
 				}
 				return true;
 			}
@@ -54,6 +63,10 @@ namespace ntk {
 
 	std::optional<mime_type> https_live_stream_friend_helper::expected_data( const https_live_stream& h ) {
 		return h.m_expected_data;
+	}
+
+	std::optional<std::string> https_live_stream_friend_helper::name_of_written_file( const https_live_stream& h ) {
+		return h.m_name_of_written_file;
 	}
 
 } // namespace ntk

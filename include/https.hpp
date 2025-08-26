@@ -9,6 +9,11 @@ namespace ntk {
     struct incomplete_request_response {
         std::optional<http_request> request;
         std::optional<incomplete_http_response> response;
+
+        void reset() {
+            request = std::nullopt;
+            response = std::nullopt;
+        }
     };
 
     class https_live_stream : public tls_live_stream {
@@ -20,6 +25,7 @@ namespace ntk {
             std::vector<std::pair<http_request,http_response>> m_request_response;
             incomplete_request_response m_incomplete_request_response;
             std::optional<mime_type> m_expected_data;
+            std::optional<std::string> m_name_of_written_file;
             friend class https_live_stream_friend_helper;
     };
 
@@ -27,6 +33,7 @@ namespace ntk {
         public:
             static incomplete_request_response get_incomplete_request_response( const https_live_stream& h );
             static std::optional<mime_type> expected_data( const https_live_stream& h );
+            static std::optional<std::string> name_of_written_file( const https_live_stream& h );
     };
 
 } // namespace ntk
