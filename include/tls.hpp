@@ -220,7 +220,7 @@ namespace ntk {
 
     std::expected<uint16_t,std::string> get_server_hello_cipher_suite( const std::span<const uint8_t>& server_hello_bytes, const std::size_t cipher_suite_pos );
 
-    std::expected<void,std::string> get_server_hello_session_id( const std::span<const uint8_t>& server_hello_bytes, server_hello& s_hello );
+    std::expected<std::vector<uint8_t>,std::string> extract_tls_session_id( const std::span<const uint8_t> handshake_message_bytes );
 
     std::expected<void,std::string> get_server_hello_extensions( const std::span<const uint8_t>& server_hello_bytes, server_hello s_hello,
                                                                  const std::size_t extensions_len_pos );

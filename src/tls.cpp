@@ -41,10 +41,13 @@ namespace ntk {
         c_hello.client_version = static_cast<tls_version>( read_uint16_be( client_hello_bytes, 0 ) );
         std::memcpy( c_hello.random.data(), &client_hello_bytes[ client_version_len ], random_len );
 
-        const std::size_t session_id_len = client_hello_bytes[ client_version_len + random_len ];
-        c_hello.session_id.resize( session_id_len );
-        std::memcpy( c_hello.session_id.data(), &client_hello_bytes[ client_version_len + random_len + 1 ], session_id_len );
+        auto session_id_result = extract_tls_session_id( client_hello_bytes );
+        if ( !session_id_result ) {
+            return std::unexpected( session_id_result.error() );
+        }
+        c_hello.session_id = std::move( session_id_result.value() );
 
+        const std::size_t session_id_len = c_hello.session_id.size();
         const std::size_t cipher_suites_len_pos = session_id_len_pos + 1 + session_id_len;
         const std::size_t cipher_suites_pos = cipher_suites_len_pos + 2;
         std::size_t cipher_suites_len = read_uint16_be( client_hello_bytes, cipher_suites_len_pos );
@@ -134,10 +137,11 @@ namespace ntk {
         s_hello.server_version = static_cast<tls_version>( read_uint16_be( server_hello_bytes, 0 ) );
         std::memcpy( s_hello.random.data(), &server_hello_bytes[ version_len ], random_len );
 
-        auto session_id_result = get_server_hello_session_id( server_hello_bytes, s_hello );
+        auto session_id_result = extract_tls_session_id( server_hello_bytes );
         if ( !session_id_result ) {
             return std::unexpected( session_id_result.error() );
         }
+        s_hello.session_id = std::move( session_id_result.value() );
 
         const std::size_t session_id_len = s_hello.session_id.size();
         const std::size_t cipher_suite_pos = session_id_len_pos + 1 + session_id_len;
@@ -177,17 +181,17 @@ namespace ntk {
     //  Get Server Hello Session ID
     // ==============================
 
-    std::expected<void,std::string> get_server_hello_session_id( const std::span<const uint8_t>& server_hello_bytes, server_hello& s_hello ) {
+    std::expected<std::vector<uint8_t>,std::string> extract_tls_session_id( const std::span<const uint8_t> handshake_message_bytes ) {
         constexpr std::size_t version_len = 2;
         constexpr std::size_t random_len = 32;
         constexpr std::size_t session_id_len_pos = version_len + random_len;
-        const std::size_t session_id_len = server_hello_bytes[ session_id_len_pos ];
-        if ( server_hello_bytes.size() < session_id_len_pos + 1 + session_id_len ) {
-            return std::unexpected( "ServerHello too short for session id" );
+        const std::size_t session_id_len = handshake_message_bytes[ session_id_len_pos ];
+        if ( handshake_message_bytes.size() < session_id_len_pos + 1 + session_id_len ) {
+            return std::unexpected( "Handshake Message too short for session id" );
         }
-        s_hello.session_id.resize( session_id_len );
-        std::memcpy( s_hello.session_id.data(), &server_hello_bytes[ session_id_len_pos + 1 ], session_id_len );
-        return {};
+        std::vector<uint8_t> session_id( session_id_len );
+        std::memcpy( session_id.data(), &handshake_message_bytes[ session_id_len_pos + 1 ], session_id_len );
+        return session_id;
     }
 
     // ==============================
