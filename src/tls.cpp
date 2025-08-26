@@ -727,7 +727,7 @@ namespace ntk {
     }
 
     // ==============================
-    //        Decrypt Record
+    //        Encrypt Record
     // ==============================
 
     tls_record encrypt_record( const std::array<uint8_t,32>& client_random,
@@ -1108,6 +1108,10 @@ namespace ntk {
             }
         }
         return false;
+    }
+
+    bool tls_live_stream::has_secrets() const {
+        return !m_tls_secrets.empty();
     }
 
     bool tls_live_stream::populate_client_hello( const std::vector<uint8_t>& packet ) {

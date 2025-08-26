@@ -34,7 +34,8 @@ namespace ntk {
     // ==============================
 
     enum class tls_version : uint16_t {
-        TLS_1_2 = 0x0303
+        TLS_1_2 = 0x0303,
+        TLS_1_3 = 0x0304
     };
 
     // ==============================
@@ -328,6 +329,15 @@ namespace ntk {
                                const std::string& secret_label,
                                uint64_t seq_num );
 
+    tls_record encrypt_record( const std::array<uint8_t,32>& client_random,
+                               const std::array<uint8_t,32>& server_random,
+                               const tls_version version,
+                               const uint16_t cipher_suite_id,
+                               const tls_record& record,
+                               const secrets& session_keys,
+                               const std::string& secret_label,
+                               uint64_t seq_num );
+
     std::vector<uint8_t> build_tls13_nonce( const std::vector<uint8_t>& base_iv, uint64_t seq_num );
 
     std::vector<uint8_t> build_tls13_aad( tls_content_type content_type, tls_version version, uint16_t length );
@@ -368,6 +378,7 @@ namespace ntk {
             tls_live_stream( const tcp_live_stream& tcp_stream );
             const std::string& get_sni() const;
             bool feed( const std::vector<uint8_t>& packet );
+            bool has_secrets() const;
         private:
             bool populate_client_hello( const std::vector<uint8_t>& packet ); 
             bool populate_server_hello( const std::vector<uint8_t>& packet );
@@ -378,7 +389,7 @@ namespace ntk {
             std::string m_sni;
             std::ifstream m_ssl_keys_log;
             secrets m_tls_secrets;
-            std::size_t m_lines_consumed;
+            std::atomic<std::size_t> m_lines_consumed;
             int m_client_traffic_seq_number;
             int m_server_traffic_seq_number;
             std::vector<uint8_t> m_partial_record_buffer;
@@ -408,6 +419,8 @@ namespace ntk {
     class log_file_trimmer {
         public:
             log_file_trimmer( std::string log_file ) : m_log_file( log_file ) {}
+            log_file_trimmer( const log_file_trimmer& ) = delete;
+            log_file_trimmer& operator=( const log_file_trimmer& ) = delete;
             void start();
             void stop();
         private:
