@@ -183,6 +183,9 @@ namespace ntk {
 
     std::expected<client_hello,std::string> parse_client_hello( const std::span<const uint8_t> client_hello_bytes );
 
+    std::expected<std::vector<uint8_t>,std::string> extract_client_hello_cipher_suites( const std::span<const uint8_t> client_hello_bytes,
+                                                                                        const std::size_t session_id_len ); 
+
     std::expected<client_hello,std::string> get_client_hello( const std::span<const uint8_t> tcp_payload );
 
     std::expected<client_hello,std::string> get_client_hello( const tls_record& record );
@@ -224,6 +227,10 @@ namespace ntk {
 
     std::expected<void,std::string> get_server_hello_extensions( const std::span<const uint8_t>& server_hello_bytes, server_hello s_hello,
                                                                  const std::size_t extensions_len_pos );
+
+    std::optional<tls_version> get_tls_version_from_handshake_message( const std::span<const uint8_t> handshake_message_bytes );
+
+    std::expected<std::array<uint8_t,constants::random_len>,std::string> extract_handshake_message_random( const std::span<const uint8_t> handshake_message_bytes );
 
     bool is_server_hello( const unsigned char* packet );
 
