@@ -26,30 +26,31 @@ namespace ntk {
     //       TCP Header Offset
     // ==============================
 
-    enum class tcp_header_offset : uint8_t {
-        SRC_PORT        = 0,
-        DEST_PORT       = 2,
-        SEQ_NUMBER      = 4,
-        ACK_NUMBER      = 8,
-        DATA_OFFSET    = 12,
-        FLAGS          = 13,
-        WINDOW_SIZE    = 14,
-        CHECKSUM       = 16,
-        URGENT_PTR     = 18
-    };
+    namespace tcp_header_offset {
 
+        constexpr std::size_t src_port     = 0;
+        constexpr std::size_t dest_port    = 2;
+        constexpr std::size_t seq_number   = 4;
+        constexpr std::size_t ack_number   = 8;
+        constexpr std::size_t data_offset  = 12;
+        constexpr std::size_t flags        = 13;
+        constexpr std::size_t window_size  = 14;
+        constexpr std::size_t checksum     = 16;
+        constexpr std::size_t urgent_ptr   = 18;
+    
+    } // namespace tcp_header_offset
 
     // ==============================
     //           TCP Flags
     // ==============================
 
     enum class tcp_flags : uint8_t {
-        FIN         = 0x01,
-        SYN         = 0x02,
-        RST         = 0x04,
-        ACK         = 0x10,
-        FIN_ACK     = 0x11,
-        SYN_ACK     = 0x12
+        fin         = 0x01,
+        syn         = 0x02,
+        rst         = 0x04,
+        ack         = 0x10,
+        fin_ack     = 0x11,
+        syn_ack     = 0x12
     };
 
     bool flags_contains( const uint8_t header_flags, const tcp_flags flags );
@@ -65,17 +66,30 @@ namespace ntk {
     //         TCP Option
     // ==============================
 
-    enum class option_type : uint8_t {
-        END_OF_OPTIONS_LIST, // 0x00
-        NOP,                 // 0x01
-        MSS,                 // 0x02
-        WINDOW_SCALE,        // 0x03
-        SACK_PERMITTED,      // 0x04
-        TIMESTAMP             = 0x08
+    enum class tcp_option_type : uint8_t {
+        end_of_options_list, // 0x00
+        nop,                 // 0x01
+        mss,                 // 0x02
+        window_scale,        // 0x03
+        sack_permitted,      // 0x04
+        timestamp             = 0x08
     };
 
+    namespace look_up {
+
+        constexpr std::array<tcp_option_type,6/* entries in tcp_option_type enum */> tcp_option_types {
+            tcp_option_type::end_of_options_list,
+            tcp_option_type::nop,
+            tcp_option_type::mss,
+            tcp_option_type::window_scale,
+            tcp_option_type::sack_permitted,
+            tcp_option_type::timestamp
+        };
+    
+    } // namespace look_up   
+
     struct tcp_option {
-        option_type type;
+        tcp_option_type type;
         std::vector<uint8_t> option;
 
         bool operator==( const tcp_option& other ) const {
@@ -117,17 +131,19 @@ namespace ntk {
     //       TCP Header Parsing
     // ==============================
 
-    tcp_header get_parsed_tcp_header( std::span<const uint8_t> raw_tcp_header );
+    std::expected<tcp_header,std::string> get_parsed_tcp_header( std::span<const uint8_t> raw_tcp_header );
 
-    tcp_header get_parsed_tcp_header( const unsigned char* ethernet_frame );
+    std::expected<tcp_header,std::string> get_parsed_tcp_header( const unsigned char* ethernet_frame );
 
-    tcp_header get_parsed_tcp_header( const std::vector<uint8_t>& packet );
+    std::expected<tcp_header,std::string> get_parsed_tcp_header_from_ethernet( std::span<const uint8_t> packet );
 
     std::vector<uint8_t> get_raw_tcp_header( const unsigned char* ethernet_frame, const std::size_t ipv4_header_len );
 
-    std::vector<uint8_t> get_raw_tcp_header( const unsigned char* ethernet_frame );
+    std::expected<std::vector<uint8_t>,std::string> get_raw_tcp_header( const unsigned char* ethernet_frame );
 
-    std::vector<uint8_t> get_raw_tcp_header( const std::vector<uint8_t>& packet );
+    std::expected<std::vector<uint8_t>,std::string> get_raw_tcp_header( std::span<const uint8_t> packet );
+
+    std::optional<tcp_option_type> get_tcp_option_type( const uint8_t option_type_byte );
 
     // ==============================
     //      TCP Stream Parsing
@@ -147,35 +163,40 @@ namespace ntk {
 
     tcp_stream get_merged_tcp_stream( const session& packet_data ); 
 
-    std::vector<uint8_t> get_tcp_payload( const unsigned char* ethernet_frame );
+    std::expected<std::vector<uint8_t>,std::string> get_tcp_payload( const unsigned char* ethernet_frame );
 
-    std::vector<uint8_t> get_tcp_payload( std::span<const uint8_t> packet );
+    std::expected<std::vector<uint8_t>,std::string> get_tcp_payload( std::span<const uint8_t> packet );
 
     // ==============================
     //     TCP Packet Predicates
     // ==============================
 
-    bool is_tcp( const unsigned char* packet );
+    std::expected<bool,std::string> is_tcp( const unsigned char* packet );
 
-    bool is_tcp_v( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_tcp_v( const std::vector<uint8_t>& packet );
 
-    bool is_data_packet( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_data_packet( std::span<const uint8_t> packet );
 
     bool is_ack_only_packet( const std::vector<uint8_t>& packet );
 
     bool is_reset( const std::vector<uint8_t>& packet );
 
-    bool is_syn( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_syn( std::span<const uint8_t> packet );
 
-    bool is_ack( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_fin_ack( std::span<const uint8_t> packet );
 
-    bool is_fin_ack( const std::vector<uint8_t>& packet );
+    bool is_fin_ack( const tcp_header& header );
 
-    bool is_ack_of_seq( const std::vector<uint8_t>& data_sender_packet, const std::vector<uint8_t>& data_reciever_packet );
+    std::expected<bool,std::string> is_ack_of_seq( std::span<const uint8_t> data_sender_packet, std::span<const uint8_t> data_reciever_packet );
 
     bool is_ack_of_seq( const tcp_header& data_sender_header, const tcp_header& data_reciever_header );
 
+    std::expected<bool,std::string> is_ack_of_seq( std::span<const uint8_t> data_sender_packet, const tcp_header& data_reciever_header );
+
+    std::expected<bool,std::string> is_ack_of_seq( const tcp_header& data_sender_header, std::span<const uint8_t> data_reciever_packet );
+
     bool is_ack_of_seq( const uint32_t seq_number, const uint32_t ack_number );
+
 
     // ==============================
     //         Four Tuple
@@ -203,11 +224,11 @@ namespace ntk {
     //       Is Same Connection
     // ==============================
 
-    bool is_same_connection(const four_tuple& lhs, const four_tuple& rhs );
+    bool is_same_connection( const four_tuple& lhs, const four_tuple& rhs );
 
-    bool is_same_connection( const std::vector<uint8_t>& packet, const four_tuple& four );
+    std::expected<bool,std::string> is_same_connection( std::span<const uint8_t> packet, const four_tuple& four );
 
-    bool is_same_connection( const std::vector<uint8_t>& lhs, const std::vector<uint8_t>& rhs );
+    std::expected<bool,std::string> is_same_connection( std::span<const uint8_t> lhs, std::span<const uint8_t> rhs );
 
 } // namespace ntk
 
@@ -230,9 +251,9 @@ namespace ntk {
 
     std::unordered_set<four_tuple> get_four_tuples( const session& packets );
 
-    four_tuple get_four_from_ethernet( const unsigned char* packet );
+    std::expected<four_tuple,std::string> get_four_from_ethernet( const unsigned char* packet );
 
-    four_tuple get_four_from_ethernet( const std::vector<uint8_t>& packet );
+    std::expected<four_tuple,std::string> get_four_from_ethernet( std::span<const uint8_t> packet );
 
     four_tuple flip_four( const four_tuple& four );
 
@@ -271,9 +292,9 @@ namespace ntk {
     bool is_valid_handshake( const std::vector<uint8_t>& syn, const std::vector<uint8_t>& synack, const std::vector<uint8_t>& ack );
 
     struct tcp_handshake_feed { 
-        bool feed( const std::vector<uint8_t>& packet );
+        std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
     private:
-        bool feed_packet( const std::vector<uint8_t>& packet ); 
+        std::expected<bool,std::string> feed_packet( std::span<const uint8_t> packet ); 
     public:
         void reset() {
             m_syn = m_syn_ack = m_ack = std::nullopt;
@@ -307,7 +328,6 @@ namespace ntk {
                    responder_fin == other.responder_fin &&
                    initiator_ack == other.initiator_ack;
         }
-
     };
 
     // ==============================
@@ -326,7 +346,7 @@ namespace ntk {
         std::optional<std::vector<uint8_t>> responder_fin; 
         std::optional<std::vector<uint8_t>> initiator_ack;
 
-        bool feed( const std::vector<uint8_t>& );
+        std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
         operator bool() const;
         void reset();
     };
@@ -362,9 +382,9 @@ namespace ntk {
     const std::vector<uint8_t>* get_start_of_termination( const session& packets, const tcp_termination& termination );
 
     struct tcp_termination_feed { 
-        bool feed( const std::vector<uint8_t>& packet );
+        std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
     private:
-        bool feed_packet( const std::vector<uint8_t>& packet );
+        std::expected<bool,std::string> feed_packet( std::span<const uint8_t> packet );
     public:
         tcp_termination_feed( const four_tuple& four ) 
             : m_four( four ), m_complete( false ) {}
@@ -413,7 +433,7 @@ namespace ntk {
             bool operator==( const tcp_live_stream& other ) const;
 
             bool is_complete() const;
-            bool feed( const std::vector<uint8_t>& packet );
+            std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
             const four_tuple& get_four_tuple() const;
 
             template<typename Predicate>
@@ -425,8 +445,8 @@ namespace ntk {
         private:
             tcp_termination_feed m_termination_feed;
         protected:
-            bool is_client_packet( const std::vector<uint8_t>& packet ) const;
-            bool is_server_packet( const std::vector<uint8_t>& packet ) const;
+            bool is_client_packet( std::span<const uint8_t> packet ) const;
+            bool is_server_packet( std::span<const uint8_t> packet ) const;
             std::vector<std::vector<uint8_t>> m_traffic;
             four_tuple m_four;
         private:
@@ -459,7 +479,7 @@ namespace ntk {
         public:
             tcp_live_stream_session();
             tcp_live_stream_session( transfer_queue_interface<tcp_live_stream>* offload_queue );
-            void feed( const std::vector<uint8_t>& packet );
+            std::expected<bool,std::string> feed_packet( std::span<const uint8_t> packet );
             std::size_t number_of_completed_transfers();
         private:
             void offload( tcp_live_stream&& stream );
