@@ -14,6 +14,8 @@
 #include <limits>
 #include <expected>
 
+#include <iomanip>
+
 #include <ipv4.hpp>
 #include <constants.hpp>
 #include <spmc_queue.hpp>
@@ -88,6 +90,8 @@ namespace ntk {
     
     } // namespace look_up   
 
+    inline auto get_tcp_option_type = make_lookup( look_up::tcp_option_types );
+
     struct tcp_option {
         tcp_option_type type;
         std::vector<uint8_t> option;
@@ -133,7 +137,7 @@ namespace ntk {
 
     std::expected<tcp_header,std::string> get_parsed_tcp_header( std::span<const uint8_t> raw_tcp_header );
 
-    std::expected<tcp_header,std::string> get_parsed_tcp_header( const unsigned char* ethernet_frame );
+    std::expected<tcp_header,std::string> get_parsed_tcp_header_from_ethernet( const unsigned char* ethernet_frame );
 
     std::expected<tcp_header,std::string> get_parsed_tcp_header_from_ethernet( std::span<const uint8_t> packet );
 
@@ -142,8 +146,6 @@ namespace ntk {
     std::expected<std::vector<uint8_t>,std::string> get_raw_tcp_header( const unsigned char* ethernet_frame );
 
     std::expected<std::vector<uint8_t>,std::string> get_raw_tcp_header( std::span<const uint8_t> packet );
-
-    std::optional<tcp_option_type> get_tcp_option_type( const uint8_t option_type_byte );
 
     // ==============================
     //      TCP Stream Parsing
@@ -163,9 +165,9 @@ namespace ntk {
 
     tcp_stream get_merged_tcp_stream( const session& packet_data ); 
 
-    std::expected<std::vector<uint8_t>,std::string> get_tcp_payload( const unsigned char* ethernet_frame );
+    std::expected<std::optional<std::vector<uint8_t>>,std::string> get_tcp_payload( const unsigned char* ethernet_frame );
 
-    std::expected<std::vector<uint8_t>,std::string> get_tcp_payload( std::span<const uint8_t> packet );
+    std::expected<std::optional<std::vector<uint8_t>>,std::string> get_tcp_payload( std::span<const uint8_t> packet );
 
     // ==============================
     //     TCP Packet Predicates
@@ -173,13 +175,15 @@ namespace ntk {
 
     std::expected<bool,std::string> is_tcp( const unsigned char* packet );
 
-    std::expected<bool,std::string> is_tcp_v( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_tcp( std::span<const uint8_t> packet );
 
     std::expected<bool,std::string> is_data_packet( std::span<const uint8_t> packet );
 
-    bool is_ack_only_packet( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_ack_only_packet( const std::vector<uint8_t>& packet );
 
-    bool is_reset( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_reset( std::span<const uint8_t> packet );
+
+    bool is_syn( const tcp_header& header );
 
     std::expected<bool,std::string> is_syn( std::span<const uint8_t> packet );
 
@@ -216,9 +220,9 @@ namespace ntk {
         }
     };
 
-    bool has_four( const std::vector<uint8_t>& packet, const four_tuple& four ); 
+    std::expected<bool,std::string> has_four( std::span<const uint8_t> packet, const four_tuple& four ); 
 
-    bool has_flipped_four( const std::vector<uint8_t>& packet, const four_tuple& four );
+    std::expected<bool,std::string> has_flipped_four( std::span<const uint8_t> packet, const four_tuple& four );
 
     // ==============================
     //       Is Same Connection
@@ -285,11 +289,11 @@ namespace ntk {
 
     const std::vector<uint8_t>* get_end_of_handshake( const session& packets, const tcp_handshake& handshake );
 
-    bool is_valid_handshake( const tcp_handshake& handshake );
+    std::expected<bool,std::string> is_valid_handshake( const tcp_handshake& handshake );
 
     bool is_valid_handshake( const tcp_header& syn_header, const tcp_header& syn_ack_header, const tcp_header& ack_header );
 
-    bool is_valid_handshake( const std::vector<uint8_t>& syn, const std::vector<uint8_t>& synack, const std::vector<uint8_t>& ack );
+    std::expected<bool,std::string> is_valid_handshake( const std::vector<uint8_t>& syn, const std::vector<uint8_t>& synack, const std::vector<uint8_t>& ack );
 
     struct tcp_handshake_feed { 
         std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
@@ -371,9 +375,9 @@ namespace ntk {
     //    Is Valid FIN ACK FIN ACK
     // ==============================
 
-    bool is_valid_fin_ack_fin_ack( const fin_ack_fin_ack& closing_sequence );
+    std::expected<bool,std::string> is_valid_fin_ack_fin_ack( const fin_ack_fin_ack& closing_sequence );
 
-    bool is_valid_fin_ack_fin_ack( const tcp_termination& termination );
+    std::expected<bool,std::string> is_valid_fin_ack_fin_ack( const tcp_termination& termination );
 
     std::optional<tcp_termination> get_termination( const four_tuple& four, const session& packets );
 
@@ -445,8 +449,8 @@ namespace ntk {
         private:
             tcp_termination_feed m_termination_feed;
         protected:
-            bool is_client_packet( std::span<const uint8_t> packet ) const;
-            bool is_server_packet( std::span<const uint8_t> packet ) const;
+            std::expected<bool,std::string> is_client_packet( std::span<const uint8_t> packet ) const;
+            std::expected<bool,std::string> is_server_packet( std::span<const uint8_t> packet ) const;
             std::vector<std::vector<uint8_t>> m_traffic;
             four_tuple m_four;
         private:
@@ -461,8 +465,8 @@ namespace ntk {
             static const tcp_termination_feed& termination_feed( const tcp_live_stream& t );
             static const std::vector<std::vector<uint8_t>>& traffic( const tcp_live_stream& t );
             static const four_tuple& four( const tcp_live_stream& t );
-            static bool is_client_packet( const tcp_live_stream& t, const std::vector<uint8_t>& packet );
-            static bool is_server_packet( const tcp_live_stream& t, const std::vector<uint8_t>& packet );
+            static std::expected<bool,std::string> is_client_packet( const tcp_live_stream& t, std::span<const uint8_t> packet );
+            static std::expected<bool,std::string> is_server_packet( const tcp_live_stream& t, std::span<const uint8_t> packet );
     };
 
     struct four_tuple_filter {
