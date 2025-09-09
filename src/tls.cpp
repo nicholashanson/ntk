@@ -3,12 +3,16 @@
 namespace ntk {
 
     // ==============================
-    //           Helpers
+    //        String to Hex
     // ==============================
 
     std::string string_to_hex( const std::vector<uint8_t>& data ) {
         return session_id_to_hex( data );
     }
+
+    // ==============================
+    //     Client Random to Hex
+    // ==============================
 
     std::string client_random_to_hex( const std::array<uint8_t,32>& random ) {
         std::ostringstream oss;
@@ -16,6 +20,10 @@ namespace ntk {
             oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << int( byte );
         return oss.str();
     }
+
+    // ==============================
+    //       Session ID to Hex
+    // ==============================
 
     std::string session_id_to_hex( const std::vector<uint8_t>& session_id ) {
         std::ostringstream oss;
@@ -57,7 +65,7 @@ namespace ntk {
         }
         c_hello.cipher_suites = std::move( cipher_suites_result.value() );
         
-        const std::size_t cipher_suites_pos = constants::minimum_handshake_message_len + session_id_len  + 2 /* cipher suites length bytes */; 
+        const std::size_t cipher_suites_pos = constants::minimum_handshake_message_len + session_id_len  + 2 /* cipher suites len bytes */; 
         const std::size_t cipher_suites_len = c_hello.cipher_suites.size(); 
         const std::size_t compression_methods_len_pos = cipher_suites_pos + cipher_suites_len;
         auto compression_methods_result = extract_client_hello_compression_methods( client_hello_bytes, compression_methods_len_pos );
@@ -82,7 +90,7 @@ namespace ntk {
 
     std::expected<std::vector<uint8_t>,std::string> extract_client_hello_cipher_suites( const std::span<const uint8_t> client_hello_bytes,
                                                                                         const std::size_t session_id_len ) {
-        const std::size_t cipher_suites_len_pos = constants::session_id_len_pos + 1 /* session id length byte */ + session_id_len;
+        const std::size_t cipher_suites_len_pos = constants::session_id_len_pos + 1 /* session id len byte */ + session_id_len;
         const std::size_t cipher_suites_pos = cipher_suites_len_pos + 2 /* cipher suites len bytes */;
         if ( client_hello_bytes.size() < cipher_suites_len_pos + 1 + 2 /* cipher suites len bytes */ ) {
             return std::unexpected( "ClientHello too short for Cipher Suites length bytes" );
@@ -99,8 +107,7 @@ namespace ntk {
     std::expected<std::vector<uint8_t>,std::string> extract_client_hello_compression_methods( const std::span<const uint8_t> client_hello_bytes,
                                                                                               const std::size_t compression_methods_len_pos ) {
         const std::size_t compression_methods_len = client_hello_bytes[ compression_methods_len_pos ];
-        std::vector<uint8_t> compression_methods;
-        compression_methods.resize( compression_methods_len );
+        std::vector<uint8_t> compression_methods( compression_methods_len );
         std::memcpy( compression_methods.data(), &client_hello_bytes[ compression_methods_len_pos + 1 ], compression_methods_len );
         return compression_methods;
     }
@@ -142,7 +149,7 @@ namespace ntk {
     }
 
     // ==============================
-    //    Client Hello Predicates
+    //       Is Client Hello
     // ==============================
 
     std::expected<bool,std::string> is_client_hello( const unsigned char* packet ) {
@@ -154,7 +161,7 @@ namespace ntk {
             return false;
         }
         auto& payload = *payload_result.value();
-        if ( payload.size() < constants::record_header_len + 1 /* 5 bytes for recorder header + 1 payload bytes */ ) { 
+        if ( payload.size() < constants::record_header_len + 1 /* 5 recorder header bytes + 1 handshake type byte */ ) { 
             return false;
         }
         auto content_type_opt = get_tls_content_type( payload[ record_header_offset::content_type ] );
@@ -293,7 +300,7 @@ namespace ntk {
             return std::unexpected( "HandShake Message too short extensions" );
         }
         std::vector<uint8_t> extensions( extensions_len );
-        std::memcpy( extensions.data(), &handshake_message_bytes[ extensions_len_pos + 2 ], extensions_len );
+        std::memcpy( extensions.data(), &handshake_message_bytes[ extensions_len_pos + 2 /* extension len bytes */ ], extensions_len );
         return extensions;
     }
 
@@ -1004,34 +1011,36 @@ namespace ntk {
     // ==============================
 
     std::expected<std::string,std::string> get_sni( const client_hello& hello ) {
-        constexpr std::size_t extension_length_pos = 2;
-        constexpr std::size_t sni_list_length_pos = 4;
+        constexpr std::size_t extension_type_field_offset = 0;
+        constexpr std::size_t extension_len_field_offset = 2;
+        constexpr std::size_t extension_header_len = 4;
+        constexpr std::size_t sni_list_len_field_len = 2;
         auto extension_bytes = std::span<const uint8_t>( hello.extensions );
 
         while ( !extension_bytes.empty() ) {
-            if ( extension_bytes.size() < 4 ) {
-                return std::unexpected( "Extension too short for header" );
+            if ( extension_bytes.size() < extension_header_len ) {
+                return std::unexpected( "Extension too short for Header" );
             }
-            uint16_t extension_type = read_uint16_be( extension_bytes, 0 );
-            uint16_t extension_length = read_uint16_be( extension_bytes, 2 );
-            if ( extension_bytes.size() < 4 + extension_length ) {
+            const uint16_t extension_type = read_uint16_be( extension_bytes, extension_type_field_offset );
+            const uint16_t extension_len = read_uint16_be( extension_bytes, extension_len_field_offset );
+            if ( extension_bytes.size() < extension_header_len + extension_len ) {
                 return std::unexpected( "Extension body truncated" );
             }
             if ( extension_type == 0x0000 ) {
-                if ( extension_length < 2 ) {
-                    return std::unexpected( "SNI extension too short to contain list length" );
+                if ( extension_len < sni_list_len_field_len ) {
+                    return std::unexpected( "SNI Extension too short to contain List Length" );
                 }
-                uint16_t sni_list_length = read_uint16_be( extension_bytes, 0 );
-                if ( sni_list_length > extension_length - 2 ) {
-                    return std::unexpected( "SNI list length exceeds bounds" );
+                const uint16_t sni_list_len = read_uint16_be( extension_bytes, extension_header_len );
+                if ( sni_list_len_field_len + sni_list_len > extension_len ) {
+                    return std::unexpected( "SNI List length exceeds bounds" );
                 }
-                auto sni_list = extension_bytes.subspan( sni_list_length_pos + 2 );
+                auto sni_list = extension_bytes.subspan( extension_header_len + sni_list_len_field_len );
                 return parse_sni_list( sni_list );
             }
 
-            extension_bytes = extension_bytes.subspan( 4 + extension_length );
+            extension_bytes = extension_bytes.subspan( extension_header_len + extension_len );
         }
-        return std::unexpected( "No sever name found" );
+        return std::unexpected( "No Sever Name found" );
     }
 
      // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1053,24 +1062,24 @@ namespace ntk {
     // ==============================
 
     std::expected<std::string,std::string> parse_sni_list( std::span<const unsigned char>& sni_list ) {
+        constexpr std::size_t sni_entry_header_len = 3;
+        constexpr std::size_t name_len_offset = 1;
         while ( !sni_list.empty() ) {
-            if ( sni_list.size() < 3 ) {
-                return std::unexpected( "SNI entry too short" );
+            if ( sni_list.size() < sni_entry_header_len ) {
+                return std::unexpected( "SNI Entry too short" );
+            }
+            const uint8_t name_type = sni_list.front();
+            const uint16_t name_len = read_uint16_be( sni_list, name_len_offset );
+            if ( sni_list.size() < sni_entry_header_len + name_len ) {
+                return std::unexpected( "Server Name truncated" );
             }
 
-            uint8_t name_type = sni_list[ 0 ];
-            uint16_t name_length = read_uint16_be( sni_list, 1 );
-            if ( sni_list.size() < 3 + name_length ) {
-                return std::unexpected( "Server name truncated" );
-            }
-
-            std::string server_name( sni_list.begin() + 3,
-                                     sni_list.begin() + 3 + name_length );
+            std::string server_name( sni_list.begin() + sni_entry_header_len,
+                                     sni_list.begin() + sni_entry_header_len + name_len );
             return server_name;
-            sni_list = sni_list.subspan( 3 + name_length );
+            sni_list = sni_list.subspan( sni_entry_header_len + name_len );
         }
-
-        return std::unexpected( "No server name found" );
+        return std::unexpected( "No Server Name found" );
     }
 
     // ==============================
@@ -1096,6 +1105,10 @@ namespace ntk {
         }
         return result.value().contains( host );
     }
+
+    // ==============================
+    //           Get SNIs
+    // ==============================
 
     std::vector<std::string> get_snis( const session& packets, const std::string& host ) {
         std::vector<std::string> snis;
@@ -1448,7 +1461,7 @@ namespace ntk {
     }
 
     // ==============================
-    //     TLS Record Extraction
+    //      Extract TLS Records
     // ==============================
 
     tls_record_extraction_result extract_tls_records( const std::vector<std::vector<uint8_t>>& payloads ) {
@@ -1465,6 +1478,10 @@ namespace ntk {
         result.has_remainder = !remainder.empty();
         return result;
     }
+
+    // ==============================
+    //        Get TLS Record
+    // ==============================
 
     std::expected<tls_record,std::string> get_tls_record_from_ethernet( std::span<const uint8_t> packet ) {
         auto payload_result = get_tcp_payload( packet );
@@ -1490,6 +1507,10 @@ namespace ntk {
             return std::unexpected( result.error() );
         }
     }
+
+    // ==================================
+    //    Append to Incomplete Record
+    // ==================================
 
     std::variant<tls_record,incomplete_tls_record> append_to_incomplete_record( incomplete_tls_record incomplete_record, std::span<const unsigned char> packet ) {
         if ( incomplete_record.record.payload.size() == incomplete_record.expected_payload_length ) { 
@@ -1517,6 +1538,10 @@ namespace ntk {
         }
     }
 
+    // ==================================
+    // Get Complete or Incomplete Record
+    // ==================================
+
     std::expected<std::variant<tls_record,incomplete_tls_record>,std::string> get_complete_or_incomplete_record( std::span<const uint8_t> packet ) {
         auto record = get_parsed_tls_record_from_ethernet( packet );
         if ( !record ) {
@@ -1532,6 +1557,10 @@ namespace ntk {
             return record.value();
         }
     }
+
+    // ==============================
+    //      Get Empty TLS Record
+    // ==============================
 
     std::expected<tls_record,std::string> get_empty_tls_record_from_ethernet( std::span<const uint8_t> packet ) {
         auto payload_result = get_tcp_payload( packet );
@@ -1553,6 +1582,10 @@ namespace ntk {
         }
         return tls_record { record_header_result.value().content_type, record_header_result.value().version };
     }
+
+    // ==============================
+    //    Get TLS Record Header
+    // ==============================
 
     std::expected<tls_record_header,std::string> get_tls_record_header( const std::array<uint8_t,constants::record_header_len> record_header_bytes ) {
         auto content_type_opt = get_tls_content_type( record_header_bytes[ record_header_offset::content_type ] );
