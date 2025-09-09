@@ -34,9 +34,22 @@ namespace ntk {
     // ==============================
 
     enum class tls_version : uint16_t {
-        TLS_1_2 = 0x0303,
-        TLS_1_3 = 0x0304
+        tls_1_0 = 0x0301,
+        tls_1_2 = 0x0303,
+        tls_1_3 = 0x0304
     };
+
+    namespace look_up {
+
+        constexpr std::array<tls_version,3/* entries in enum tls_version */> tls_versions = {
+            tls_version::tls_1_0,
+            tls_version::tls_1_2,
+            tls_version::tls_1_3
+        };
+
+    } // namespace look_up
+
+    inline auto get_tls_version = make_lookup( look_up::tls_versions );
 
     // ==============================
     //         Cipher Suites
@@ -57,22 +70,43 @@ namespace ntk {
     // ==============================
 
     enum class tls_content_type : uint8_t {
-        CHANGE_CIPHER_SPEC = 0x14,
-        ALERT,            // 0x15
-        HANDSHAKE,        // 0x16
-        APPLICATION_DATA  // 0x17
+        change_cipher_spec = 0x14,
+        alert,            // 0x15
+        handshake,        // 0x16
+        application_data  // 0x17
     };
 
+    namespace look_up {
+
+        constexpr std::array<tls_content_type,4/* entries in tls_content_type enum */> tls_content_types {
+            tls_content_type::change_cipher_spec,
+            tls_content_type::alert,
+            tls_content_type::handshake,
+            tls_content_type::application_data
+        };
+
+    } // namespace look_up
+
+    inline auto get_tls_content_type = make_lookup( look_up::tls_content_types );
+
     static const std::unordered_map<tls_content_type,std::string> tls_content_type_names = {
-        { tls_content_type::CHANGE_CIPHER_SPEC, "ChangeCipherSpec" },
-        { tls_content_type::ALERT, "Alert" },
-        { tls_content_type::HANDSHAKE, "Handshake" },
-        { tls_content_type::APPLICATION_DATA, "Application Data" }
+        { tls_content_type::change_cipher_spec, "ChangeCipherSpec" },
+        { tls_content_type::alert, "Alert" },
+        { tls_content_type::handshake, "Handshake" },
+        { tls_content_type::application_data, "Application Data" }
     };
 
     // ==============================
     //           TLS Records
     // ==============================
+
+    namespace record_header_offset {
+
+        constexpr std::size_t content_type = 0;
+        constexpr std::size_t version = 1;
+        constexpr std::size_t payload_len = 3;
+    
+    } // record_header_offset
 
     struct tls_record {
         tls_content_type content_type;
@@ -81,8 +115,8 @@ namespace ntk {
 
         bool operator==( const tls_record& other ) const {
             return content_type == other.content_type &&
-                   version == other.version &&
-                   payload == other.payload;
+                version == other.version &&
+                payload == other.payload;
         }
     };
 
@@ -103,8 +137,8 @@ namespace ntk {
 
         bool operator==( const tls_record_header& other ) const {
             return content_type == other.content_type &&
-                   version == other.version &&
-                   payload_length == other.payload_length;
+                version == other.version &&
+                payload_length == other.payload_length;
         }
     };
 
@@ -114,27 +148,27 @@ namespace ntk {
 
     std::expected<tls_record,std::string> get_tls_record_from_payload( std::span<const uint8_t> payload );
 
-    std::variant<tls_record,incomplete_tls_record> append_to_incomplete_record( incomplete_tls_record record, std::span<const unsigned char> packet );
+    std::variant<tls_record,incomplete_tls_record> append_to_incomplete_record( incomplete_tls_record record, std::span<const uint8_t> packet );
 
-    std::variant<tls_record,incomplete_tls_record> get_complete_or_incomplete_record( std::span<const unsigned char> packet );
+    std::expected<std::variant<tls_record,incomplete_tls_record>,std::string> get_complete_or_incomplete_record( std::span<const uint8_t> packet );
 
-    tls_record get_empty_tls_record_from_ethernet( std::span<const unsigned char> packet );
+    std::expected<tls_record,std::string> get_empty_tls_record_from_ethernet( std::span<const uint8_t> packet );
 
-    tls_record get_empty_tls_record_from_payload( std::span<const unsigned char> payload );
+    std::expected<tls_record,std::string> get_empty_tls_record_from_payload( std::span<const uint8_t> payload );
 
-    tls_record_header get_tls_record_header( const std::array<uint8_t,5> record_header_bytes );
+    std::expected<tls_record_header,std::string> get_tls_record_header( const std::array<uint8_t,constants::record_header_len> record_header_bytes );
 
-    tls_record_header get_tls_record_header_from_ethernet( std::span<const unsigned char> packet );
+    std::expected<tls_record_header,std::string> get_tls_record_header_from_ethernet( std::span<const uint8_t> packet );
 
-    tls_record_header get_tls_record_header_from_payload( std::span<const unsigned char> payload );
+    std::expected<tls_record_header,std::string> get_tls_record_header_from_payload( std::span<const uint8_t> payload );
 
     bool is_complete_record( std::span<const unsigned char> record_bytes );
 
-    bool is_tls( const unsigned char* packet );
+    std::expected<bool,std::string> is_tls( const unsigned char* packet );
 
-    bool is_tls_v( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_tls( std::span<const uint8_t> packet );
 
-    bool is_tls_payload( const std::vector<uint8_t>& payload );
+    std::expected<bool,std::string> is_tls_payload( const std::span<const uint8_t> payload );
 
     std::expected<
         std::tuple<std::vector<tls_record>,size_t>, 
@@ -154,10 +188,21 @@ namespace ntk {
     //      TLS Handshake Type
     // ==============================
 
-    enum class handshake_type : uint8_t {
-        CLIENT_HELLO  = 0x01,
-        SERVER_HELLO // 0x02
+    enum class tls_handshake_type : uint8_t {
+        client_hello  = 0x01,
+        server_hello // 0x02
     };
+
+    namespace look_up {
+
+        constexpr std::array<tls_handshake_type,2/* entries in tls_handshake_type enum */> tls_handshake_types = {
+            tls_handshake_type::client_hello,
+            tls_handshake_type::server_hello
+        };
+
+    } // namespace look_up
+
+    inline auto get_tls_handshake_type = make_lookup( look_up::tls_handshake_types );
 
     // ==============================
     //           Client Hello
@@ -186,17 +231,20 @@ namespace ntk {
     std::expected<std::vector<uint8_t>,std::string> extract_client_hello_cipher_suites( const std::span<const uint8_t> client_hello_bytes,
                                                                                         const std::size_t session_id_len ); 
 
+    std::expected<std::vector<uint8_t>,std::string> extract_client_hello_compression_methods( const std::span<const uint8_t> client_hello_bytes,
+                                                                                              const std::size_t compression_methods_len_pos );
+
     std::expected<client_hello,std::string> get_client_hello( const std::span<const uint8_t> tcp_payload );
 
     std::expected<client_hello,std::string> get_client_hello( const tls_record& record );
 
     std::expected<client_hello,std::string> get_client_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
 
-    std::expected<client_hello,std::string> get_client_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
+    std::expected<client_hello,std::string> get_client_hello_from_ethernet_frame( std::span<const uint8_t> ethernet_frame );
 
-    bool is_client_hello( const unsigned char* packet );
+    std::expected<bool,std::string> is_client_hello( const unsigned char* packet );
 
-    bool is_client_hello_v( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_client_hello( std::span<const uint8_t> packet );
 
     bool is_client_hello( const tls_record& record );
 
@@ -215,9 +263,9 @@ namespace ntk {
 
     std::expected<server_hello,std::string> parse_server_hello( const std::span<const uint8_t> server_hello_bytes );
 
-    std::expected<server_hello,std::string> get_server_hello_from_ethernet_frame( const unsigned char* ethernet_frame );
+    std::expected<server_hello,std::string> get_server_hello_from_ethernet( const unsigned char* ethernet_frame );
 
-    std::expected<server_hello,std::string> get_server_hello_from_ethernet_frame( const std::vector<uint8_t>& ethernet_frame );
+    std::expected<server_hello,std::string> get_server_hello_from_ethernet( std::span<const uint8_t> ethernet_frame );
 
     std::expected<server_hello,std::string> get_server_hello( const tls_record& record );
 
@@ -228,13 +276,16 @@ namespace ntk {
     std::expected<void,std::string> get_server_hello_extensions( const std::span<const uint8_t>& server_hello_bytes, server_hello s_hello,
                                                                  const std::size_t extensions_len_pos );
 
-    std::optional<tls_version> get_tls_version_from_handshake_message( const std::span<const uint8_t> handshake_message_bytes );
+    std::expected<std::optional<tls_version>,std::string> get_tls_version_from_handshake_message( const std::span<const uint8_t> handshake_message_bytes );
 
     std::expected<std::array<uint8_t,constants::random_len>,std::string> extract_handshake_message_random( const std::span<const uint8_t> handshake_message_bytes );
 
-    bool is_server_hello( const unsigned char* packet );
+    std::expected<std::vector<uint8_t>,std::string> extract_handshake_message_extensions( const std::span<const uint8_t> handshake_message_bytes,
+                                                                                          const std::size_t extensions_len_pos );
 
-    bool is_server_hello_v( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_server_hello( const unsigned char* packet );
+
+    std::expected<bool,std::string> is_server_hello( const std::vector<uint8_t>& packet );
 
     bool is_server_hello( const tls_record& record );
 
@@ -242,9 +293,9 @@ namespace ntk {
     //              Alert
     // ==============================
 
-    bool is_tls_alert( const unsigned char* packet );
+    std::expected<bool,std::string> is_tls_alert( const unsigned char* packet );
     
-    bool is_tls_alert_v( const std::vector<uint8_t>& packet );
+    std::expected<bool,std::string> is_tls_alert( std::span<const uint8_t> packet );
 
     bool is_tls_alert( const tls_record& record );
 
@@ -282,7 +333,8 @@ namespace ntk {
     //          TLS Secrets
     // ==============================
 
-    using secrets = std::map<std::string,std::map<std::string,std::vector<uint8_t>>>;
+    using session_secrets = std::map<std::string,std::vector<uint8_t>>;
+    using secrets = std::map<std::string,session_secrets>;
 
     secrets get_tls_secrets( const std::string& filename );
 
@@ -294,7 +346,7 @@ namespace ntk {
                                              const std::array<uint8_t,32>& client_random,
                                              const std::string& label );
 
-    bool is_complete_secrets( const std::map<std::string,std::vector<uint8_t>>& secrets );
+    bool is_complete_secrets( const session_secrets& secrets );
 
     bool secret_labels_are_equal( std::array<std::string,5> lhs, std::array<std::string,5> rhs );
 
@@ -384,11 +436,11 @@ namespace ntk {
                   m_decrypted_records( std::nullopt ) {}
             tls_live_stream( const tcp_live_stream& tcp_stream );
             const std::string& get_sni() const;
-            bool feed( const std::vector<uint8_t>& packet );
+            std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
             bool has_secrets() const;
         private:
-            bool populate_client_hello( const std::vector<uint8_t>& packet ); 
-            bool populate_server_hello( const std::vector<uint8_t>& packet );
+            bool populate_client_hello( std::span<const uint8_t> packet ); 
+            bool populate_server_hello( std::span<const uint8_t> packet );
             client_hello m_client_hello;
             server_hello m_server_hello;
             bool m_client_hello_populated;
