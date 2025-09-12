@@ -4,9 +4,11 @@
 - Extracts and decyprts TLS traffic.
 
   
-<div style="text-align: center;">
+<div style="display: flex; flex-direction: column; align-items: center;">
   <img src="assets/final_clip.gif" alt="Demo Video">
+  <span>Demo of Qt TS player</span>
 </div>
+
 
 
 # Build and Run Tests
