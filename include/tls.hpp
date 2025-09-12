@@ -438,6 +438,7 @@ namespace ntk {
             const std::string& get_sni() const;
             std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
             bool has_secrets() const;
+            bool has_client_traffic_secret() const;
         private:
             bool populate_client_hello( std::span<const uint8_t> packet ); 
             bool populate_server_hello( std::span<const uint8_t> packet );

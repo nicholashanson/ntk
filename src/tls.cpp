@@ -7,7 +7,10 @@ namespace ntk {
     // ==============================
 
     std::string string_to_hex( const std::vector<uint8_t>& data ) {
-        return session_id_to_hex( data );
+        std::ostringstream oss;
+        for ( auto byte : data )
+            oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << int( byte );
+        return oss.str();
     }
 
     // ==============================
@@ -644,7 +647,6 @@ namespace ntk {
                     break;
             }
         }
-
         return { tls_secrets, line_number };
     }
 
@@ -1221,10 +1223,8 @@ namespace ntk {
             populate_server_hello( packet );
             if ( m_server_hello_populated ) { 
                 auto [ tls_secrets, line_reached ] = get_tls_secrets_dynamically( m_ssl_keys_log, m_client_hello.random );
-                if ( is_complete_secrets( tls_secrets[ client_random_to_hex( m_client_hello.random ) ] ) ) {
-                    m_tls_secrets = tls_secrets;
-                    m_lines_consumed = line_reached;
-                }
+                m_tls_secrets = tls_secrets;
+                m_lines_consumed = line_reached;
                 return true; 
             }
         }
@@ -1245,11 +1245,13 @@ namespace ntk {
             if ( is_change_cipher_spec( encrypted_record ) ) {
                 return false;
             }
-            auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
-                                                    m_tls_secrets, "CLIENT_TRAFFIC_SECRET_0", m_client_traffic_seq_number );
-            m_decrypted_records.emplace();
-            m_decrypted_records->push_back( std::move( decrypted_record ) );
-            ++m_client_traffic_seq_number;
+            if ( has_client_traffic_secret() ) {
+                auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
+                                                        m_tls_secrets, "CLIENT_TRAFFIC_SECRET_0", m_client_traffic_seq_number );
+                m_decrypted_records.emplace();
+                m_decrypted_records->push_back( std::move( decrypted_record ) );
+                ++m_client_traffic_seq_number;
+            }
             return true;
         }
         auto is_server_packet_result = is_server_packet( packet );
@@ -1351,6 +1353,16 @@ namespace ntk {
             return false;
         }
     }
+
+    bool tls_live_stream::has_client_traffic_secret() const {
+        if ( has_secrets() ) {
+            auto it = m_tls_secrets.find( client_random_to_hex( m_client_hello.random ) );
+            if ( it != m_tls_secrets.end() && it->second.contains( "CLIENT_TRAFFIC_SECRET_0" ) ) {
+                return true;
+            }
+        }
+        return false;
+    } 
 
     std::optional<std::reference_wrapper<const client_hello>> tls_live_stream_friend_helper::get_client_hello( const tls_live_stream& t ) {
         if ( t.m_client_hello_populated ) {
