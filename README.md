@@ -3,7 +3,10 @@
 - Reconstructs TCP sessions from captured network packets.
 - Extracts and decyprts TLS traffic.
 
-![Demo Video](assets/final_clip.gif)
+  
+<div style="text-align: center;">
+  <img src="assets/final_clip.gif" alt="Demo Video">
+</div>
 
 
 # Build and Run Tests
