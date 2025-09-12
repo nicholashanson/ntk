@@ -3,6 +3,9 @@
 - Reconstructs TCP sessions from captured network packets.
 - Extracts and decyprts TLS traffic.
 
+![Demo Video](assets/final_clip.gif)
+
+
 # Build and Run Tests
 
 Clone the directory, cd to main and set-up GoogleTest:
