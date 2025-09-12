@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include <array>
+#include <expected>
 #include <map>
 #include <string>
 #include <vector>
@@ -26,6 +27,7 @@ namespace ntk {
     // ==============================
     //      IPV4 Header Offset
     // ==============================
+    
     enum class ipv4_header_offset : uint8_t {
         IHL =          0,
         TOTAL_LEN    = 2,
@@ -41,8 +43,8 @@ namespace ntk {
     // ==============================
 
     enum class protocol : uint8_t {
-        TCP = 0x06,
-        UDP = 0x11
+        tcp = 0x06,
+        udp = 0x11
     };
 
     // ==============================
@@ -88,26 +90,30 @@ namespace ntk {
     //      IPV4 Header Parsing
     // ==============================
 
-    std::size_t get_ipv4_header_len( const unsigned char* ethernet_frame );
+    std::expected<std::size_t,std::string> get_ipv4_header_len_from_ethernet( const unsigned char* ethernet_frame );
 
-     std::size_t get_ipv4_header_len( const std::vector<uint8_t>& packet );
+    std::expected<std::size_t,std::string> get_ipv4_header_len_from_ethernet( std::span<const uint8_t> packet );
 
-    std::vector<uint8_t> get_raw_ipv4_header( const unsigned char* ethernet_frame );
+    std::expected<std::size_t,std::string> get_ipv4_header_len_from_ihl( const uint8_t ihl_byte );
 
-    ipv4_header get_parsed_ipv4_header( const std::vector<uint8_t>& raw_ipv4_header );
+    std::expected<std::vector<uint8_t>,std::string> get_raw_ipv4_header( const unsigned char* ethernet_frame );
 
-    ipv4_header get_parsed_ipv4_header( const unsigned char* ethernet_frame );
+    std::expected<ipv4_header,std::string> get_parsed_ipv4_header( const std::span<const uint8_t> raw_ipv4_header );
+
+    std::expected<ipv4_header,std::string> get_parsed_ipv4_header_from_ethernet( const unsigned char* ethernet_frame );
+
+    std::expected<ipv4_header,std::string> get_parsed_ipv4_header_from_ethernet( std::span<const uint8_t> packet );
 
     struct ipv4_filter {
         uint32_t ip_addr;
 
         bool operator()( const std::vector<uint8_t>& packet ) const {
-            auto header = get_parsed_ipv4_header( packet );
-            return ( header.source_ip_addr == ip_addr ) || ( header.destination_ip_addr == ip_addr );
+            auto parse_result = get_parsed_ipv4_header( packet );
+            return parse_result.has_value() && ( parse_result.value().source_ip_addr == ip_addr || parse_result.value().destination_ip_addr == ip_addr );
         }
     };
 
-    sender_reciever get_sender_reciever( const unsigned char* ethernet_frame );
+    std::expected<sender_reciever,std::string> get_sender_reciever( const unsigned char* ethernet_frame );
 
     sender_reciever flip_sender_reciever( const sender_reciever& src_dest );
 
