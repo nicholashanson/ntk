@@ -1237,96 +1237,153 @@ namespace ntk {
             return std::unexpected( is_client_packet_result.error() );
         }
         if ( is_data_packet_result.value() && is_client_packet_result.value() ) {
-            auto result = get_tls_record_from_ethernet( packet );
-            if ( !result ) {
-                return false;
-            }
-            auto& encrypted_record = result.value();
-            if ( is_change_cipher_spec( encrypted_record ) ) {
-                return false;
-            }
-            if ( has_client_traffic_secret() ) {
-                auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
-                                                        m_tls_secrets, "CLIENT_TRAFFIC_SECRET_0", m_client_traffic_seq_number );
-                m_decrypted_records.emplace();
-                m_decrypted_records->push_back( std::move( decrypted_record ) );
-                ++m_client_traffic_seq_number;
-            }
-            return true;
+            return handle_client_data_packet( packet );
         }
         auto is_server_packet_result = is_server_packet( packet );
         if ( !is_server_packet_result ) {
             return std::unexpected( is_server_packet_result.error() );
         }
         if ( is_data_packet_result.value() && is_server_packet_result.value() ) {
-            auto is_tls_result = is_tls( packet );
-            if ( !is_tls_result ) { 
-                return std::unexpected( is_tls_result.error() );
-            }
-            if ( !is_tls_result.value() && !m_incomplete_record ) {
-                return false;
-            }
-            std::optional<std::vector<tls_record>> encrypted_records; 
-            auto payload_result = get_tcp_payload( packet );
-            if ( !payload_result ) {
-                return std::unexpected( payload_result.error() );
-            }
-            auto& payload = *payload_result.value();
-            std::span<const uint8_t> payload_span( payload.data(), payload.size() ); 
-            while ( !payload_span.empty() ) {
-                if ( m_incomplete_record ) {
-                    std::size_t payload_size_before = m_incomplete_record.value().record.payload.size();
-                    auto record_variant = append_to_incomplete_record( m_incomplete_record.value(), packet );
-                    if ( std::holds_alternative<tls_record>( record_variant ) ) {
-                        if ( !encrypted_records ) encrypted_records.emplace();
-                        std::size_t payload_size_after = std::get<tls_record>( record_variant ).payload.size();
-                        encrypted_records->push_back( std::move( std::get<tls_record>( record_variant ) ) );
-                        std::size_t bytes_consumed = payload_size_after - payload_size_before;
-                        payload_span = payload_span.subspan( bytes_consumed );
-                        m_incomplete_record.reset();
-                    } else {
-                        m_incomplete_record.value().record.payload.insert( m_incomplete_record.value().record.payload.end(), payload_span.begin(), payload_span.end() );
-                        payload_span = payload_span.subspan( 0, 0 );
-                    }
-                } else {
-                    auto split_result = split_tls_records( payload_span );
-                    if ( !split_result ) {
-                        return false;
-                    } else {
-                        auto [ records, offset_reached ] = split_result.value();
-                        if ( records.empty() ) {
-                            auto empty_record_result = get_empty_tls_record_from_payload( payload_span );
-                            if ( !empty_record_result ) {
-                                return std::unexpected( empty_record_result.error() );
-                            }
-                            auto record_header = get_tls_record_header_from_payload( payload_span ).value();
-                            empty_record_result.value().payload.assign( payload_span.begin() + constants::record_header_len, payload_span.end() );
-                            m_incomplete_record = incomplete_tls_record {
-                                empty_record_result.value(),
-                                record_header.payload_length
-                            };
-                            payload_span = payload_span.subspan( 0, 0 ); 
-                        } else {
-                            if ( !encrypted_records ) encrypted_records.emplace();
-                            encrypted_records->insert( encrypted_records->end(), records.begin(), records.end() );
-                            payload_span = payload_span.subspan( offset_reached );
-                        }
-                    } 
-                }
-            }
-            if ( encrypted_records ) {
-                for ( auto& encrypted_record : encrypted_records.value() ) {
-                    auto decrypted_record = decrypt_record( m_client_hello.random, m_server_hello.random, m_server_hello.server_version, m_server_hello.cipher_suite, encrypted_record,
-                                                            m_tls_secrets, "SERVER_TRAFFIC_SECRET_0", m_server_traffic_seq_number );
-                    if ( !m_decrypted_records ) m_decrypted_records.emplace();
-                    m_decrypted_records->push_back( std::move( decrypted_record ) );
-                    ++m_server_traffic_seq_number;
-                }
-                return true;
-            }
+            return handle_server_data_packet( packet );
         }
         return false;
     }
+
+    // ============================================
+    // TLS Live Stream :: Handle Client Data Packet
+    // ============================================
+
+    std::expected<bool,std::string> tls_live_stream::handle_client_data_packet( std::span<const uint8_t> client_data_packet ) {
+        auto result = get_tls_record_from_ethernet( client_data_packet );
+        if ( !result ) {
+            return false;
+        }
+        auto& encrypted_record = result.value();
+        if ( is_change_cipher_spec( encrypted_record ) ) {
+            return false;
+        }
+        if ( has_client_traffic_secret() ) {
+            auto decrypted_record = decrypt_record( m_client_hello.random, 
+                                                    m_server_hello.random, 
+                                                    m_server_hello.server_version, 
+                                                    m_server_hello.cipher_suite, 
+                                                    encrypted_record,
+                                                    m_tls_secrets, 
+                                                    "CLIENT_TRAFFIC_SECRET_0", 
+                                                    m_client_traffic_seq_number );
+            m_decrypted_records.emplace();
+            m_decrypted_records->push_back( std::move( decrypted_record ) );
+            ++m_client_traffic_seq_number;
+        }
+        return true;
+    }
+
+    // ============================================
+    // TLS Live Stream :: Handle Server Data Packet
+    // ============================================
+
+    std::expected<bool,std::string> tls_live_stream::handle_server_data_packet( std::span<const uint8_t> server_data_packet ) {
+        auto is_tls_result = is_tls( server_data_packet );
+        if ( !is_tls_result ) { 
+            return std::unexpected( is_tls_result.error() );
+        }
+        if ( !is_tls_result.value() && !m_incomplete_record ) {
+            return false;
+        }
+        std::optional<std::vector<tls_record>> encrypted_records; 
+        auto payload_result = get_tcp_payload( server_data_packet );
+        if ( !payload_result ) {
+            return std::unexpected( payload_result.error() );
+        }
+        auto& payload = *payload_result.value();
+        std::span<const uint8_t> payload_span( payload.data(), payload.size() ); 
+        while ( !payload_span.empty() ) {
+            if ( m_incomplete_record ) {
+                handle_incomplete_record( server_data_packet, encrypted_records, payload_span );
+            } else {
+                auto result = handle_complete_record( encrypted_records, payload_span );
+                if ( !result ) {
+                    return std::unexpected( result.error() );
+                }
+            }
+        }
+        if ( encrypted_records ) {
+            return decrypt_server_records( encrypted_records.value() );
+        }
+        return false;
+    }
+
+    void tls_live_stream::handle_incomplete_record( std::span<const uint8_t> server_data_packet,
+                                                    std::optional<std::vector<tls_record>>& encrypted_records,
+                                                    std::span<const uint8_t>& payload_span ) {
+        std::size_t payload_size_before = m_incomplete_record.value().record.payload.size();
+        auto record_variant = append_to_incomplete_record( m_incomplete_record.value(), server_data_packet );
+        if ( std::holds_alternative<tls_record>( record_variant ) ) {
+            if ( !encrypted_records ) encrypted_records.emplace();
+            std::size_t payload_size_after = std::get<tls_record>( record_variant ).payload.size();
+            encrypted_records->push_back( std::move( std::get<tls_record>( record_variant ) ) );
+            std::size_t bytes_consumed = payload_size_after - payload_size_before;
+            payload_span = payload_span.subspan( bytes_consumed );
+            m_incomplete_record.reset();
+        } else {
+            m_incomplete_record.value().record.payload.insert( m_incomplete_record.value().record.payload.end(), 
+                                                               payload_span.begin(), payload_span.end() );
+            payload_span = payload_span.subspan( 0, 0 );
+        }
+    }
+
+    std::expected<bool,std::string> tls_live_stream::handle_complete_record( std::optional<std::vector<tls_record>>& encrypted_records,   
+                                                                             std::span<const uint8_t> payload_span ) {
+        auto split_result = split_tls_records( payload_span );
+        if ( !split_result ) {
+            return false;
+        } else {
+            auto [ records, offset_reached ] = split_result.value();
+            if ( records.empty() ) {
+                auto empty_record_result = get_empty_tls_record_from_payload( payload_span );
+                if ( !empty_record_result ) {
+                    return std::unexpected( empty_record_result.error() );
+                }
+                auto record_header = get_tls_record_header_from_payload( payload_span ).value();
+                empty_record_result.value().payload.assign( payload_span.begin() + constants::record_header_len, payload_span.end() );
+                m_incomplete_record = incomplete_tls_record {
+                    empty_record_result.value(),
+                    record_header.payload_length
+                };
+                payload_span = payload_span.subspan( 0, 0 ); 
+            } else {
+                if ( !encrypted_records ) encrypted_records.emplace();
+                encrypted_records->insert( encrypted_records->end(), records.begin(), records.end() );
+                payload_span = payload_span.subspan( offset_reached );
+            }
+        }
+        return true;
+    } 
+
+    // ============================================
+    //  TLS Live Stream :: Decrypt Server Records
+    // ============================================
+
+    std::expected<bool,std::string> tls_live_stream::decrypt_server_records( std::span<const tls_record> encrypted_records ) {
+        for ( auto& encrypted_record : encrypted_records ) {
+            auto decrypted_record = decrypt_record( m_client_hello.random, 
+                                                    m_server_hello.random, 
+                                                    m_server_hello.server_version, 
+                                                    m_server_hello.cipher_suite, 
+                                                    encrypted_record,
+                                                    m_tls_secrets, 
+                                                    "SERVER_TRAFFIC_SECRET_0", 
+                                                    m_server_traffic_seq_number );
+            if ( !m_decrypted_records ) m_decrypted_records.emplace();
+            m_decrypted_records->push_back( std::move( decrypted_record ) );
+            ++m_server_traffic_seq_number;
+        }
+        return true;
+    }
+
+    // ==============================
+    // TLS Live Stream :: Has Filter
+    // ==============================
 
     bool tls_live_stream::has_secrets() const {
         return !m_tls_secrets.empty();

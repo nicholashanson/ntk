@@ -454,6 +454,14 @@ namespace ntk {
             int m_server_traffic_seq_number;
             std::vector<uint8_t> m_partial_record_buffer;
             std::optional<incomplete_tls_record> m_incomplete_record;
+            std::expected<bool,std::string> handle_client_data_packet( std::span<const uint8_t> client_data_packet );
+            std::expected<bool,std::string> handle_server_data_packet( std::span<const uint8_t> server_data_packet );
+            void handle_incomplete_record( std::span<const uint8_t> server_data_packet, 
+                                           std::optional<std::vector<tls_record>>& encrypted_records,
+                                           std::span<const uint8_t>& payload_span );
+            std::expected<bool,std::string> handle_complete_record( std::optional<std::vector<tls_record>>& encrypted_records,   
+                                                                    std::span<const uint8_t> payload_span ); 
+            std::expected<bool,std::string> decrypt_server_records( std::span<const tls_record> encrypted_records );
         protected:
             std::optional<std::vector<tls_record>> m_decrypted_records;
         private:
