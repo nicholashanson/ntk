@@ -1,21 +1,22 @@
-
 #include <ipv4.hpp>
 
 namespace ntk {
 
-    // ==============================
-    //      Get IPV4 Header Len
-    // ==============================
+    // =====================
+    //  Get IPV4 Header Len 
+    // =====================
 
     std::expected<std::size_t,std::string> get_ipv4_header_len_from_ethernet( const unsigned char* ethernet_frame ) {
         constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
         return get_ipv4_header_len_from_ihl( ethernet_frame[ ethernet_header_len ] );
     }
 
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     std::expected<std::size_t,std::string> get_ipv4_header_len_from_ethernet( const std::span<const uint8_t> packet ) {
         return get_ipv4_header_len_from_ethernet( packet.data() );
     }
 
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     std::expected<std::size_t,std::string> get_ipv4_header_len_from_ihl( const uint8_t ihl_byte ) {
         constexpr std::size_t bytes_per_offset = 4;
         const uint8_t ihl = extract_low_nibble( ihl_byte );
@@ -29,9 +30,9 @@ namespace ntk {
         return header_length;
     }
 
-    // ==============================
-    //     Get Raw IPV4 Header
-    // ==============================
+    // =====================
+    //  Get Raw IPV4 Header 
+    // =====================
 
     std::expected<std::vector<uint8_t>,std::string> get_raw_ipv4_header( const unsigned char* ethernet_frame ) {
         constexpr std::size_t ethernet_header_len = constants::ethernet_header_len;
@@ -45,9 +46,9 @@ namespace ntk {
         return ipv4_header;  
     }
 
-    // ==============================
-    //     Get Parsed IPV4 Header
-    // ==============================
+    // ========================
+    //  Get Parsed IPV4 Header 
+    // ========================
 
     std::expected<ipv4_header,std::string> get_parsed_ipv4_header( const std::span<const uint8_t> raw_ipv4_header ) {
         if ( raw_ipv4_header.size() < 20 ) {
@@ -87,9 +88,9 @@ namespace ntk {
         return get_parsed_ipv4_header_from_ethernet( packet.data() );
     }
 
-    // ==============================
-    //    Get IPV4 Sender-Reciever
-    // ==============================
+    // ==========================
+    //  Get IPV4 Sender-Reciever 
+    // ==========================
 
     std::expected<sender_reciever,std::string> get_sender_reciever( const unsigned char* ethernet_frame ) {
         auto result = get_raw_ipv4_header( ethernet_frame );
@@ -100,9 +101,9 @@ namespace ntk {
         return std::make_pair( parsed_header.source_ip_addr, parsed_header.destination_ip_addr );
     }
 
-    // ==============================
-    //    Flip IPV4 Sender-Reciever
-    // ==============================
+    // ===========================
+    //  Flip IPV4 Sender-Reciever 
+    // ===========================
 
     sender_reciever flip_sender_reciever( const sender_reciever& src_dest ) {
         sender_reciever dest_src;
@@ -111,9 +112,9 @@ namespace ntk {
         return dest_src;
     }
 
-    // ==============================
-    //         IP To String
-    // ==============================
+    // ==============
+    //  IP To String 
+    // ==============
 
     std::string ip_to_string( uint32_t ip ) {
         auto extract_octet = []( uint32_t ip, int shift ) {

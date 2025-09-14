@@ -2,9 +2,9 @@
 
 namespace ntk {
 
-    // ==============================
-    //        String to Hex
-    // ==============================
+    // ===============
+    //  String to Hex 
+    // ===============
 
     std::string string_to_hex( const std::vector<uint8_t>& data ) {
         std::ostringstream oss;
@@ -13,9 +13,9 @@ namespace ntk {
         return oss.str();
     }
 
-    // ==============================
-    //     Client Random to Hex
-    // ==============================
+    // ======================
+    //  Client Random to Hex 
+    // ======================
 
     std::string client_random_to_hex( const std::array<uint8_t,32>& random ) {
         std::ostringstream oss;
@@ -24,9 +24,9 @@ namespace ntk {
         return oss.str();
     }
 
-    // ==============================
-    //       Session ID to Hex
-    // ==============================
+    // ===================
+    //  Session ID to Hex 
+    // ===================
 
     std::string session_id_to_hex( const std::vector<uint8_t>& session_id ) {
         std::ostringstream oss;
@@ -35,9 +35,9 @@ namespace ntk {
         return oss.str();
     }
 
-    // ==============================
-    //       Parse Client Hello
-    // ==============================
+    // ====================
+    //  Parse Client Hello 
+    // ====================
 
     std::expected<client_hello,std::string> parse_client_hello( const std::span<const uint8_t> client_hello_bytes ) {
         client_hello c_hello;
@@ -87,9 +87,9 @@ namespace ntk {
         return c_hello;
     }
 
-    // ==============================
-    //     Extract Cipher Suites
-    // ==============================
+    // =======================
+    //  Extract Cipher Suites 
+    // =======================
 
     std::expected<std::vector<uint8_t>,std::string> extract_client_hello_cipher_suites( const std::span<const uint8_t> client_hello_bytes,
                                                                                         const std::size_t session_id_len ) {
@@ -107,6 +107,10 @@ namespace ntk {
         return cipher_suites;
     }
 
+    // ==========================================
+    //  Extract Client Hello Compression Methods 
+    // ==========================================
+
     std::expected<std::vector<uint8_t>,std::string> extract_client_hello_compression_methods( const std::span<const uint8_t> client_hello_bytes,
                                                                                               const std::size_t compression_methods_len_pos ) {
         const std::size_t compression_methods_len = client_hello_bytes[ compression_methods_len_pos ];
@@ -115,9 +119,9 @@ namespace ntk {
         return compression_methods;
     }
 
-    // ==============================
-    //        Get Client Hello
-    // ==============================
+    // ==================
+    //  Get Client Hello 
+    // ==================
 
     std::expected<client_hello,std::string> get_client_hello( const std::span<const uint8_t> tcp_payload ) {
         if ( tcp_payload.size() < constants::record_header_len + constants::handshake_header_len ) {
@@ -151,9 +155,9 @@ namespace ntk {
         return parse_client_hello( client_hello_bytes );
     }
 
-    // ==============================
-    //       Is Client Hello
-    // ==============================
+    // =================
+    //  Is Client Hello 
+    // =================
 
     std::expected<bool,std::string> is_client_hello( const unsigned char* packet ) {
         auto payload_result = get_tcp_payload( packet );
@@ -187,9 +191,9 @@ namespace ntk {
                static_cast<tls_handshake_type>( record.payload.front() ) == tls_handshake_type::client_hello;
     }
 
-    // ==============================
-    //       Parse Server Hello
-    // ==============================
+    // ====================
+    //  Parse Server Hello 
+    // ====================
 
     std::expected<server_hello,std::string> parse_server_hello( const std::span<const uint8_t> server_hello_bytes ) {
         server_hello s_hello;
@@ -237,9 +241,9 @@ namespace ntk {
         return s_hello;
     }
 
-    // ==============================
-    // Get Server Hello Cipher Suite
-    // ==============================
+    // ===============================
+    //  Get Server Hello Cipher Suite 
+    // ===============================
 
     std::expected<uint16_t,std::string> get_server_hello_cipher_suite( const std::span<const uint8_t>& server_hello_bytes, const std::size_t cipher_suite_pos ) {
         if ( server_hello_bytes.size() < cipher_suite_pos + 1 + constants::cipher_suite_len ) {
@@ -248,9 +252,9 @@ namespace ntk {
         return read_uint16_be( server_hello_bytes, cipher_suite_pos );
     }
 
-    // ==============================
-    //      Extract Session ID
-    // ==============================
+    // ====================
+    //  Extract Session ID 
+    // ====================
 
     std::expected<std::vector<uint8_t>,std::string> extract_tls_session_id( std::span<const uint8_t> handshake_message_bytes ) {
         if ( handshake_message_bytes.size() < constants::session_id_len_pos + 1 ) {
@@ -268,9 +272,9 @@ namespace ntk {
         return session_id;
     }
 
-    // ==============================
-    //     Extract Message Random
-    // ==============================
+    // ========================
+    //  Extract Message Random 
+    // ========================
 
     std::expected<std::array<uint8_t,constants::random_len>,std::string> extract_handshake_message_random( const std::span<const uint8_t> handshake_message_bytes ) {
         if ( handshake_message_bytes.size() < constants::version_len + constants::random_len ) {
@@ -281,9 +285,9 @@ namespace ntk {
         return random;
     }
 
-    // ==============================
-    //        Get TLS Version
-    // ==============================
+    // =================
+    //  Get TLS Version 
+    // =================
 
     std::expected<std::optional<tls_version>,std::string> get_tls_version_from_handshake_message( const std::span<const uint8_t> handshake_message_bytes ) {
         if ( handshake_message_bytes.size() < constants::version_len  ) {
@@ -292,9 +296,9 @@ namespace ntk {
         return get_tls_version( read_uint16_be( handshake_message_bytes, 0 ) );
     }
 
-    // ==============================
-    //       Extract Extensions
-    // ==============================
+    // ====================
+    //  Extract Extensions 
+    // ====================
 
     std::expected<std::vector<uint8_t>,std::string> extract_handshake_message_extensions( const std::span<const uint8_t> handshake_message_bytes,
                                                                                           const std::size_t extensions_len_pos ) {
@@ -307,9 +311,9 @@ namespace ntk {
         return extensions;
     }
 
-    // ==============================
-    //        Get Server Hello
-    // ==============================
+    // ==================
+    //  Get Server Hello 
+    // ==================
 
     std::expected<server_hello,std::string> get_server_hello_from_payload( const std::span<const uint8_t> tcp_payload ) {
         auto server_hello_bytes = tcp_payload.subspan( constants::record_header_len + constants::handshake_header_len );
@@ -352,9 +356,9 @@ namespace ntk {
         return parse_server_hello( server_hello_bytes ); 
     }
 
-    // ==============================
-    //       Split TLS Records 
-    // ==============================
+    // ===================
+    //  Split TLS Records 
+    // ===================
 
     std::expected<
         std::tuple<std::vector<tls_record>,std::size_t>,
@@ -386,9 +390,9 @@ namespace ntk {
         return std::make_tuple( records, offset_reached );
     }
 
-    // ==============================
-    // Get TLS Records From Ethernet
-    // ==============================
+    // ===============================
+    //  Get TLS Records From Ethernet 
+    // ===============================
 
     std::expected<
         std::tuple<std::vector<tls_record>,std::size_t>,
@@ -405,9 +409,9 @@ namespace ntk {
         return split_tls_records( payload );
     }
 
-    // ==============================
-    //      Get Parsed TLS Record 
-    // ==============================
+    // =======================
+    //  Get Parsed TLS Record 
+    // =======================
 
     std::expected<tls_record,std::string> get_parsed_tls_record( std::span<const uint8_t> raw_tls_record ) {
         if ( raw_tls_record.size() < constants::record_header_len ) {
@@ -447,9 +451,9 @@ namespace ntk {
         return get_parsed_tls_record( payload );
     }
 
-    // ==============================
-    //       Is Server Hello
-    // ==============================
+    // =================
+    //  Is Server Hello 
+    // =================
 
     std::expected<bool,std::string> is_server_hello( const unsigned char* packet ) {
         auto payload_result = get_tcp_payload( packet );
@@ -487,9 +491,9 @@ namespace ntk {
                static_cast<tls_handshake_type>( record.payload.front() ) == tls_handshake_type::server_hello;
     }
 
-    // ==============================
-    //         Is TLS Alert
-    // ==============================
+    // ==============
+    //  Is TLS Alert 
+    // ==============
 
     std::expected<bool,std::string> is_tls_alert( const unsigned char* packet ) {
         auto payload_result = get_tcp_payload( packet );
@@ -517,25 +521,25 @@ namespace ntk {
         return record.content_type == tls_content_type::alert;
     }
 
-    // ==============================
-    //     Is Change Cipher Spec
-    // ==============================
+    // =======================
+    //  Is Change Cipher Spec 
+    // =======================
 
     bool is_change_cipher_spec( const tls_record& record ) {
         return record.content_type == tls_content_type::change_cipher_spec;    
     }
 
-    // ==============================
-    //   Is TLS Application Data
-    // ==============================
+    // =========================
+    //  Is TLS Application Data 
+    // =========================
 
     bool is_tls_application_data( const tls_record& record ) {
         return record.content_type == tls_content_type::application_data;
     }
 
-    // ==============================
-    //       Get Traffic Secret
-    // ==============================
+    // ====================
+    //  Get Traffic Secret 
+    // ====================
 
     std::vector<uint8_t> get_traffic_secret( const secrets& session_keys,
                                              const std::array<uint8_t,32>& client_random,
@@ -544,9 +548,9 @@ namespace ntk {
         return session_keys.at( client_hex ).at( label );
     }
 
-    // ==============================
-    //         Get TLS Secrets
-    // ==============================
+    // =================
+    //  Get TLS Secrets 
+    // =================
 
     secrets get_tls_secrets( const std::string& filename ) {
         secrets tls_secrets;
@@ -650,9 +654,9 @@ namespace ntk {
         return { tls_secrets, line_number };
     }
 
-    // ==============================
-    //       Is Complete Secrets
-    // ==============================
+    // =====================
+    //  Is Complete Secrets 
+    // =====================
 
     bool is_complete_secrets( const session_secrets& secrets ) {
         constexpr std::size_t expected_number_of_secrets = 5;
@@ -666,12 +670,12 @@ namespace ntk {
         return secret_labels_are_equal( labels, tls_secret_labels );
     }
 
-    // ==============================
-    //        HKDF Expand Label
-    // ==============================
+    // ===================
+    //  HKDF Expand Label 
+    // ===================
 
     std::vector<uint8_t> hkdf_expand_label( const std::vector<uint8_t>& secret, const std::string& label,              
-                                            const std::vector<uint8_t>& context, size_t out_len, const EVP_MD* hash_func ) {
+                                            const std::vector<uint8_t>& context, std::size_t out_len, const EVP_MD* hash_func ) {
         std::string full_label = "tls13 " + label;
         std::vector<uint8_t> hkdf_label;
 
@@ -700,9 +704,9 @@ namespace ntk {
         return out;
     }
 
-    // ==============================
-    //       Derive TLS Key IV
-    // ==============================
+    // ===================
+    //  Derive TLS Key IV 
+    // ===================
 
     tls_key_material derive_tls_key_iv( const std::vector<uint8_t>& secret, const EVP_MD* hash_func,
                                         size_t key_len, size_t iv_len ) {
@@ -713,9 +717,9 @@ namespace ntk {
         return km;
     }
 
-    // ==============================
-    //      Build TLS 1.3 Nonce
-    // ==============================
+    // =====================
+    //  Build TLS 1.3 Nonce 
+    // =====================
 
     std::vector<uint8_t> build_tls13_nonce( const std::vector<uint8_t>& base_iv, uint64_t seq_num ) {
         std::vector<uint8_t> nonce = base_iv;
@@ -725,9 +729,9 @@ namespace ntk {
         return nonce;
     }
 
-    // ==============================
-    //       Decrypt AES-GCM
-    // ==============================
+    // =================
+    //  Decrypt AES-GCM 
+    // =================
 
     std::vector<uint8_t> decrypt_aes_gcm( const std::vector<uint8_t>& key,
                                           const std::vector<uint8_t>& nonce,
@@ -759,9 +763,9 @@ namespace ntk {
         return plain_text;
     }
 
-    // ==============================
-    //        Encrypt AES-GCM
-    // ==============================
+    // =================
+    //  Encrypt AES-GCM 
+    // =================
 
     std::vector<uint8_t> encrypt_aes_gcm( const std::vector<uint8_t>& key,
                                           const std::vector<uint8_t>& nonce,
@@ -788,9 +792,9 @@ namespace ntk {
         return cipher_text_with_tag;
     }
 
-    // ==============================
-    //      Build TLS 1.3 AAD
-    // ==============================
+    // ===================
+    //  Build TLS 1.3 AAD 
+    // ===================
 
     std::vector<uint8_t> build_tls13_aad( tls_content_type content_type, tls_version version, uint16_t length ) {
         return {
@@ -802,9 +806,9 @@ namespace ntk {
         };
     }
 
-    // ==============================
-    //        Decrypt TLS Data
-    // ==============================
+    // ==================
+    //  Decrypt TLS Data 
+    // ==================
 
     std::vector<tls_record> decrypt_tls_data( const std::array<uint8_t,32>& client_random,
                                               const std::array<uint8_t,32>& server_random,
@@ -850,9 +854,9 @@ namespace ntk {
         return result;
     }
 
-    // ==============================
-    //        Decrypt Record
-    // ==============================
+    // ================
+    //  Decrypt Record 
+    // ================
 
     tls_record decrypt_record( const std::array<uint8_t,32>& client_random,
                                const std::array<uint8_t,32>& server_random,
@@ -889,9 +893,9 @@ namespace ntk {
         return result;
     }
 
-    // ==============================
-    //        Encrypt Record
-    // ==============================
+    // ================
+    //  Encrypt Record 
+    // ================
 
     tls_record encrypt_record( const std::array<uint8_t,32>& client_random,
                                const std::array<uint8_t,32>& server_random,
@@ -934,9 +938,9 @@ namespace ntk {
         };
     }
 
-    // ==============================
-    //      Extract Certificate
-    // ==============================
+    // =====================
+    //  Extract Certificate 
+    // =====================
 
     std::vector<uint8_t> extract_certificate( const std::vector<uint8_t>& handshake_payload ) {
         std::size_t pos = 4; 
@@ -955,9 +959,9 @@ namespace ntk {
         return cert;
     }
 
-    // ==============================
-    //      Is Complete Record
-    // ==============================
+    // ====================
+    //  Is Complete Record 
+    // ====================
 
     bool is_complete_record( const std::span<const uint8_t> record_bytes ) {
         if ( record_bytes.size() < constants::record_header_len ) { 
@@ -968,9 +972,9 @@ namespace ntk {
         return record_bytes.size() == total_len;
     }
 
-    // ==============================
-    //           Is TLS
-    // ==============================
+    // ========
+    //  Is TLS 
+    // ========
 
     std::expected<bool,std::string> is_tls( const unsigned char* packet ) {
         auto payload_result = get_tcp_payload( packet );
@@ -989,9 +993,9 @@ namespace ntk {
         return is_tls( packet.data() );
     }
 
-    // ==============================
-    //         Is TLS Payload
-    // ==============================
+    // ================
+    //  Is TLS Payload 
+    // ================
 
     std::expected<bool,std::string> is_tls_payload( std::span<const uint8_t> payload ) {
         if ( payload.size() < constants::record_header_len ) { 
@@ -1002,15 +1006,19 @@ namespace ntk {
         return content_type_opt && version_opt;
     }
 
+    // =========================
+    //  Secret Labels Are Equal 
+    // =========================
+
     bool secret_labels_are_equal( std::array<std::string,5> lhs, std::array<std::string,5> rhs ) {
         std::sort( lhs.begin(), lhs.end() );
         std::sort( rhs.begin(), rhs.end() );
         return lhs == rhs;
     }
 
-    // ==============================
-    //           Get SNI
-    // ==============================
+    // =========
+    //  Get SNI 
+    // =========
 
     std::expected<std::string,std::string> get_sni( const client_hello& hello ) {
         constexpr std::size_t extension_type_field_offset = 0;
@@ -1058,10 +1066,9 @@ namespace ntk {
         return sni_result.value();
     }
 
-
-    // ==============================
-    //         Parse SNI List
-    // ==============================
+    // ================
+    //  Parse SNI List 
+    // ================
 
     std::expected<std::string,std::string> parse_sni_list( std::span<const unsigned char>& sni_list ) {
         constexpr std::size_t sni_entry_header_len = 3;
@@ -1084,9 +1091,9 @@ namespace ntk {
         return std::unexpected( "No Server Name found" );
     }
 
-    // ==============================
-    //            Has SNI
-    // ==============================
+    // =========
+    //  Has SNI 
+    // =========
 
     std::expected<bool,std::string> has_sni( const client_hello& hello, const std::string& host ) {
         auto result = get_sni( hello );
@@ -1096,9 +1103,9 @@ namespace ntk {
         return result.value() == host;
     }
 
-    // ==============================
-    //         SNI Contains
-    // ==============================
+    // ==============
+    //  SNI Contains 
+    // ==============
 
     std::expected<bool,std::string> sni_contains( const client_hello& hello, const std::string& host ) {
         auto result = get_sni( hello );
@@ -1108,9 +1115,9 @@ namespace ntk {
         return result.value().contains( host );
     }
 
-    // ==============================
-    //           Get SNIs
-    // ==============================
+    // ==========
+    //  Get SNIs 
+    // ==========
 
     std::vector<std::string> get_snis( const session& packets, const std::string& host ) {
         std::vector<std::string> snis;
@@ -1133,9 +1140,9 @@ namespace ntk {
         return snis;
     }
 
-    // ==============================
-    //        Get SNI To IP
-    // ==============================
+    // ===============
+    //  Get SNI To IP 
+    // ===============
 
     sni_to_ip get_sni_to_ip( const session& packets ) {
         sni_to_ip results;
@@ -1158,16 +1165,16 @@ namespace ntk {
         return results;
     }
 
-    // ==============================
-    //      TLS Over TCP Class
-    // ==============================
+    // ==============
+    //  TLS Over TCP 
+    // ==============
 
     tls_over_tcp::tls_over_tcp( const four_tuple& four )
         : tcp_transfer( four ) {}
 
-    // ==============================
-    //        TLS Live Stream
-    // ==============================
+    // =================
+    //  TLS Live Stream 
+    // =================
 
     tls_live_stream::tls_live_stream( const tcp_live_stream& tcp_stream ) 
         : tcp_live_stream( tcp_stream ) {
@@ -1197,13 +1204,17 @@ namespace ntk {
         }
     }
 
+    // ============================
+    //  TLS Live Stream :: Get SNI 
+    // ============================
+    
     const std::string& tls_live_stream::get_sni() const {
         return m_sni;
     }
 
-    // ==============================
-    //    TLS Live Stream :: Feed
-    // ==============================
+    // =========================
+    //  TLS Live Stream :: Feed 
+    // =========================
 
     std::expected<bool,std::string> tls_live_stream::feed( std::span<const uint8_t> packet ) {
         m_decrypted_records = std::nullopt;
@@ -1249,9 +1260,9 @@ namespace ntk {
         return false;
     }
 
-    // ============================================
-    // TLS Live Stream :: Handle Client Data Packet
-    // ============================================
+    // ==============================================
+    //  TLS Live Stream :: Handle Client Data Packet 
+    // ==============================================
 
     std::expected<bool,std::string> tls_live_stream::handle_client_data_packet( std::span<const uint8_t> client_data_packet ) {
         auto result = get_tls_record_from_ethernet( client_data_packet );
@@ -1278,9 +1289,9 @@ namespace ntk {
         return true;
     }
 
-    // ============================================
-    // TLS Live Stream :: Handle Server Data Packet
-    // ============================================
+    // ==============================================
+    //  TLS Live Stream :: Handle Server Data Packet 
+    // ==============================================
 
     std::expected<bool,std::string> tls_live_stream::handle_server_data_packet( std::span<const uint8_t> server_data_packet ) {
         auto is_tls_result = is_tls( server_data_packet );
@@ -1313,6 +1324,10 @@ namespace ntk {
         return false;
     }
 
+    // =============================================
+    //  TLS Live Stream :: Handle Incomplete Record 
+    // =============================================
+
     void tls_live_stream::handle_incomplete_record( std::span<const uint8_t> server_data_packet,
                                                     std::optional<std::vector<tls_record>>& encrypted_records,
                                                     std::span<const uint8_t>& payload_span ) {
@@ -1332,8 +1347,12 @@ namespace ntk {
         }
     }
 
+    // ===========================================
+    //  TLS Live Stream :: Handle Complete Record 
+    // ===========================================
+
     std::expected<bool,std::string> tls_live_stream::handle_complete_record( std::optional<std::vector<tls_record>>& encrypted_records,   
-                                                                             std::span<const uint8_t> payload_span ) {
+                                                                             std::span<const uint8_t>& payload_span ) {
         auto split_result = split_tls_records( payload_span );
         if ( !split_result ) {
             return false;
@@ -1360,9 +1379,9 @@ namespace ntk {
         return true;
     } 
 
-    // ============================================
-    //  TLS Live Stream :: Decrypt Server Records
-    // ============================================
+    // ===========================================
+    //  TLS Live Stream :: Decrypt Server Records 
+    // ===========================================
 
     std::expected<bool,std::string> tls_live_stream::decrypt_server_records( std::span<const tls_record> encrypted_records ) {
         for ( auto& encrypted_record : encrypted_records ) {
@@ -1381,13 +1400,17 @@ namespace ntk {
         return true;
     }
 
-    // ==============================
-    // TLS Live Stream :: Has Filter
-    // ==============================
+    // ================================
+    //  TLS Live Stream :: Has Secrets 
+    // ================================
 
     bool tls_live_stream::has_secrets() const {
         return !m_tls_secrets.empty();
     }
+
+    // ==========================================
+    //  TLS Live Stream :: Populate Client Hello 
+    // ==========================================
 
     bool tls_live_stream::populate_client_hello( std::span<const uint8_t> packet ) {
         auto result = get_client_hello_from_ethernet_frame( packet );
@@ -1400,6 +1423,10 @@ namespace ntk {
         }
     }
 
+    // ==========================================
+    //  TLS Live Stream :: Populate Server Hello 
+    // ==========================================
+
     bool tls_live_stream::populate_server_hello( const std::span<const uint8_t> packet ) {
         auto result = get_server_hello_from_ethernet( packet );
         if ( result ) {
@@ -1411,6 +1438,10 @@ namespace ntk {
         }
     }
 
+    // ==============================================
+    //  TLS Live Stream :: Has Client Traffic Secret 
+    // ==============================================
+
     bool tls_live_stream::has_client_traffic_secret() const {
         if ( has_secrets() ) {
             auto it = m_tls_secrets.find( client_random_to_hex( m_client_hello.random ) );
@@ -1421,6 +1452,10 @@ namespace ntk {
         return false;
     } 
 
+    // ===================================================
+    //  TLS Live Stream Friend Helper :: Get Client Hello 
+    // ===================================================
+
     std::optional<std::reference_wrapper<const client_hello>> tls_live_stream_friend_helper::get_client_hello( const tls_live_stream& t ) {
         if ( t.m_client_hello_populated ) {
             return std::cref( t.m_client_hello );
@@ -1428,6 +1463,10 @@ namespace ntk {
             return std::nullopt;
         }
     }
+
+    // ===================================================
+    //  TLS Live Stream Friend Helper :: Get Server Hello 
+    // ===================================================
 
     std::optional<std::reference_wrapper<const server_hello>> tls_live_stream_friend_helper::get_server_hello( const tls_live_stream& t ) {
         if ( t.m_server_hello_populated ) {
@@ -1437,45 +1476,81 @@ namespace ntk {
         }
     }
 
+    // =======================================================
+    //  TLS Live Stream Friend Helper :: Get Client Populated 
+    // =======================================================
+
     const bool tls_live_stream_friend_helper::client_hello_populated( const tls_live_stream& t ) {
         return t.m_client_hello_populated;
     }
+
+    // =======================================================
+    //  TLS Live Stream Friend Helper :: Get Server Populated 
+    // =======================================================
 
     const bool tls_live_stream_friend_helper::server_hello_populated( const tls_live_stream& t ) {
         return t.m_server_hello_populated;
     }
 
+    // =================================================
+    //  TLS Live Stream Friend Helper :: Lines Consumed 
+    // =================================================
+
     const std::size_t tls_live_stream_friend_helper::lines_consumed( const tls_live_stream& t ) {
         return t.m_lines_consumed;
     } 
+
+    // ==============================================
+    //  TLS Live Stream Friend Helper :: TLS Secrets 
+    // ==============================================
 
     const secrets tls_live_stream_friend_helper::tls_secrets( const tls_live_stream& t ) {
         return t.m_tls_secrets;
     }
 
+    // ============================================================
+    //  TLS Live Stream Friend Helper :: Client Traffic Seq Number 
+    // ============================================================
+
     const int tls_live_stream_friend_helper::client_traffic_seq_number( const tls_live_stream& t ) {
         return t.m_client_traffic_seq_number;
     }
+
+    // ============================================================
+    //  TLS Live Stream Friend Helper :: Server Traffic Seq Number 
+    // ============================================================
 
     const int tls_live_stream_friend_helper::server_traffic_seq_number( const tls_live_stream& t ) {
         return t.m_server_traffic_seq_number;
     }
 
+    // ====================================================
+    //  TLS Live Stream Friend Helper :: Decrypted Records 
+    // ====================================================
+
     std::optional<std::vector<tls_record>> tls_live_stream_friend_helper::decrypted_records( const tls_live_stream& t ) {
         return t.m_decrypted_records;
     }
+
+    // ========================================================
+    //  TLS Live Stream Friend Helper :: Partial Record Buffer 
+    // ========================================================
 
     std::vector<uint8_t> tls_live_stream_friend_helper::partial_record_buffer( const tls_live_stream& t ) {
         return t.m_partial_record_buffer;
     }
 
+    // ========================================================
+    //  TLS Live Stream Friend Helper :: Get Incomplete Record 
+    // ========================================================
+
     std::optional<incomplete_tls_record> tls_live_stream_friend_helper::get_incomplete_record( const tls_live_stream& t ) {
         return t.m_incomplete_record;
     }
 
-    // ==============================
-    //        Log File Trimmer
-    // ==============================
+    // ==================
+    //  Log File Trimmer 
+    // ==================
 
     void log_file_trimmer::start() {
         m_thread = std::thread( &log_file_trimmer::run, this );
@@ -1492,9 +1567,9 @@ namespace ntk {
         }
     }
 
-    // ==============================
-    //           TLS Filter
-    // ==============================
+    // ============
+    //  TLS Filter 
+    // ============
 
     bool tls_filter::operator()( const ntk::tcp_live_stream& stream ) {
         return stream.traffic_contains( [] ( const auto& packet ) {
@@ -1503,12 +1578,16 @@ namespace ntk {
         });
     }
 
-    // ==============================
-    //           SNI Filter
-    // ==============================
+    // ============
+    //  SNI Filter 
+    // ============
 
     sni_filter::sni_filter( const std::string& sni )
         : m_sni( sni ) {}
+
+    // ==================
+    //  SNI Filter :: () 
+    // ==================
 
     bool sni_filter::operator()( const ntk::tcp_live_stream& stream ) {
         auto has_matching_sni = [&]( const std::vector<uint8_t> packet ) {
@@ -1529,9 +1608,9 @@ namespace ntk {
         return stream.traffic_contains( has_matching_sni );
     }
 
-    // ==============================
-    //      Extract TLS Records
-    // ==============================
+    // =====================
+    //  Extract TLS Records 
+    // =====================
 
     tls_record_extraction_result extract_tls_records( const std::vector<std::vector<uint8_t>>& payloads ) {
         tls_record_extraction_result result;
@@ -1548,9 +1627,9 @@ namespace ntk {
         return result;
     }
 
-    // ==============================
-    //        Get TLS Record
-    // ==============================
+    // ================
+    //  Get TLS Record 
+    // ================
 
     std::expected<tls_record,std::string> get_tls_record_from_ethernet( std::span<const uint8_t> packet ) {
         auto payload_result = get_tcp_payload( packet );
@@ -1577,9 +1656,9 @@ namespace ntk {
         }
     }
 
-    // ==================================
-    //    Append to Incomplete Record
-    // ==================================
+    // =============================
+    //  Append to Incomplete Record 
+    // =============================
 
     std::variant<tls_record,incomplete_tls_record> append_to_incomplete_record( incomplete_tls_record incomplete_record, std::span<const unsigned char> packet ) {
         if ( incomplete_record.record.payload.size() == incomplete_record.expected_payload_length ) { 
@@ -1607,9 +1686,9 @@ namespace ntk {
         }
     }
 
-    // ==================================
-    // Get Complete or Incomplete Record
-    // ==================================
+    // ===================================
+    //  Get Complete or Incomplete Record 
+    // ===================================
 
     std::expected<std::variant<tls_record,incomplete_tls_record>,std::string> get_complete_or_incomplete_record( std::span<const uint8_t> packet ) {
         auto record = get_parsed_tls_record_from_ethernet( packet );
@@ -1627,9 +1706,9 @@ namespace ntk {
         }
     }
 
-    // ==============================
-    //      Get Empty TLS Record
-    // ==============================
+    // ======================
+    //  Get Empty TLS Record 
+    // ======================
 
     std::expected<tls_record,std::string> get_empty_tls_record_from_ethernet( std::span<const uint8_t> packet ) {
         auto payload_result = get_tcp_payload( packet );
@@ -1652,9 +1731,9 @@ namespace ntk {
         return tls_record { record_header_result.value().content_type, record_header_result.value().version };
     }
 
-    // ==============================
-    //    Get TLS Record Header
-    // ==============================
+    // =======================
+    //  Get TLS Record Header 
+    // =======================
 
     std::expected<tls_record_header,std::string> get_tls_record_header( const std::array<uint8_t,constants::record_header_len> record_header_bytes ) {
         auto content_type_opt = get_tls_content_type( record_header_bytes[ record_header_offset::content_type ] );

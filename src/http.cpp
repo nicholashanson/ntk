@@ -2,9 +2,14 @@
 
 namespace ntk {
 
-    // ==============================
-    //             Trim 
-    // ==============================
+    std::ostream& operator<<( std::ostream& os, http_parse_error error ) {
+        os << http_parse_error_messages[ static_cast<std::size_t>( error ) ];
+        return os;
+    }
+
+    // ======
+    //  Trim 
+    // ======
 
     std::string trim( const std::string& str ) {
         size_t start = str.find_first_not_of(" \t\r\n" );
@@ -14,17 +19,29 @@ namespace ntk {
             : str.substr( start, end - start + 1 );
     }
 
+    // ======================
+    //  Ends With Zero Chunk
+    // ======================
+
     bool ends_with_zero_chunk( const tcp_stream& stream ) {
         const auto& [ seq, data ] = *stream.rbegin();
-        std::vector<uint8_t> zero_chunk_pattern = { '\r', '\n', '\r', '\n' };
-        return std::equal( zero_chunk_pattern.rbegin(), zero_chunk_pattern.rend(), data.rbegin() );
+        return ends_with_zero_chunk( data );
     };
 
-    // ==============================
-    //           Is HTTP
-    // ==============================
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    bool ends_with_zero_chunk( std::span<const uint8_t> body ) {
+        std::vector<uint8_t> zero_chunk_pattern = { '\r', '\n', '\r', '\n' };
+        if ( body.size() < zero_chunk_pattern.size() ) { 
+            return false;
+        }
+        return std::equal( zero_chunk_pattern.rbegin(), zero_chunk_pattern.rend(), body.rbegin() );
+    };
 
-    bool is_http( const std::vector<uint8_t>& maybe_http_payload ) {
+    // =========
+    //  Is HTTP
+    // =========
+
+    bool is_http( const std::span<const uint8_t> maybe_http_payload ) {
         std::string first_five( maybe_http_payload.begin(), maybe_http_payload.begin() + 5 );
         if ( first_five.compare( 0, 5, "HTTP/" ) == 0 || first_five.compare( 0, 3, "GET" ) == 0 ) {
             return true;
@@ -32,37 +49,56 @@ namespace ntk {
         return false;
     }
 
-    // ==============================
-    //        Is HTTP Request
-    // ==============================
+    // =================
+    //  Is HTTP Request
+    // =================
 
-    bool is_http_request_packet( std::span<const unsigned char> packet ) {
-        auto payload = get_tcp_payload( packet );
-        return is_http_request( payload );
-    }
-
-    bool is_http_request( const std::vector<uint8_t>& tcp_payload ) {
+    bool is_http_request( std::span<const uint8_t> tcp_payload ) {
         return get_http_type( tcp_payload ) == http_type::REQUEST;
     }
 
-    // ==============================
-    //        Is HTTP Response
-    // ==============================
-
-    bool is_http_response_packet( std::span<const unsigned char> packet ) {
-        auto payload = get_tcp_payload( packet );
-        return is_http_response( payload );
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<bool,std::string> is_http_request_packet( std::span<const uint8_t> packet ) {
+        auto payload_result = get_tcp_payload( packet );
+        if ( !payload_result ) {
+            return std::unexpected( payload_result.error() );
+        }
+        if ( !payload_result.value() ) {
+            return false;
+        }
+        auto& payload = *payload_result.value();
+        return is_http_request( payload );
     }
 
-    bool is_http_response( const std::vector<uint8_t>& tcp_payload ) {
+    // ==================
+    //  Is HTTP Response
+    // ==================
+
+    bool is_http_response( std::span<const uint8_t> tcp_payload ) {
         return get_http_type( tcp_payload ) == http_type::RESPONSE; 
     }
 
-    // ==============================
-    //         Get HTTP Type
-    // ==============================
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<bool,std::string> is_http_response_packet( std::span<const uint8_t> packet ) {
+        auto payload_result = get_tcp_payload( packet );
+        if ( !payload_result ) {
+            return std::unexpected( payload_result.error() );
+        }
+        if ( !payload_result.value() ) {
+            return false;
+        }
+        auto& payload = *payload_result.value();
+        return is_http_response( payload );
+    }
 
-    http_type get_http_type( const std::vector<uint8_t>& http_payload ) {
+    // ===============
+    //  Get HTTP Type
+    // ===============
+
+    std::optional<http_type> get_http_type( std::span<const uint8_t> http_payload ) {
+        if ( http_payload.size() < 5 ) {
+            return std::nullopt;
+        }
         std::string first_five( http_payload.begin(), http_payload.begin() + 5 );
 
         if ( first_five.compare( 0, 5, "HTTP/" ) == 0 ) {
@@ -74,17 +110,21 @@ namespace ntk {
         }
     }
 
+    // ====================
+    //  Split HTTP Payload
+    // ====================
+
     std::expected<split_http_message,http_parse_error> split_http_payload( std::span<const unsigned char> payload ) {
         auto begin = payload.begin();
         auto end = payload.end();
         auto start_line_end = std::search( begin, end, "\r\n", "\r\n" + 2 );
         if ( start_line_end == end ) {
-            return std::unexpected( http_parse_error::MISSING_START_LINE );
+            return std::unexpected( http_parse_error::missing_start_line );
         } 
         auto headers_start = start_line_end + 2; 
         auto headers_end = std::search( headers_start, end, "\r\n\r\n", "\r\n\r\n" + 4 );
         if ( headers_end == end ) {
-            return std::unexpected( http_parse_error::MISSING_HEADERS );
+            return std::unexpected( http_parse_error::missing_headers );
         }
         auto body_start = headers_end + 4; 
         return split_http_message {
@@ -94,7 +134,11 @@ namespace ntk {
         };
     }
 
-    http_request_line parse_http_request_line( const std::vector<uint8_t>& request_line_bytes ) {
+    // =========================
+    //  Parse HTTP Request Line
+    // =========================
+
+    http_request_line parse_http_request_line( std::span<const uint8_t> request_line_bytes ) {
         std::string request_line_string( request_line_bytes.begin(), request_line_bytes.end() );
         std::stringstream request_line_stream( request_line_string );
         http_request_line r_line;
@@ -102,15 +146,19 @@ namespace ntk {
         return r_line;
     }
 
-    // ==============================
-    //      Contains HTTP Header
-    // ==============================
+    // ======================
+    //  Contains HTTP Header
+    // ======================
 
     bool contains_http_header( const http_headers& headers, const std::string& header_name  ) {
         return headers.contains( header_name );
     }  
 
-    http_headers parse_http_headers(const std::vector<uint8_t>& header_bytes) {
+    // ====================
+    //  Parse HTTP Headers
+    // ====================
+
+    http_headers parse_http_headers( std::span<const uint8_t> header_bytes ) {
         std::string headers_string( header_bytes.begin(), header_bytes.end() );
         http_headers headers;
         std::size_t pos = 0;
@@ -136,7 +184,11 @@ namespace ntk {
         return headers;
     }
 
-    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( std::span<const unsigned char> http_payload_bytes ) {
+    // ===============================
+    //  Get HTTP Headers From Payload
+    // ===============================
+
+    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( std::span<const uint8_t> http_payload_bytes ) {
         auto split_result = split_http_payload( http_payload_bytes );
         if ( !split_result ) {
             return std::unexpected( split_result.error() );
@@ -144,9 +196,13 @@ namespace ntk {
         return parse_http_headers( split_result->headers );
     }
 
-    http_response_status_line parse_http_status_line( const std::vector<uint8_t>& status_line_bytes ) {
+    // ========================
+    //  Parse HTTP Status Line
+    // ========================
+
+    http_response_status_line parse_http_status_line( std::span<const uint8_t> status_line_bytes ) {
         std::string line( status_line_bytes.begin(), status_line_bytes.end() );
-        std::istringstream stream(line);
+        std::istringstream stream( line );
         
         http_response_status_line status_line;
         stream >> status_line.http_version;
@@ -162,14 +218,22 @@ namespace ntk {
         return status_line;
     }
 
-    std::vector<uint8_t> decode_single_chunk( const std::vector<uint8_t>& chunked_body ) {
+    // =====================
+    //  Decode Sungle Chunk
+    // =====================
+
+    std::vector<uint8_t> decode_single_chunk( std::span<const uint8_t> chunked_body ) {
         auto it = std::search( chunked_body.begin(), chunked_body.end(), "\r\n", "\r\n" + 2 );
         size_t chunk_size = std::stoul( std::string( chunked_body.begin(), it ), nullptr, 16 );
         auto data_start = it + 2;
         return std::vector<uint8_t>( data_start, data_start + chunk_size );
     }
 
-    std::vector<uint8_t> decode_chunked_http_body( const std::vector<uint8_t>& chunked_body ) {
+    // ==========================
+    //  Decode Chunked HTTP Body
+    // ==========================
+
+    std::vector<uint8_t> decode_chunked_http_body( std::span<const uint8_t> chunked_body ) {
         std::vector<uint8_t> decoded;
         std::size_t pos = 0;
 
@@ -190,19 +254,28 @@ namespace ntk {
         return decoded;
     }
 
+    // =========================
+    //  Get First HTTP Response
+    // =========================
+
     std::vector<uint8_t> get_first_http_respone( const session& packet_data ) {
         auto raw_tcp_stream = get_raw_tcp_stream( packet_data );
         auto tcp_stream = get_tcp_stream( raw_tcp_stream ); 
-        std::cout << "hi" << std::endl;
-        auto response = *std::find_if( tcp_stream.begin(), tcp_stream.end(), 
+        auto it = std::find_if( tcp_stream.begin(), tcp_stream.end(), 
             []( const auto& pair ) { 
                 auto& [ unused, http_payload ] = pair;
                 return ntk::get_http_type( http_payload ) == ntk::http_type::RESPONSE;
             } 
         );
+        if ( it == tcp_stream.end() ) {
+            return {};
+        }
+        return it->second;
+    } 
 
-        return response.second;
-    }   
+    // ========================
+    //  Get HTTP Response Data
+    // ========================  
 
     std::expected<std::vector<uint8_t>,http_parse_error> get_http_response_data( const tcp_stream& stream ) {
         auto response_pos = std::find_if( stream.begin(), stream.end(), 
@@ -236,7 +309,11 @@ namespace ntk {
         }
     }
 
-    std::expected<http_request,http_parse_error> get_http_request( std::span<const unsigned char> http_payload ) {
+    // ==================
+    //  Get HTTP Request
+    // ==================
+
+    std::expected<http_request,http_parse_error> get_http_request( std::span<const uint8_t> http_payload ) {
         auto split_result = split_http_payload( http_payload );
         if ( !split_result ) {
             return std::unexpected( split_result.error() );
@@ -247,7 +324,11 @@ namespace ntk {
         return request;
     }
 
-    std::expected<http_response,http_parse_error> get_http_response( const std::vector<uint8_t>& http_payload ) {
+    // ===================
+    //  Get HTTP Response
+    // ===================
+
+    std::expected<http_response,http_parse_error> get_http_response( std::span<const uint8_t> http_payload ) {
         http_response response;
         auto split_result = split_http_payload( http_payload );
         if ( !split_result ) {
@@ -259,25 +340,46 @@ namespace ntk {
         return response;
     }
 
+    // ========================
+    //  Extract File Extension
+    // ========================
+
     std::optional<file_extension> extract_file_extension( const std::string& path ) {
         auto last_dot = path.rfind( '.' );
         if ( last_dot == std::string::npos ) return std::nullopt;
         return string_to_file_extension( path.substr( last_dot + 1 ) );
     }
 
+    // ==========
+    //  Get Path
+    // ==========
+
     std::string get_path( const std::string& request_target ) {
         return request_target.substr( 0, request_target.find( '?' ) );
     }
 
+    // ==========================
+    //  String To File Extension
+    // ==========================
+
     std::optional<file_extension> string_to_file_extension( const std::string& file_extension_string ) {
         if ( file_extension_string == "m3u8" ) return file_extension::M3U8;
+        if ( file_extension_string == "ts" ) return file_extension::TS;
         return std::nullopt;
     }
+
+    // ==========================
+    //  File Extension To String
+    // ==========================
 
     std::optional<std::string> file_extension_to_string( file_extension extension ) {
         if ( extension == file_extension::TS ) return "ts";
         return std::nullopt;
     }
+
+    // =============================
+    //  Get MIME Type From Ethernet
+    // =============================
 
     std::expected<mime_type,http_parse_error> get_mime_type_from_ethernet( std::span<const unsigned char> ethernet_frame ) {
         auto maybe_headers = get_http_headers_from_payload( ethernet_frame );
@@ -287,19 +389,26 @@ namespace ntk {
         auto headers = *maybe_headers;
         auto maybe_mime_type = string_to_mime_type( headers[ "Content-Type" ] );
         if ( !maybe_mime_type ) {
-            return std::unexpected( http_parse_error::UNRECOGNIZED_MIME_TYPE );
+            return std::unexpected( http_parse_error::unrecognized_mime_type );
         }
         return maybe_mime_type.value();
     }
 
+    // =====================
+    //  String to MUME Type
+    // =====================
+
     std::optional<mime_type> string_to_mime_type( const std::string& mime_type_string ) {
-        std::cout << mime_type_string << std::endl;
         if ( mime_type_string == "text/plain" ) return mime_type::TEXT_PLAIN;
         if ( mime_type_string == "application/vnd.apple.mpegurl" ) return mime_type::APPLICATION_VND_APPLE_MPEGURL;
         return std::nullopt;
     }
 
-    std::string write_to_file( const std::vector<uint8_t>& data, file_extension extension ) {
+    // ===============
+    //  Write To File
+    // ===============
+
+    std::string write_to_file( std::span<const uint8_t> data, file_extension extension ) {
         auto now = std::chrono::system_clock::now();
         auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>( now.time_since_epoch() ).count();
         std::ostringstream oss;
