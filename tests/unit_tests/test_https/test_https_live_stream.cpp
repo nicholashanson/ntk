@@ -17,7 +17,7 @@ TEST( UnitTest, HttpsLiveStream_ServerHelloPopulated_HasClientTrafficSecret ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 7;
+	const std::size_t read_packets_to = 7 /* client hello */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -36,7 +36,7 @@ TEST( UnitTest, HttpsLiveStream_TlsSecrets ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 7;
+	const std::size_t read_packets_to = 7 /* client hello */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -56,7 +56,7 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_HttpRequest ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 12;
+	const std::size_t read_packets_to = 12 /* first http request */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -99,7 +99,7 @@ TEST( UnitTest, HttpsLiveStream_ExpectedData ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 12;
+	const std::size_t read_packets_to = 12 /* first http request */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -116,7 +116,7 @@ TEST( UnitTest, HttpsLiveStream_ExpectedData_MimeType ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 12;
+	const std::size_t read_packets_to = 12 /* first http request */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -133,7 +133,7 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 27;
+	const std::size_t read_packets_to = 27 /* last part of first record of http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -156,7 +156,7 @@ TEST( UnitTest, HttpsLiveStream_IsComplete_BecomesTrue ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	std::size_t read_packets_to = 97;
+	std::size_t read_packets_to = 97 /* last part of last record of http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -189,7 +189,7 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 27;
+	const std::size_t read_packets_to = 27 /* last part of first record of http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -207,7 +207,7 @@ TEST( UnitTest, HttpsLiveStream_NameOfWrittenFile ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	std::size_t read_packets_to = 97;
+	std::size_t read_packets_to = 97 /* last part of last record of http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -224,7 +224,7 @@ TEST( UnitTest, HttpsLiveStream_FileWrittenToDisk ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	std::size_t read_packets_to = 97;
+	std::size_t read_packets_to = 97 /* last part of last record of http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -284,7 +284,7 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_Request_BecomesNullOpt
 
 TEST( UnitTest, HttpsLiveStream_SegmentCapture ) {
 	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "segment_capture" ] );
-	ASSERT_FALSE( packet_data.empty() ) << "Packet Data is empty" << std::endl;
+	ASSERT_FALSE( packet_data.empty() );
 	std::string ssl_keys_log = "../server/session_keys.log";
 	auto four_result = ntk::get_four_from_ethernet( packet_data.front() );
 	ASSERT_TRUE( four_result ) << four_result.error() << std::endl;
@@ -298,13 +298,13 @@ TEST( UnitTest, HttpsLiveStream_SegmentCapture ) {
 
 TEST( UnitTest, HttpsLiveStream_SegmentCapture_ClientHelloPopulated ) {
 	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "segment_capture" ] );
-	ASSERT_FALSE( packet_data.empty() ) << "Packet Data is empty" << std::endl;
+	ASSERT_FALSE( packet_data.empty() );
 	std::string ssl_keys_log = "../server/session_keys.log";
 	auto four_result = ntk::get_four_from_ethernet( packet_data.front() );
 	ASSERT_TRUE( four_result ) << four_result.error() << std::endl;
 	auto& four = four_result.value();
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_to = 7;
+	const std::size_t read_to = 7 /* client hello */;
 	for ( std::size_t i = 0; i < read_to; ++i ) {
 		auto feed_result = live_stream.feed( packet_data[ i ] );
 		ASSERT_TRUE( feed_result ) << feed_result.error() << std::endl;
@@ -315,13 +315,13 @@ TEST( UnitTest, HttpsLiveStream_SegmentCapture_ClientHelloPopulated ) {
 
 TEST( UnitTest, HttpsLiveStream_SegmentCapture_ServerHelloPopulated_HasSecrets ) {
 	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "segment_capture" ] );
-	ASSERT_FALSE( packet_data.empty() ) << "Packet Data is empty" << std::endl;
+	ASSERT_FALSE( packet_data.empty() );
 	std::string ssl_keys_log = "../server/session_keys.log";
 	auto four_result = ntk::get_four_from_ethernet( packet_data.front() );
 	ASSERT_TRUE( four_result ) << four_result.error() << std::endl;
 	auto& four = four_result.value();
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_to = 9;
+	const std::size_t read_to = 9 /* server hello */;
 	for ( std::size_t i = 0; i < read_to; ++i ) {
 		auto feed_result = live_stream.feed( packet_data[ i ] );
 		ASSERT_TRUE( feed_result ) << feed_result.error() << std::endl;
