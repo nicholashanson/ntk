@@ -341,7 +341,7 @@ TEST( UnitTest, TlsLiveStream_IncompleteRecord ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::tls_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 19 /* first part of first record http response */;
+	const std::size_t read_packets_to = 19 /* first part of first record of http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}

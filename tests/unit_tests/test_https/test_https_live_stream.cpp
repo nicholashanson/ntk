@@ -133,7 +133,7 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 27 /* last part of first record of http response */;
+	const std::size_t read_packets_to = 27 /* last part of first record of third http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -156,7 +156,7 @@ TEST( UnitTest, HttpsLiveStream_IsComplete_BecomesTrue ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	std::size_t read_packets_to = 97 /* last part of last record of http response */;
+	std::size_t read_packets_to = 97 /* last part of last record of third http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -189,7 +189,7 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 27 /* last part of first record of http response */;
+	const std::size_t read_packets_to = 27 /* last part of first record of third http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -207,7 +207,7 @@ TEST( UnitTest, HttpsLiveStream_NameOfWrittenFile ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	std::size_t read_packets_to = 97 /* last part of last record of http response */;
+	std::size_t read_packets_to = 97 /* last part of last record of third http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -224,7 +224,7 @@ TEST( UnitTest, HttpsLiveStream_FileWrittenToDisk ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
-	std::size_t read_packets_to = 97 /* last part of last record of http response */;
+	std::size_t read_packets_to = 97 /* last part of last record of tnird http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
