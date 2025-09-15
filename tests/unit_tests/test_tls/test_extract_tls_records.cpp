@@ -1,12 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <span>
-
 #include <tls.hpp>
-#include <io.hpp>
-
-#include <test_constants.hpp>
 
 TEST( UnitTest, ExtractTlsRecords ) {
     std::vector<uint8_t> first_payload = {
