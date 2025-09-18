@@ -4,11 +4,10 @@
 - Extracts and decyprts TLS traffic.
 
   
-<p align="center">
+<figure style="text-align: center;">
   <img src="assets/final_clip.gif" alt="Demo Video">
   <figcaption>Intercepting and decrypting live HTTPS traffic in real-time</figcaption>
-</p>
-
+</figure>
 
 
 # Build and Run Tests
