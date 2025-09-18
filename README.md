@@ -3,11 +3,12 @@
 - Reconstructs TCP sessions from captured network packets.
 - Extracts and decyprts TLS traffic.
 
-  
-<figure style="text-align: center;">
-  <img src="assets/final_clip.gif" alt="Demo Video">
-  <figcaption>Intercepting and decrypting live HTTPS traffic in real-time</figcaption>
-</figure>
+
+<div align="center">
+  <img src="assets/final_clip.gif" width="600"><br>
+  <em><sub>Intercepting and decrypting live HTTPS traffic in real-time</sub></em>
+</div>
+
 
 
 # Build and Run Tests
