@@ -6,6 +6,7 @@
   
 <p align="center">
   <img src="assets/final_clip.gif" alt="Demo Video">
+  Intercepting and decrypting live HTTPS traffic in real-time
 </p>
 
 
