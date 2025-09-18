@@ -23,13 +23,18 @@ TEST( UnitTest, ParseServerHello ) {
 
 TEST( UnitTest, ParseServerHello_TlsHandshake ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
+    ASSERT_FALSE( packet_data.empty() );
     auto merged_stream = ntk::get_merged_tcp_stream( packet_data );
     auto first_packet_pos = merged_stream.begin();
     auto first_packet = first_packet_pos->second;
-    auto [ first_records, first_offset ] = *ntk::split_tls_records( 
-        std::span( first_packet.data(), first_packet.size() ) );
+    auto split_result = ntk::split_tls_records( std::span( first_packet.data(), first_packet.size() ) );
+    ASSERT_TRUE( split_result ) << split_result.error() << std::endl;
+    auto [ first_records, first_offset ] = split_result.value();
+    ASSERT_FALSE( first_records.empty() );
     auto tls_record_span = std::span<const unsigned char>( first_records[ 0 ].payload ).subspan( 4 );
-    auto server_hello = *ntk::parse_server_hello( tls_record_span );
+    auto server_hello_result = ntk::parse_server_hello( tls_record_span );
+    ASSERT_TRUE( server_hello_result ) << server_hello_result.error() << std::endl;
+    auto& server_hello = server_hello_result.value();
     ntk::cipher_suite expected_cipher_suite = ntk::cipher_suite::TLS_AES_256_GCM_SHA384;
     ntk::cipher_suite actual_cipher_suite = static_cast<ntk::cipher_suite>( server_hello.cipher_suite );
     ASSERT_EQ( actual_cipher_suite, expected_cipher_suite );
