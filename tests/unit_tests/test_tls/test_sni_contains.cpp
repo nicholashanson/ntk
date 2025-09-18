@@ -7,7 +7,6 @@
 #include <io.hpp>
 
 #include <test_constants.hpp>
-#include <test_tls_handshake_packets.hpp>
 
 TEST( UnitTest, SniContains ) {
     auto client_hello_line_numbers = ntk::get_line_numbers( test::packet_data_files[ "earth_cam_live_stream" ], ntk::client_hello_filter );
@@ -20,7 +19,7 @@ TEST( UnitTest, SniContains ) {
         ASSERT_TRUE( client_hello_result ) << client_hello_result.error() << std::endl;
         client_hellos.push_back( client_hello_result.value() );
     }
-    EXPECT_TRUE( client_hellos.empty() );
+    EXPECT_FALSE( client_hellos.empty() );
     bool found = false;
     for ( const auto& client_hello : client_hellos ) {
         auto sni_result = ntk::sni_contains( client_hello, "earthcam" );
