@@ -134,15 +134,73 @@ namespace ntk {
         };
     }
 
+    // ==================
+    //  Get HTTP Version
+    // ==================
+
+    std::expected<http_version,http_parse_error> get_http_version( std::string_view http_version_string ) {
+        auto parse_result = parse_http_version_string( http_version_string );
+        if ( !parse_result ) {
+            return std::unexpected( parse_result.error() ); 
+        }
+        auto version_opt = look_up_http_version( parse_result.value() );
+        if ( !version_opt ) {
+            return std::unexpected( http_parse_error::invalid_http_version );
+        }
+        return version_opt.value();
+    }
+
+    // ====================
+    //  Parse HTTP Version
+    // ====================
+
+    std::expected<uint8_t,http_parse_error> parse_http_version_string( std::string_view http_version_string ) {
+        auto slash = http_version_string.rfind( '/' );
+        if ( slash == std::string::npos ) {
+            return std::unexpected( http_parse_error::malformed_http_version );
+        }
+        auto after_slash = http_version_string.substr( slash + 1 );
+        auto dot = after_slash.rfind( '.' );
+        if ( dot == std::string::npos ) {
+            return ( ( *after_slash.rbegin() - '0' ) << 4 );
+        } 
+        return ( ( after_slash[ dot - 1 ] - '0' ) << 4 ) | ( after_slash[ dot + 1 ] - '0' );  
+    }
+
+    // ==================
+    //  Get Method Token
+    // ==================
+
+    std::optional<method_token> get_method_token( std::string_view method_token ) {
+        if ( method_token == "GET" ) return method_token::get;
+        if ( method_token == "POST") return method_token::post;
+        return std::nullopt;
+    }
+
     // =========================
     //  Parse HTTP Request Line
     // =========================
 
-    http_request_line parse_http_request_line( std::span<const uint8_t> request_line_bytes ) {
+    std::expected<http_request_line,http_parse_error> parse_http_request_line( std::span<const uint8_t> request_line_bytes ) {
         std::string request_line_string( request_line_bytes.begin(), request_line_bytes.end() );
         std::stringstream request_line_stream( request_line_string );
         http_request_line r_line;
-        request_line_stream >> r_line.method_token >> r_line.request_target >> r_line.http_version;
+        if ( !( request_line_stream >> r_line.method_token ) ) {
+            return std::unexpected( http_parse_error::missing_method_token );
+        }
+        if ( !get_method_token( r_line.method_token ) ) {
+            return std::unexpected( http_parse_error::invalid_method_token );
+        } 
+        request_line_stream >> r_line.request_target; 
+        request_line_stream >> r_line.http_version;
+        if ( !get_http_version( r_line.http_version ) ) {
+            return std::unexpected( http_parse_error::invalid_http_version );
+        }
+        /*
+        if ( request_line_stream != request_line_string.end() ) {
+            return std::unexpected( http_parse_error::invalid_request_line );
+        }
+        */
         return r_line;
     }
 
@@ -162,7 +220,6 @@ namespace ntk {
         std::string headers_string( header_bytes.begin(), header_bytes.end() );
         http_headers headers;
         std::size_t pos = 0;
-
         while ( pos < headers_string.size() ) {
             std::size_t line_end = headers_string.find( "\r\n", pos );
             std::string line;
@@ -180,7 +237,6 @@ namespace ntk {
             std::string value = trim( line.substr( colon_pos + 1 ) );
             headers[ key ] = value;
         }
-
         return headers;
     }
 
@@ -236,7 +292,6 @@ namespace ntk {
     std::vector<uint8_t> decode_chunked_http_body( std::span<const uint8_t> chunked_body ) {
         std::vector<uint8_t> decoded;
         std::size_t pos = 0;
-
         while ( pos < chunked_body.size() ) {
             auto crlf = std::search( chunked_body.begin() + pos, chunked_body.end(), "\r\n", "\r\n" + 2 );
             if ( crlf == chunked_body.end() ) break;
@@ -246,11 +301,14 @@ namespace ntk {
 
             if ( chunk_size == 0 ) break;
             if ( pos + chunk_size > chunked_body.size() ) break;
-            
+            /*
+            {
+                return std::unexpected( "Chunk Size exceeds size of buffer" );
+            }  
+            */   
             decoded.insert( decoded.end(), chunked_body.begin() + pos, chunked_body.begin() + pos + chunk_size );
             pos += chunk_size + 2;  
         }
-
         return decoded;
     }
 
@@ -284,6 +342,9 @@ namespace ntk {
                 return ntk::get_http_type( http_payload ) == ntk::http_type::RESPONSE;
             } 
         );
+        if ( response_pos == stream.end() ) {
+            //return std::unexpected( "HTTP Response not found" );
+        }
         auto response = *response_pos;
         auto get_headers_result = get_http_headers_from_payload( response.second );
         if ( !get_headers_result ) {
@@ -298,15 +359,13 @@ namespace ntk {
         auto it = std::next( response_pos );
 
         while ( it != stream.end() ) {
-            response_data.insert( response_data.end(),
-                it->second.begin(), it->second.end() );
+            response_data.insert( response_data.end(), it->second.begin(), it->second.end() );
             ++it;
         }
         if ( contains_http_header( http_headers, "Content-Length" ) ) {
             return response_data;
-        } else {
-            return decode_chunked_http_body( response_data );
         }
+        return decode_chunked_http_body( response_data );
     }
 
     // ==================
@@ -319,7 +378,11 @@ namespace ntk {
             return std::unexpected( split_result.error() );
         }
         http_request request;
-        request.request_line = parse_http_request_line( split_result->start_line );
+        auto request_line_result = parse_http_request_line( split_result->start_line );
+        if ( !request_line_result ) {
+            return std::unexpected( request_line_result.error() );
+        }
+        request.request_line = request_line_result.value();
         request.headers = parse_http_headers( split_result->headers );
         return request;
     }

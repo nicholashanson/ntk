@@ -16,22 +16,91 @@
 
 namespace ntk {
 
-    enum class http_parse_error {
-        MISSING_START_LINE,
-        MISSING_HEADERS,
-        UNRECOGNIZED_MIME_TYPE
+    // ==================
+    //  HTTP Parse Error
+    // ==================
+
+    enum class http_parse_error : uint8_t {
+        invalid_http_version,
+        invalid_method_token,
+        malformed_http_version,
+        missing_start_line,
+        missing_headers,
+        missing_method_token,
+        unrecognized_mime_type
     };
 
+    constexpr std::array<std::string_view,3/* entries in http_parse_error */> http_parse_error_messages = {
+        "Missing Start Line in HTTP Message",
+        "Missing Headers in HTTP Message",
+        "Missing Mime Type in HTTP Message"
+    };
+
+    std::ostream& operator<<( std::ostream& os, http_parse_error error );
+
+    // ==============
+    //  Method Token
+    // ==============
+
+    enum class method_token : uint8_t {
+        get,
+        post
+    };
+
+    std::optional<method_token> get_method_token( std::string_view method_token );
+
+    // ==============
+    //  HTTP Version
+    // ==============
+
+    enum class http_version : uint8_t {
+        http_0_9 = 0x09,
+        http_1_0 = 0x10,
+        http_1_1 = 0x11,
+        http_2   = 0x20,
+        http_3   = 0x30
+    };
+
+    namespace look_up {
+
+        constexpr std::array<http_version,5/* entries in http_version enum */> http_versions = {
+            http_version::http_0_9,
+            http_version::http_1_0,
+            http_version::http_1_1,
+            http_version::http_2,
+            http_version::http_3
+        };
+
+    } // namespace look_up
+
+    inline auto look_up_http_version = make_lookup( look_up::http_versions );
+
+    std::expected<http_version,http_parse_error> get_http_version( std::string_view http_version );
+
+    std::expected<uint8_t,http_parse_error> parse_http_version_string( std::string_view http_version_string );
+
+    // ===========
+    //  MIME Type
+    // ===========
+    
     enum class mime_type : uint8_t {
         VIDEO_MP2T,
         APPLICATION_VND_APPLE_MPEGURL,
         TEXT_PLAIN
     };
 
+    // ================
+    //  File Extension
+    // ================
+
     enum class file_extension : uint8_t {
         M3U8,
         TS
     };
+
+    // ====================
+    //  Split HTTP Message
+    // ====================
 
     struct split_http_message {
         std::vector<uint8_t> start_line;
@@ -42,9 +111,9 @@ namespace ntk {
     // TODO: check http rules on whitespace in headers
     std::string trim( const std::string& str );
 
-    // ==============================
-    //           HTTP Type
-    // ==============================
+    // ===========
+    //  HTTP Type
+    // ===========
 
     enum class http_type {
         REQUEST,
@@ -52,63 +121,68 @@ namespace ntk {
         DATA
     };
 
-    // ==============================
-    //          Predicates
-    // ==============================
+    // =========
+    //  Is HTTP
+    // =========
 
-    bool is_http( const std::vector<uint8_t>& maybe_http_payload );
+    bool is_http( std::span<const uint8_t> maybe_http_payload );
 
-    bool is_http_request_packet( std::span<const unsigned char> packet );
+    bool is_http_request( std::span<const uint8_t> tcp_payload );
 
-    bool is_http_request( const std::vector<uint8_t>& tcp_payload );
+    bool is_http_response( std::span<const uint8_t> tcp_payload );
 
-    bool is_http_response_packet( std::span<const unsigned char> packet );
+    std::expected<bool,std::string> is_http_request_packet( std::span<const uint8_t> packet );
 
-    bool is_http_response( const std::vector<uint8_t>& tcp_payload );
+    std::expected<bool,std::string> is_http_response_packet( std::span<const uint8_t> packet );
+
+    // ======================
+    //  Ends With Zero Chunk
+    // ======================
 
     bool ends_with_zero_chunk( const tcp_stream& stream );
 
-    // ==============================
-    //         HTTP Headers
-    // ==============================
+    bool ends_with_zero_chunk( std::span<const uint8_t> body );
 
     using http_headers = std::unordered_map<std::string,std::string>;
 
-    http_headers parse_http_headers( const std::vector<uint8_t>& header_bytes );
+    http_headers parse_http_headers( std::span<const uint8_t> header_bytes );
 
-    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( std::span<const unsigned char> http_payload_bytes );
+    std::expected<http_headers,http_parse_error> get_http_headers_from_payload( std::span<const uint8_t> http_payload_bytes );
 
-    http_type get_http_type( const std::vector<uint8_t>& http_payload );
-
-    std::expected<mime_type,http_parse_error> get_mime_type_from_ethernet( std::span<const unsigned char> ethernet_frame );
+    std::optional<http_type> get_http_type( std::span<const uint8_t> http_payload );
 
     std::optional<mime_type> string_to_mime_type( const std::string& mime_type_string );
 
-    // ==============================
-    //        HTTP Request
-    // ==============================
+    std::expected<mime_type,http_parse_error> get_mime_type_from_ethernet( std::span<const uint8_t> ethernet_frame );
 
-    // TODO: change "path" to "request_target"
+    // ===================
+    //  HTTP Request Line
+    // ===================
+
     struct http_request_line {
         std::string method_token;
         std::string request_target;
         std::string http_version;
     };
 
+    // ===============
+    //  HTTPS Request
+    // ===============
+
     struct http_request {
         http_request_line request_line;
         http_headers headers;
     };
 
-    http_request_line parse_http_request_line( const std::vector<uint8_t>& request_line_bytes );
+    std::expected<http_request_line,http_parse_error> parse_http_request_line( std::span<const uint8_t> request_line_bytes );
 
     std::expected<http_request,http_parse_error> get_http_request( std::span<const unsigned char> http_payload );
 
     std::vector<uint8_t> get_first_http_respone( const session& packet_data );
 
-    // ==============================
-    //        HTTP Response
-    // ==============================
+    // ===========================
+    //  HTTP Response Status Line
+    // ===========================
 
     struct http_response_status_line {
         std::string http_version;
@@ -116,42 +190,49 @@ namespace ntk {
         std::string reason_phrase;
     };
 
+    // ===============
+    //  HTTP Response
+    // ===============
+
     struct http_response {
         http_response_status_line status_line;
         http_headers headers;
         std::vector<uint8_t> body;
     };
 
+    // ==========================
+    //  Incomplete HTTP Response
+    // ==========================
+
     struct incomplete_http_response {
-        std::size_t content_length;
+        std::optional<std::size_t> content_length;
         std::vector<uint8_t> body;
 
         bool http_response_complete() {
-            return content_length == body.size();
+            if ( content_length ) {
+                return content_length.value() == body.size();
+            }
+            return ends_with_zero_chunk( body );
         }
     };
 
-    http_response_status_line parse_http_status_line( const std::vector<uint8_t>& status_line_bytes );
+    http_response_status_line parse_http_status_line( std::span<const uint8_t> status_line_bytes );
 
-    std::expected<http_response,http_parse_error> get_http_response( const std::vector<uint8_t>& http_payload );
+    std::expected<http_response,http_parse_error> get_http_response( std::span<const uint8_t> http_payload );
 
     std::expected<std::vector<uint8_t>,http_parse_error> get_http_response_data( const tcp_stream& stream );
 
-    // ==============================
-    //       Split HTTP Payload
-    // ==============================
+    // ====================
+    //  Split HTTP Payload
+    // ====================
 
-    std::expected<split_http_message,http_parse_error> split_http_payload( std::span<const unsigned char> payload );
+    std::expected<split_http_message,http_parse_error> split_http_payload( std::span<const uint8_t> payload );
 
     bool contains_http_header( const http_headers& headers, const std::string& header_name );
-   
-    // ==============================
-    //        Chunk Decoding
-    // ==============================
 
-    std::vector<uint8_t> decode_single_chunk( const std::vector<uint8_t>& chunked_body );
+    std::vector<uint8_t> decode_single_chunk( std::span<const uint8_t> chunked_body );
 
-    std::vector<uint8_t> decode_chunked_http_body( const std::vector<uint8_t>& chunked_body );
+    std::vector<uint8_t> decode_chunked_http_body( std::span<const uint8_t> chunked_body );
 
     std::optional<file_extension> extract_file_extension( const std::string& path );
 
@@ -160,6 +241,10 @@ namespace ntk {
     std::optional<file_extension> string_to_file_extension( const std::string& file_extension_string );
 
     std::optional<std::string> file_extension_to_string( file_extension extension );
+
+    // ================
+    //  Is Request For
+    // ================
 
     template<file_extension F>
     bool is_request_for( const http_request& request ) {
@@ -171,7 +256,7 @@ namespace ntk {
         return file_extension == F; 
     }
 
-    std::string write_to_file( const std::vector<uint8_t>& data, file_extension extension );
+    std::string write_to_file( std::span<const uint8_t> data, file_extension extension );
 
 } // namespace ntk
 
