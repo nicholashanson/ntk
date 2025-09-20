@@ -15,5 +15,5 @@ TEST( UnitTest, DecodeChunkedHttpBody ) {
         'W', 'i', 'k', 'i',
         'p', 'e', 'd', 'i', 'a'
     };
-    ASSERT_EQ( expected_decoded_data, actual_decoded_data );
+    EXPECT_EQ( expected_decoded_data, actual_decoded_data );
 }
