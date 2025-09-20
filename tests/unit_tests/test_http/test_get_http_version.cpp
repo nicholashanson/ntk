@@ -19,7 +19,6 @@ TEST_P( HttpVersionUnitTest, GetHttpVersion ) {
         ASSERT_TRUE( std::holds_alternative<ntk::http_parse_error>( param.expected ) );
         EXPECT_EQ( result.error(), std::get<ntk::http_parse_error>( param.expected ) );
     }
-
 }
 
 INSTANTIATE_TEST_SUITE_P(
