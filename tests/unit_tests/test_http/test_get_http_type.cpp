@@ -4,11 +4,22 @@
 
 #include <test_constants.hpp>
 
-TEST( UnitTest, GetHttpType ) {
-    auto http_request_payload = ntk::get_tcp_payload( test::http_get_packet );
-    auto http_response_payload = ntk::get_tcp_payload( test::http_response_packet );
-    ntk::http_type request_type = ntk::get_http_type( http_request_payload );
-    ntk::http_type response_type = ntk::get_http_type( http_response_payload );
-    ASSERT_EQ( request_type, ntk::http_type::REQUEST );
-    ASSERT_EQ( response_type, ntk::http_type::RESPONSE );
+TEST( UnitTest, GetHttpType_Request ) {
+    auto payload_result = ntk::get_tcp_payload( test::http_get_packet );
+    ASSERT_TRUE( payload_result ) << payload_result.error() << std::endl;
+    ASSERT_TRUE( payload_result.value() ) << "TCP Payload is empty" << std::endl;
+    auto& payload = *payload_result.value(); 
+    auto type_result = ntk::get_http_type( payload );
+    ASSERT_TRUE( type_result ) << "TCP Payload is too short to be a HTTP Message" << std::endl; 
+    ASSERT_EQ( type_result.value(), ntk::http_type::REQUEST );
+}
+
+TEST( UnitTest, GetHttpType_Response ) {
+    auto payload_result = ntk::get_tcp_payload( test::http_response_packet );
+    ASSERT_TRUE( payload_result ) << payload_result.error() << std::endl;
+    ASSERT_TRUE( payload_result.value() ) << "TCP Payload is empty" << std::endl;
+    auto& payload = *payload_result.value(); 
+    auto type_result = ntk::get_http_type( payload );
+    ASSERT_TRUE( type_result ) << "TCP Payload is too short to be a HTTP Message" << std::endl; 
+    ASSERT_EQ( type_result.value(), ntk::http_type::RESPONSE );
 }
