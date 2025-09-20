@@ -9,6 +9,9 @@ TEST( UnitTest, IsHttpResponse_Ethernet ) {
 }
 
 TEST( UnitTest, IsHttpResponse_TcpPayload ) {
-	auto http_payload = ntk::get_tcp_payload( test::http_response_packet );
-	ASSERT_TRUE( ntk::is_http_response( http_payload ) ); 
+	auto payload_result = ntk::get_tcp_payload( test::http_response_packet );
+    ASSERT_TRUE( payload_result ) << payload_result.error() << std::endl;
+    ASSERT_TRUE( payload_result.value() ) << "TCP Payload is empty" << std::endl;
+    auto& payload = *payload_result.value();
+	ASSERT_TRUE( ntk::is_http_response( payload ) ); 
 }
