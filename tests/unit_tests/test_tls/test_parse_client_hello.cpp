@@ -12,20 +12,20 @@
 
 TEST( UnitTest, ParseClientHello ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
-    auto& tls_client_hello = packet_data[ 3 ];
-    ASSERT_EQ( sizeof( test_constants::tls_client_hello_packet ), tls_client_hello.size() );
+    auto& client_hello_packet = packet_data[ 3 ];
+    ASSERT_EQ( sizeof( test_constants::tls_client_hello_packet ), client_hello_packet.size() );
+    auto payload_result = ntk::get_tcp_payload( test_constants::tls_client_hello_packet );
+    ASSERT_TRUE( payload_result ) << payload_result.error() << std::endl;
+    auto& payload = *payload_result.value();
+    ASSERT_EQ( payload.size(), 329 );
+    auto client_hello_result = ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
+    ASSERT_TRUE( client_hello_result ) << client_hello_result.error() << std::endl;
+    auto& client_hello = client_hello_result.value();
 
-    auto tls_client_hello_bytes = ntk::get_tcp_payload( test_constants::tls_client_hello_packet );
-    ASSERT_EQ( tls_client_hello_bytes.size(), 329 );
-
-    auto tls_record_span = std::span<const uint8_t>( tls_client_hello_bytes );
-    auto client_hello_span = tls_record_span.subspan( 9 );
-    auto client_hello = *ntk::parse_client_hello( client_hello_span );
-
-    ntk::tls_version expected_tls_version = ntk::tls_version::TLS_1_2;
+    ntk::tls_version expected_tls_version = ntk::tls_version::tls_1_2;
     std::size_t expected_session_id_size = 32;
-    std::string expected_session_id = "73a6f6977049af5160801e6221d25c8e4a502f7edcddae5712b90cbcde75d09a";
-    std::string expected_client_random = "7ba900c7057e9e5d0609c04b66f56e1b3003cd6906dea3cec057f8f733cc7102";
+    std::string expected_session_id = "363c4edf91f14d388547a75f371187ec468d84de548eecfa5dbb4a97390da0a4";
+    std::string expected_client_random = "e7bb2bb068dcd517e4f4ba1475e9d936dded3c24627c1b80861f2ca24a645a37";
     std::size_t expected_cipher_suites_size = 62;
     std::size_t expected_compression_methods_size = 1;
     std::size_t expected_extensions_size = 185;
