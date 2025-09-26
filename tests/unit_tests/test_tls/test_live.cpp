@@ -22,7 +22,7 @@ TEST( SystemTest, Google ) {
 
     auto packet_callback = [&]( const struct pcap_pkthdr* header, const unsigned char* packet ) {
         std::vector<uint8_t> vec( packet, packet + header->caplen );
-        live_stream_session.feed( vec );
+        live_stream_session.feed_packet( vec );
         if ( live_stream_session.number_of_completed_transfers() != 0 ) {
             std::lock_guard<std::mutex> lock( mtx );
             finished = true;
@@ -45,7 +45,8 @@ TEST( SystemTest, Google ) {
     ASSERT_TRUE( live_stream_session.number_of_completed_transfers() != 0 );
 
     auto& live_streams = ntk::tcp_live_stream_session_friend_helper::live_streams( live_stream_session );
-    ASSERT_TRUE( live_streams.front().traffic_contains( ntk::is_client_hello_v ) );
+    auto result = live_streams.front().traffic_contains( ntk::client_hello_filter ); 
+    ASSERT_TRUE( result );
     ASSERT_EQ( live_streams.size(), 1 );
 
     auto& handshake = ntk::tcp_live_stream_friend_helper::handshake_feed( live_streams.front() ).m_handshake;
@@ -66,7 +67,7 @@ TEST( SystemTest, OffloadQueueTestFilter ) {
 
     auto packet_callback = [&]( const struct pcap_pkthdr* header, const unsigned char* packet ) {
         std::vector<uint8_t> vec( packet, packet + header->caplen );
-        live_stream_session.feed( vec );
+        live_stream_session.feed_packet( vec );
         if ( !offload_queue.empty() ) {
             std::lock_guard<std::mutex> lock( mtx );
             ready = true;
@@ -90,7 +91,11 @@ TEST( SystemTest, OffloadQueueTestFilter ) {
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
     const auto& stream = maybe_stream.value();
-    ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
+    auto result = stream.traffic_contains( [] ( const auto& packet) {
+                                               auto result = ntk::is_client_hello( packet );
+                                               return result.has_value() && result.value();
+                                           } );
+    ASSERT_TRUE( result );
 }
 
 TEST( SystemTest, FireFoxGoogleTLSFilter ) {
@@ -103,7 +108,7 @@ TEST( SystemTest, FireFoxGoogleTLSFilter ) {
 
     auto packet_callback = [&]( const struct pcap_pkthdr* header, const unsigned char* packet ) {
         std::vector<uint8_t> vec( packet, packet + header->caplen );
-        live_stream_session.feed( vec );
+        live_stream_session.feed_packet( vec );
         if ( !offload_queue.empty() ) {
             std::lock_guard<std::mutex> lock( mtx );
             ready = true;
@@ -127,8 +132,11 @@ TEST( SystemTest, FireFoxGoogleTLSFilter ) {
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
     const auto& stream = maybe_stream.value();
-    ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
-
+    auto result = stream.traffic_contains( [] ( const auto& packet) {
+                                               auto result = ntk::is_client_hello( packet );
+                                               return result.has_value() && result.value();
+                                           } );
+    ASSERT_TRUE( result );
     ntk::tls_live_stream tls_stream( stream );
 }
 
@@ -142,7 +150,7 @@ TEST( SystemTest, FireFoxEarthCamTLSFilter ) {
 
     auto packet_callback = [&]( const struct pcap_pkthdr* header, const unsigned char* packet ) {
         std::vector<uint8_t> vec( packet, packet + header->caplen );
-        live_stream_session.feed( vec );
+        live_stream_session.feed_packet( vec );
         if ( !offload_queue.empty() ) {
             std::lock_guard<std::mutex> lock( mtx );
             ready = true;
@@ -166,7 +174,11 @@ TEST( SystemTest, FireFoxEarthCamTLSFilter ) {
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
     const auto& stream = maybe_stream.value();
-    ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
+    auto result = stream.traffic_contains( [] ( const auto& packet) {
+                                               auto result = ntk::is_client_hello( packet );
+                                               return result.has_value() && result.value();
+                                           } );
+    ASSERT_TRUE( result );
 
     ntk::tls_live_stream tls_stream( stream );
     ASSERT_EQ( tls_stream.get_sni(), "static.earthcam.com" );
@@ -182,7 +194,7 @@ TEST( SystemTest, FireFoxEarthCamSNIFilter ) {
 
     auto packet_callback = [&]( const struct pcap_pkthdr* header, const unsigned char* packet ) {
         std::vector<uint8_t> vec( packet, packet + header->caplen );
-        live_stream_session.feed( vec );
+        live_stream_session.feed_packet( vec );
         if ( !offload_queue.empty() ) {
             std::lock_guard<std::mutex> lock( mtx );
             ready = true;
@@ -206,7 +218,11 @@ TEST( SystemTest, FireFoxEarthCamSNIFilter ) {
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
     const auto& stream = maybe_stream.value();
-    ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
+    auto result = stream.traffic_contains( [] ( const auto& packet) {
+                                               auto result = ntk::is_client_hello( packet );
+                                               return result.has_value() && result.value();
+                                           } );
+    ASSERT_TRUE( result );
 }
 
 TEST( SystemTest, FireFoxEarthCamStrictSNIFilter ) {
@@ -219,7 +235,7 @@ TEST( SystemTest, FireFoxEarthCamStrictSNIFilter ) {
 
     auto packet_callback = [&]( const struct pcap_pkthdr* header, const unsigned char* packet ) {
         std::vector<uint8_t> vec( packet, packet + header->caplen );
-        live_stream_session.feed( vec );
+        live_stream_session.feed_packet( vec );
         if ( !offload_queue.empty() ) {
             std::lock_guard<std::mutex> lock( mtx );
             ready = true;
@@ -243,7 +259,11 @@ TEST( SystemTest, FireFoxEarthCamStrictSNIFilter ) {
     auto maybe_stream = offload_queue.try_pop();
     ASSERT_TRUE( maybe_stream.has_value() );
     const auto& stream = maybe_stream.value();
-    ASSERT_TRUE( stream.traffic_contains( ntk::is_client_hello_v ) );
+    auto result = stream.traffic_contains( [] ( const auto& packet) {
+                                               auto result = ntk::is_client_hello( packet );
+                                               return result.has_value() && result.value();
+                                           } );
+    ASSERT_TRUE( result );
 }
 
 
