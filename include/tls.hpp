@@ -23,15 +23,26 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
+#include <openssl/rand.h>
 
 #include <tcp.hpp>
 #include <utils.hpp>
 
 namespace ntk {
 
-    // ==============================
-    //          TLS Version
-    // ==============================
+    // ===============
+    //  TLS Extension 
+    // ===============   
+
+    enum class tls_extension : uint16_t {
+        server_name        = 0x0000,
+        supported_versions = 0x002b,
+        key_share          = 0x0033
+    };
+
+    // =============
+    //  TLS Version 
+    // =============
 
     enum class tls_version : uint16_t {
         tls_1_0 = 0x0301,
@@ -51,9 +62,9 @@ namespace ntk {
 
     inline auto get_tls_version = make_lookup( look_up::tls_versions );
 
-    // ==============================
-    //         Cipher Suites
-    // ==============================
+    // ===============
+    //  Cipher Suites 
+    // ===============
 
     enum class cipher_suite : uint16_t {
         TLS_AES_128_GCM_SHA256 =  0x1301,
@@ -65,9 +76,9 @@ namespace ntk {
         { cipher_suite::TLS_AES_256_GCM_SHA384, "TLS_AES_256_GCM_SHA384" }
     };
 
-    // ==============================
-    //        TLS Content Type
-    // ==============================
+    // ==================
+    //  TLS Content Type 
+    // ==================
 
     enum class tls_content_type : uint8_t {
         change_cipher_spec = 0x14,
@@ -96,9 +107,9 @@ namespace ntk {
         { tls_content_type::application_data, "Application Data" }
     };
 
-    // ==============================
-    //           TLS Records
-    // ==============================
+    // =============
+    //  TLS Records 
+    // =============
 
     namespace record_header_offset {
 
@@ -150,7 +161,11 @@ namespace ntk {
 
     std::variant<tls_record,incomplete_tls_record> append_to_incomplete_record( incomplete_tls_record record, std::span<const uint8_t> packet );
 
+    std::variant<tls_record,incomplete_tls_record> append_to_incomplete_record_from_payload( incomplete_tls_record incomplete_record, std::span<const unsigned char> payload );
+
     std::expected<std::variant<tls_record,incomplete_tls_record>,std::string> get_complete_or_incomplete_record( std::span<const uint8_t> packet );
+
+    std::expected<std::variant<tls_record,incomplete_tls_record>,std::string> get_complete_or_incomplete_record_from_payload( std::span<const uint8_t> payload );
 
     std::expected<tls_record,std::string> get_empty_tls_record_from_ethernet( std::span<const uint8_t> packet );
 
@@ -184,9 +199,9 @@ namespace ntk {
 
     std::expected<tls_record,std::string> get_parsed_tls_record_from_ethernet( std::span<const unsigned char> packet );    
 
-    // ==============================
-    //      TLS Handshake Type
-    // ==============================
+    // ====================
+    //  TLS Handshake Type 
+    // ====================
 
     enum class tls_handshake_type : uint8_t {
         client_hello  = 0x01,
@@ -204,9 +219,9 @@ namespace ntk {
 
     inline auto get_tls_handshake_type = make_lookup( look_up::tls_handshake_types );
 
-    // ==============================
-    //           Client Hello
-    // ==============================
+    // ==============
+    //  Client Hello 
+    // ==============
 
     struct client_hello {
         tls_version client_version;
@@ -248,9 +263,14 @@ namespace ntk {
 
     bool is_client_hello( const tls_record& record );
 
-    // ==============================
-    //           Server Hello
-    // ==============================
+    inline auto client_hello_filter = [] ( const auto& packet ) {
+        auto result = is_client_hello( packet );
+        return result && result.value();
+    };
+
+    // ==============
+    //  Server Hello 
+    // ==============
 
     struct server_hello {
         tls_version server_version;
@@ -289,9 +309,9 @@ namespace ntk {
 
     bool is_server_hello( const tls_record& record );
 
-    // ==============================
-    //              Alert
-    // ==============================
+    // =======
+    //  Alert 
+    // =======
 
     std::expected<bool,std::string> is_tls_alert( const unsigned char* packet );
     
@@ -299,21 +319,21 @@ namespace ntk {
 
     bool is_tls_alert( const tls_record& record );
 
-    // ==============================
-    //        Change Cipher Spec
-    // ==============================
+    // ====================
+    //  Change Cipher Spec 
+    // ====================
 
     bool is_change_cipher_spec( const tls_record& record );
 
-    // ==============================
-    //        Application Data
-    // ==============================
+    // ==================
+    //  Application Data 
+    // ==================
 
     bool is_tls_application_data( const tls_record& record );
 
-    // ==============================
-    //              SNI
-    // ==============================
+    // =====
+    //  SNI 
+    // =====
 
     std::expected<std::string,std::string> get_sni( const client_hello& hello );
 
@@ -329,9 +349,9 @@ namespace ntk {
 
     sni_to_ip get_sni_to_ip( const session& packets );
 
-    // ==============================
-    //          TLS Secrets
-    // ==============================
+    // =============
+    //  TLS Secrets 
+    // =============
 
     using session_secrets = std::map<std::string,std::vector<uint8_t>>;
     using secrets = std::map<std::string,session_secrets>;
@@ -358,9 +378,9 @@ namespace ntk {
         "CLIENT_TRAFFIC_SECRET_0"
     };
 
-    // ==============================
-    //          TLS Decryption
-    // ==============================
+    // ================
+    //  TLS Decryption 
+    // ================
 
     struct tls_key_material {
         std::vector<uint8_t> key;
@@ -401,15 +421,15 @@ namespace ntk {
 
     std::vector<uint8_t> build_tls13_aad( tls_content_type content_type, tls_version version, uint16_t length );
 
-    // ==============================
-    //          Certficiate
-    // ==============================
+    // =============
+    //  Certficiate 
+    // =============
 
     std::vector<uint8_t> extract_certificate( const std::vector<uint8_t>& handshake_payload );
 
-    // ==============================
-    //            Classes
-    // ==============================
+    // =========
+    //  Classes 
+    // =========
 
     class tls_over_tcp : public tcp_transfer {
         public:
@@ -460,7 +480,7 @@ namespace ntk {
                                            std::optional<std::vector<tls_record>>& encrypted_records,
                                            std::span<const uint8_t>& payload_span );
             std::expected<bool,std::string> handle_complete_record( std::optional<std::vector<tls_record>>& encrypted_records,   
-                                                                    std::span<const uint8_t> payload_span ); 
+                                                                    std::span<const uint8_t>& payload_span ); 
             std::expected<bool,std::string> decrypt_server_records( std::span<const tls_record> encrypted_records );
         protected:
             std::optional<std::vector<tls_record>> m_decrypted_records;
@@ -503,9 +523,9 @@ namespace ntk {
             log_file_trimmer m_log_file_trimmer;
     };
 
-    // ==============================
-    //            Filters
-    // ==============================
+    // =========
+    //  Filters 
+    // =========
 
     struct tls_filter {
         bool operator()( const ntk::tcp_live_stream& stream );
@@ -518,15 +538,31 @@ namespace ntk {
         std::string m_sni;
     };
 
-    // ==============================
-    //             Helpers
-    // ==============================
+    // =========
+    //  Helpers 
+    // =========
 
     std::string client_random_to_hex( const std::array<uint8_t,32>& random );
 
     std::string session_id_to_hex( const std::vector<uint8_t>& session_id );
 
     std::string string_to_hex( const std::vector<uint8_t>& data );
+
+    // =====================
+    //  Generate TLS Random 
+    // =====================
+
+    std::array<uint8_t,32> generate_tls_random( const uint32_t timestamp );
+
+    std::array<uint8_t,32> generate_tls_random();
+
+    std::array<uint8_t,32> generate_tls_random( const tls_version version );
+
+    // ===============
+    //  Get Timestamp 
+    // ===============
+
+    uint32_t get_timestamp();
 
 } // namespace ntk
 
