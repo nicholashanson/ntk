@@ -26,9 +26,9 @@ TEST( UnitTest, TlsLiveStream_Initialization_LinesConsumed ) {
 	ASSERT_TRUE( four_result ) << four_result.error() << std::endl;
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "tls_session_keys.log";
-	ntk::tls_live_stream live_stream( four, ssl_keys_log );read_packets_to
+	ntk::tls_live_stream live_stream( four, ssl_keys_log );
 	auto lines_consumed = ntk::tls_live_stream_friend_helper::lines_consumed( live_stream );
-	ASSERT_EQ( lines_consumed, 0 );
+	EXPECT_EQ( lines_consumed, 0 );
 }
 
 TEST( UnitTest, TlsLiveStream_Initialization_ClientTrafficSeqNumber ) {
@@ -41,7 +41,7 @@ TEST( UnitTest, TlsLiveStream_Initialization_ClientTrafficSeqNumber ) {
 	std::string ssl_keys_log = "tls_session_keys.log";
 	ntk::tls_live_stream live_stream( four, ssl_keys_log );
 	auto client_traffic_seq_number = ntk::tls_live_stream_friend_helper::client_traffic_seq_number( live_stream );
-	ASSERT_EQ( client_traffic_seq_number, 0 );
+	EXPECT_EQ( client_traffic_seq_number, 0 );
 }
 
 TEST( UnitTest, TlsLiveStream_Initialization_IncompleteRecord ) {
@@ -56,7 +56,7 @@ TEST( UnitTest, TlsLiveStream_Initialization_IncompleteRecord ) {
 	auto incomplete_record = ntk::tls_live_stream_friend_helper::get_incomplete_record( live_stream );
 	ASSERT_FALSE( incomplete_record );
 }
-read_packets_to
+
 TEST( UnitTest, TlsLiveStream_Initialization_ServerTrafficSeqNumber ) {
 	auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
 	ASSERT_FALSE( packet_data.empty() );
@@ -67,7 +67,7 @@ TEST( UnitTest, TlsLiveStream_Initialization_ServerTrafficSeqNumber ) {
 	std::string ssl_keys_log = "tls_session_keys.log";
 	ntk::tls_live_stream live_stream( four, ssl_keys_log );
 	auto server_traffic_seq_number = ntk::tls_live_stream_friend_helper::server_traffic_seq_number( live_stream );
-	ASSERT_EQ( server_traffic_seq_number, 0 );
+	EXPECT_EQ( server_traffic_seq_number, 0 );
 }
 
 TEST( UnitTest, TlsLiveStream_HandshakeFeed_Complete ) {
@@ -82,7 +82,7 @@ TEST( UnitTest, TlsLiveStream_HandshakeFeed_Complete ) {
 	live_stream.feed( tcp_synack_packet );
 	live_stream.feed( tcp_ack_packet );
 	auto handshake_complete = ntk::tcp_live_stream_friend_helper::handshake_feed( live_stream ).m_complete;
-	ASSERT_TRUE( handshake_complete );
+	EXPECT_TRUE( handshake_complete );
 }
 
 TEST( UnitTest, TlsLiveStream_ClientHelloPopulated ) {
@@ -103,7 +103,7 @@ TEST( UnitTest, TlsLiveStream_ClientHelloPopulated ) {
 	ASSERT_TRUE( client_hello_populated );
 	auto client_hello_from_ethernet = ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
 	auto client_hello_from_tls_live_stream = *ntk::tls_live_stream_friend_helper::get_client_hello( live_stream );
-	ASSERT_EQ( client_hello_from_ethernet, client_hello_from_tls_live_stream );
+	EXPECT_EQ( client_hello_from_ethernet, client_hello_from_tls_live_stream );
 }
 
 TEST( UnitTest, TlsLiveStream_ClientHelloPopulated_LongStream ) {
@@ -188,7 +188,7 @@ TEST( UnitTest, TlsLiveStream_GetTlsSecretsDynamically ) {
 	live_stream.feed( client_hello_packet );
 	live_stream.feed( server_hello_packet );
 	auto lines_consumed = ntk::tls_live_stream_friend_helper::lines_consumed( live_stream );
-	ASSERT_EQ( lines_consumed, 10 );
+	EXPECT_EQ( lines_consumed, 10 );
 }
 
 TEST( UnitTest, TlsLiveStream_ClientTrafficSeqNumber ) {
@@ -206,7 +206,7 @@ TEST( UnitTest, TlsLiveStream_ClientTrafficSeqNumber ) {
 	}
 	auto client_traffic_seq_number = ntk::tls_live_stream_friend_helper::client_traffic_seq_number( live_stream );
 	auto client_hello_from_tls_live_stream = *ntk::tls_live_stream_friend_helper::get_client_hello( live_stream );
-	ASSERT_EQ( client_traffic_seq_number, 1 );
+	EXPECT_EQ( client_traffic_seq_number, 1 );
 }
 
 TEST( UnitTest, TlsLiveStream_ServerTrafficSeqNumber ) {
@@ -224,8 +224,8 @@ TEST( UnitTest, TlsLiveStream_ServerTrafficSeqNumber ) {
 	}
 	auto server_traffic_seq_number = ntk::tls_live_stream_friend_helper::server_traffic_seq_number( live_stream );
 	auto partial_record_buffer = ntk::tls_live_stream_friend_helper::partial_record_buffer( live_stream );
-	ASSERT_TRUE( partial_record_buffer.empty() );
-	ASSERT_EQ( server_traffic_seq_number, 1 );
+	EXPECT_TRUE( partial_record_buffer.empty() );
+	EXPECT_EQ( server_traffic_seq_number, 1 );
 }
 
 TEST( UnitTest, TlsLiveStream_Initialization_DecryptedRecord ) {
@@ -255,7 +255,7 @@ TEST( UnitTest, TlsLiveStream_DecryptedRecord ) {
 	}
 	auto decrypted_records = ntk::tls_live_stream_friend_helper::decrypted_records( live_stream );
 	ASSERT_TRUE( decrypted_records );
-	ASSERT_EQ( decrypted_records.value().size(), 1 );
+	EXPECT_EQ( decrypted_records.value().size(), 1 );
 }
 
 TEST( UnitTest, TlsLiveStream_DecryptedRecord_Reset ) {
@@ -284,7 +284,7 @@ TEST( UnitTest, TlsLiveStream_Initialization_PartialRecordBuffer ) {
 	std::string ssl_keys_log = "tls_session_keys.log";
 	ntk::tls_live_stream live_stream( four, ssl_keys_log );
 	auto partial_record_buffer = ntk::tls_live_stream_friend_helper::partial_record_buffer( live_stream );
-	ASSERT_TRUE( partial_record_buffer.empty() );
+	EXPECT_TRUE( partial_record_buffer.empty() );
 }
 
 TEST( UnitTest, TlsLiveStream_IncompleteRecord_NotNullOpt ) {
@@ -296,7 +296,7 @@ TEST( UnitTest, TlsLiveStream_IncompleteRecord_NotNullOpt ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::tls_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 19 /* first part of first record of http response */;
+	const std::size_t read_packets_to = 19 /* first part of first record of third http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 		auto incomplete_record = ntk::tls_live_stream_friend_helper::get_incomplete_record( live_stream );
@@ -315,7 +315,7 @@ TEST( UnitTest, TlsLiveStream_IncompleteRecord_PayloadGrows ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::tls_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 21 /* second part of first record of http response */;
+	const std::size_t read_packets_to = 21 /* second part of first record of third http response */;
 	std::size_t payload_size_before;
 	std::size_t payload_size_after;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
@@ -341,7 +341,7 @@ TEST( UnitTest, TlsLiveStream_IncompleteRecord ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::tls_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 19 /* first part of first record of http response */;
+	const std::size_t read_packets_to = 19 /* first part of first record of third http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
@@ -358,16 +358,16 @@ TEST( UnitTest, TlsLiveStream_IncompleteRecord_IsStartOfNextRecord ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::tls_live_stream live_stream( four, ssl_keys_log );
-	const std::size_t read_packets_to = 27 /* last part of first record of http response */;
+	const std::size_t read_packets_to = 27 /* last part of first record of third http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
 	auto incomplete_record = ntk::tls_live_stream_friend_helper::get_incomplete_record( live_stream );
 	auto decrypted_records = ntk::tls_live_stream_friend_helper::decrypted_records( live_stream );
 	ASSERT_TRUE( incomplete_record );
-	ASSERT_EQ( incomplete_record.value().record.payload.size(), 797 );
+	EXPECT_EQ( incomplete_record.value().record.payload.size(), 797 );
 	ASSERT_TRUE( decrypted_records );
-	ASSERT_EQ( decrypted_records.value().size(), 1 );
+	EXPECT_EQ( decrypted_records.value().size(), 1 );
 }
 
 TEST( UnitTest, TlsLiveStream_LinesConsumed ) {
@@ -401,5 +401,5 @@ TEST( UnitTest, TlsLiveStream_HasSecrets ) {
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		live_stream.feed( packet_data[ i ] );
 	}
-	ASSERT_TRUE( live_stream.has_secrets() );
+	EXPECT_TRUE( live_stream.has_secrets() );
 }
