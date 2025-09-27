@@ -29,6 +29,9 @@ TEST( UnitTest, GetTerminations_EarthCamVideo ) {
     auto four_tuples = ntk::get_four_tuples( packet_data );
     auto four_tuple = *four_tuples.begin();
     auto tcp_terminations = ntk::get_terminations( four_tuple, packet_data );
-    auto number_of_resets = std::count_if( packet_data.begin(), packet_data.end(), ntk::is_reset );
+    auto number_of_resets = std::count_if( packet_data.begin(), packet_data.end(), [] ( const auto& packet ) {
+                                                                                       auto result = ntk::is_reset( packet );
+                                                                                       return result.has_value() && result.value();
+                                                                                   } );
     ASSERT_EQ( tcp_terminations.size(), number_of_resets );
 }

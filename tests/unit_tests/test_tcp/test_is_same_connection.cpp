@@ -7,8 +7,19 @@
 
 #include <test_tcp_handshake_packets.hpp>
 
-TEST( UnitTest, IsSameConnection ) {
-    std::vector<uint8_t> tcp_syn_packet( std::begin( test_constants::tcp_syn_packet ), std::end( test_constants::tcp_syn_packet ) );
-    std::vector<uint8_t> tcp_synack_packet( std::begin( test_constants::tcp_synack_packet ), std::end( test_constants::tcp_synack_packet ) );
-    ASSERT_TRUE( ntk::is_same_connection( tcp_syn_packet, tcp_synack_packet ) );
+TEST( UnitTest, IsSameConnection_PacketPacket ) {
+    auto result = ntk::is_same_connection( test_constants::tcp_syn_packet, test_constants::tcp_synack_packet );
+    ASSERT_TRUE( result ) << result.error() << std::endl;
+    ASSERT_TRUE( result.value() );
+}
+
+TEST( UnitTest, IsSameConnection_PacketHeader ) {
+    auto result = ntk::is_same_connection( test_constants::tcp_syn_packet, test_constants::tcp_synack_four );
+    ASSERT_TRUE( result ) << result.error() << std::endl;
+    ASSERT_TRUE( result.value() );
+}
+
+TEST( UnitTest, IsSameConnection_HeaderHeader ) {
+    auto result = ntk::is_same_connection( test_constants::tcp_syn_four, test_constants::tcp_synack_four );
+    ASSERT_TRUE( result );
 }

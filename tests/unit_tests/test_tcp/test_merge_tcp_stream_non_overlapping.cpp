@@ -24,7 +24,7 @@ TEST( UnitTest, MergeTcpStreamNonOverlapping ) {
 }
 
 TEST( UnitTest, MergeTcpStreamNonOverlapping_Lena ) {
-    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "Lena" ] );
+    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "lena" ] );
     auto raw_stream = ntk::get_raw_tcp_stream( packet_data );
     auto tcp_stream = ntk::get_tcp_stream( raw_stream );
     auto merged_tcp_stream = ntk::merge_tcp_stream_non_overlapping( tcp_stream );

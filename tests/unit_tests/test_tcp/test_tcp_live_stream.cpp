@@ -125,7 +125,8 @@ TEST( UnitTest, TcpLiveStream_IsClientPacket ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "checkerboard" ] );
     auto syn_packet = packet_data[ 0 ];
     auto four = ntk::get_four_from_ethernet( syn_packet );
-    ntk::tcp_live_stream live_stream( four );
+    ASSERT_TRUE( four );
+    ntk::tcp_live_stream live_stream( four.value() );
     ASSERT_TRUE( ntk::tcp_live_stream_friend_helper::is_client_packet( live_stream, syn_packet ) );
 }
 
@@ -134,6 +135,33 @@ TEST( UnitTest, TcpLiveStream_IsServerPacket ) {
     auto syn_packet = packet_data[ 0 ];
     auto synack_packet = packet_data[ 1 ];
     auto four = ntk::get_four_from_ethernet( syn_packet );
-    ntk::tcp_live_stream live_stream( four );
+    ASSERT_TRUE( four );
+    ntk::tcp_live_stream live_stream( four.value() );
     ASSERT_TRUE( ntk::tcp_live_stream_friend_helper::is_server_packet( live_stream, synack_packet ) );
+}
+
+TEST( UnitTest, TcpLiveStream_IsServerPacket_LongStream ) {
+    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+    auto syn_packet = packet_data[ 0 ];
+    auto synack_packet = packet_data[ 1 ];
+    auto four = ntk::get_four_from_ethernet( syn_packet );
+    ASSERT_TRUE( four );
+    ntk::tcp_live_stream live_stream( four.value() );
+    auto server_packet = packet_data[ 20 ];
+    ASSERT_TRUE( ntk::tcp_live_stream_friend_helper::is_server_packet( live_stream, server_packet ) );
+}
+
+TEST( UnitTest, TcpiveStream_TcpHandshakeFeed_Complete ) {
+    auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "long_stream" ] );
+    auto four = *ntk::get_four_from_ethernet( packet_data.front() );
+    ntk::tcp_live_stream live_stream( four );
+    const std::size_t read_up_to = 3;
+    for ( std::size_t i = 0; i < read_up_to; ++i ) {
+        auto result = live_stream.feed( packet_data[ i ] );
+        if ( !result ) {
+            std::cout << result.error() << std::endl;
+        }
+    }
+    auto handshake_feed = ntk::tcp_live_stream_friend_helper::handshake_feed( live_stream );
+    ASSERT_TRUE( handshake_feed.m_complete );
 }
