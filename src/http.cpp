@@ -54,7 +54,7 @@ namespace ntk {
     // =================
 
     bool is_http_request( std::span<const uint8_t> tcp_payload ) {
-        return get_http_type( tcp_payload ) == http_type::REQUEST;
+        return get_http_type( tcp_payload ) == http_type::request;
     }
 
     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -75,7 +75,7 @@ namespace ntk {
     // ==================
 
     bool is_http_response( std::span<const uint8_t> tcp_payload ) {
-        return get_http_type( tcp_payload ) == http_type::RESPONSE; 
+        return get_http_type( tcp_payload ) == http_type::response; 
     }
 
     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -102,11 +102,11 @@ namespace ntk {
         std::string first_five( http_payload.begin(), http_payload.begin() + 5 );
 
         if ( first_five.compare( 0, 5, "HTTP/" ) == 0 ) {
-            return http_type::RESPONSE; 
+            return http_type::response; 
         } else if ( first_five.compare( 0, 3, "GET" ) == 0 ) {
-            return http_type::REQUEST;
+            return http_type::request;
         } else {
-            return http_type::DATA;
+            return http_type::data;
         }
     }
 
@@ -150,9 +150,9 @@ namespace ntk {
         return version_opt.value();
     }
 
-    // ====================
-    //  Parse HTTP Version
-    // ====================
+    // ===========================
+    //  Parse HTTP Version String
+    // ===========================
 
     std::expected<uint8_t,http_parse_error> parse_http_version_string( std::string_view http_version_string ) {
         auto slash = http_version_string.rfind( '/' );
@@ -164,6 +164,9 @@ namespace ntk {
         if ( dot == std::string::npos ) {
             return ( ( *after_slash.rbegin() - '0' ) << 4 );
         } 
+        if ( dot + 1 >= after_slash.size() ) {
+            return std::unexpected( http_parse_error::malformed_http_version );
+        }
         return ( ( after_slash[ dot - 1 ] - '0' ) << 4 ) | ( after_slash[ dot + 1 ] - '0' );  
     }
 
@@ -173,7 +176,7 @@ namespace ntk {
 
     std::optional<method_token> get_method_token( std::string_view method_token ) {
         if ( method_token == "GET" ) return method_token::get;
-        if ( method_token == "POST") return method_token::post;
+        if ( method_token == "POST" ) return method_token::post;
         return std::nullopt;
     }
 
@@ -191,16 +194,18 @@ namespace ntk {
         if ( !get_method_token( r_line.method_token ) ) {
             return std::unexpected( http_parse_error::invalid_method_token );
         } 
-        request_line_stream >> r_line.request_target; 
-        request_line_stream >> r_line.http_version;
+        if ( !( request_line_stream >> r_line.request_target ) ) {
+            return std::unexpected( http_parse_error::missing_request_target );
+        } 
+        if ( !( request_line_stream >> r_line.http_version ) ) {
+            return std::unexpected( http_parse_error::missing_http_version );
+        }
         if ( !get_http_version( r_line.http_version ) ) {
             return std::unexpected( http_parse_error::invalid_http_version );
         }
-        /*
-        if ( request_line_stream != request_line_string.end() ) {
-            return std::unexpected( http_parse_error::invalid_request_line );
+        if ( request_line_stream.peek() != std::char_traits<char>::eof() ) {
+            return std::unexpected( http_parse_error::trailing_content );
         }
-        */
         return r_line;
     }
 
@@ -256,21 +261,35 @@ namespace ntk {
     //  Parse HTTP Status Line
     // ========================
 
-    http_response_status_line parse_http_status_line( std::span<const uint8_t> status_line_bytes ) {
+    std::expected<http_response_status_line,http_parse_error> parse_http_status_line( std::span<const uint8_t> status_line_bytes ) {
         std::string line( status_line_bytes.begin(), status_line_bytes.end() );
         std::istringstream stream( line );
-        
         http_response_status_line status_line;
-        stream >> status_line.http_version;
-
+        if ( !( stream >> status_line.http_version ) ) {
+            return std::unexpected( http_parse_error::missing_http_version );
+        }
+        if ( !get_http_version( status_line.http_version ) ) {
+            return std::unexpected( http_parse_error::invalid_http_version );
+        }
         std::string status_code_string;
-        stream >> status_code_string;
-        status_line.status_code = std::stoi( status_code_string );
-
+        if ( !( stream >> status_code_string ) ) {
+            return std::unexpected( http_parse_error::missing_status_code );
+        }
+        int code;
+        auto [ pointer, error_code ] = std::from_chars( status_code_string.data(), 
+                                                        status_code_string.data() + status_code_string.size(), code );
+        if ( error_code != std::errc{} ) {
+            return std::unexpected( http_parse_error::invalid_status_code );
+        }
+        status_line.status_code = code;
         std::string reason_phrase;
-        std::getline( stream, reason_phrase );
-
-        status_line.reason_phrase = trim( reason_phrase );
+        if ( !( stream >> reason_phrase ) ) {
+            return std::unexpected( http_parse_error::missing_reason_phrase );
+        }
+        status_line.reason_phrase = reason_phrase;
+        if ( stream.peek() != std::char_traits<char>::eof() ) {
+            return std::unexpected( http_parse_error::trailing_content );
+        }
         return status_line;
     }
 
@@ -280,7 +299,7 @@ namespace ntk {
 
     std::vector<uint8_t> decode_single_chunk( std::span<const uint8_t> chunked_body ) {
         auto it = std::search( chunked_body.begin(), chunked_body.end(), "\r\n", "\r\n" + 2 );
-        size_t chunk_size = std::stoul( std::string( chunked_body.begin(), it ), nullptr, 16 );
+        std::size_t chunk_size = std::stoul( std::string( chunked_body.begin(), it ), nullptr, 16 );
         auto data_start = it + 2;
         return std::vector<uint8_t>( data_start, data_start + chunk_size );
     }
@@ -320,9 +339,9 @@ namespace ntk {
         auto raw_tcp_stream = get_raw_tcp_stream( packet_data );
         auto tcp_stream = get_tcp_stream( raw_tcp_stream ); 
         auto it = std::find_if( tcp_stream.begin(), tcp_stream.end(), 
-            []( const auto& pair ) { 
+            [] ( const auto& pair ) { 
                 auto& [ unused, http_payload ] = pair;
-                return ntk::get_http_type( http_payload ) == ntk::http_type::RESPONSE;
+                return ntk::get_http_type( http_payload ) == ntk::http_type::response;
             } 
         );
         if ( it == tcp_stream.end() ) {
@@ -339,7 +358,7 @@ namespace ntk {
         auto response_pos = std::find_if( stream.begin(), stream.end(), 
             []( const auto& pair ) { 
                 auto& [ unused, http_payload ] = pair;
-                return ntk::get_http_type( http_payload ) == ntk::http_type::RESPONSE;
+                return ntk::get_http_type( http_payload ) == ntk::http_type::response;
             } 
         );
         if ( response_pos == stream.end() ) {
@@ -397,7 +416,11 @@ namespace ntk {
         if ( !split_result ) {
             return std::unexpected( split_result.error() );
         }
-        response.status_line = parse_http_status_line( split_result->start_line );
+        auto status_line_result = parse_http_status_line( split_result->start_line );
+        if ( !status_line_result ) {
+            return std::unexpected( status_line_result.error() );
+        }
+        response.status_line = status_line_result.value();
         response.headers = parse_http_headers( split_result->headers );
         response.body = split_result->body;
         return response;
@@ -426,8 +449,8 @@ namespace ntk {
     // ==========================
 
     std::optional<file_extension> string_to_file_extension( const std::string& file_extension_string ) {
-        if ( file_extension_string == "m3u8" ) return file_extension::M3U8;
-        if ( file_extension_string == "ts" ) return file_extension::TS;
+        if ( file_extension_string == "m3u8" ) return file_extension::m3u8;
+        if ( file_extension_string == "ts" ) return file_extension::ts;
         return std::nullopt;
     }
 
@@ -436,7 +459,7 @@ namespace ntk {
     // ==========================
 
     std::optional<std::string> file_extension_to_string( file_extension extension ) {
-        if ( extension == file_extension::TS ) return "ts";
+        if ( extension == file_extension::ts ) return "ts";
         return std::nullopt;
     }
 
@@ -444,17 +467,17 @@ namespace ntk {
     //  Get MIME Type From Ethernet
     // =============================
 
-    std::expected<mime_type,http_parse_error> get_mime_type_from_ethernet( std::span<const unsigned char> ethernet_frame ) {
-        auto maybe_headers = get_http_headers_from_payload( ethernet_frame );
-        if ( !maybe_headers ) {
-            return std::unexpected( maybe_headers.error() );
+    std::expected<mime_type,http_parse_error> get_mime_type_from_ethernet( std::span<const uint8_t> ethernet_frame ) {
+        auto parse_result = get_http_headers_from_payload( ethernet_frame );
+        if ( !parse_result ) {
+            return std::unexpected( parse_result.error() );
         }
-        auto headers = *maybe_headers;
-        auto maybe_mime_type = string_to_mime_type( headers[ "Content-Type" ] );
-        if ( !maybe_mime_type ) {
+        auto headers = *parse_result;
+        auto mime_type_result = string_to_mime_type( headers[ "Content-Type" ] );
+        if ( !mime_type_result ) {
             return std::unexpected( http_parse_error::unrecognized_mime_type );
         }
-        return maybe_mime_type.value();
+        return mime_type_result.value();
     }
 
     // =====================
@@ -462,8 +485,8 @@ namespace ntk {
     // =====================
 
     std::optional<mime_type> string_to_mime_type( const std::string& mime_type_string ) {
-        if ( mime_type_string == "text/plain" ) return mime_type::TEXT_PLAIN;
-        if ( mime_type_string == "application/vnd.apple.mpegurl" ) return mime_type::APPLICATION_VND_APPLE_MPEGURL;
+        if ( mime_type_string == "text/plain" ) return mime_type::text_plain;
+        if ( mime_type_string == "application/vnd.apple.mpegurl" ) return mime_type::application_vnd_apple_mpegurl;
         return std::nullopt;
     }
 

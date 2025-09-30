@@ -23,17 +23,32 @@ namespace ntk {
     enum class http_parse_error : uint8_t {
         invalid_http_version,
         invalid_method_token,
+        invalid_status_code,
         malformed_http_version,
-        missing_start_line,
         missing_headers,
+        missing_http_version,
+        missing_request_target,
+        missing_start_line,
+        missing_status_code,
         missing_method_token,
+        missing_reason_phrase,
+        trailing_content,
         unrecognized_mime_type
     };
 
-    constexpr std::array<std::string_view,3/* entries in http_parse_error */> http_parse_error_messages = {
+    constexpr std::array<std::string_view,12/* entries in http_parse_error enum */> http_parse_error_messages = {
+        "The Parsed HTTP Version is invalid",
+        "The Parsed HTTP Method Token is invalid",
+        "The Parsed HTTP Code is invalid",
+        "The HTTP Version String from the Request Line is malformed",
         "Missing Start Line in HTTP Message",
         "Missing Headers in HTTP Message",
-        "Missing Mime Type in HTTP Message"
+        "Missing Mime Type in HTTP Message",
+        "The HTTP status code is not present in the Status Line",
+        "The HTTP Method Token is not present in the Request Line",
+        "The HTTP Reason Phrease is not present in the Status Line",
+        "Invalid Trailing Content was found during parsing",
+        "The Parsed Mime Type is invalid"
     };
 
     std::ostream& operator<<( std::ostream& os, http_parse_error error );
@@ -84,9 +99,9 @@ namespace ntk {
     // ===========
     
     enum class mime_type : uint8_t {
-        VIDEO_MP2T,
-        APPLICATION_VND_APPLE_MPEGURL,
-        TEXT_PLAIN
+        video_mp2t,
+        application_vnd_apple_mpegurl,
+        text_plain
     };
 
     // ================
@@ -94,8 +109,8 @@ namespace ntk {
     // ================
 
     enum class file_extension : uint8_t {
-        M3U8,
-        TS
+        m3u8,
+        ts
     };
 
     // ====================
@@ -116,9 +131,9 @@ namespace ntk {
     // ===========
 
     enum class http_type {
-        REQUEST,
-        RESPONSE,
-        DATA
+        request,
+        response,
+        data
     };
 
     // =========
@@ -216,7 +231,7 @@ namespace ntk {
         }
     };
 
-    http_response_status_line parse_http_status_line( std::span<const uint8_t> status_line_bytes );
+    std::expected<http_response_status_line,http_parse_error> parse_http_status_line( std::span<const uint8_t> status_line_bytes );
 
     std::expected<http_response,http_parse_error> get_http_response( std::span<const uint8_t> http_payload );
 
