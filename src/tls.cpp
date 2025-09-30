@@ -921,6 +921,13 @@ namespace ntk {
                 cipher = EVP_aes_256_gcm();
                 key_len = 32;
                 break;
+            case cipher_suite::TLS_CHACHA20_POLY1305_SHA256:
+            case cipher_suite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:
+            case cipher_suite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:
+                hash_fn = EVP_sha256();
+                cipher = EVP_chacha20_poly1305();
+                key_len = 32;
+                break;
             default:
                 throw std::runtime_error( "Unsupported cipher suite" );
         }
@@ -959,6 +966,13 @@ namespace ntk {
             case cipher_suite::TLS_AES_256_GCM_SHA384:
                 hash_fn = EVP_sha384();
                 cipher = EVP_aes_256_gcm();
+                key_len = 32;
+                break;
+            case cipher_suite::TLS_CHACHA20_POLY1305_SHA256:
+            case cipher_suite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:
+            case cipher_suite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:
+                hash_fn = EVP_sha256();
+                cipher = EVP_chacha20_poly1305();
                 key_len = 32;
                 break;
             default:
