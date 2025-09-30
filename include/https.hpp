@@ -6,6 +6,10 @@
 
 namespace ntk {
 
+    // =============================
+    //  Incomplete Request Response
+    // =============================
+
     struct incomplete_request_response {
         std::optional<http_request> request;
         std::optional<incomplete_http_response> response;
@@ -15,6 +19,10 @@ namespace ntk {
             response = std::nullopt;
         }
     };
+
+    // ===================
+    //  HTTPS Live Stream
+    // ===================
 
     class https_live_stream : public tls_live_stream {
         public:
@@ -35,6 +43,10 @@ namespace ntk {
             friend class https_live_stream_friend_helper;
     };
 
+    // =================================
+    //  HTTPS Live Stream Friend Helper
+    // =================================
+
     class https_live_stream_friend_helper {
         public:
             static incomplete_request_response get_incomplete_request_response( const https_live_stream& h );
@@ -42,6 +54,10 @@ namespace ntk {
             static std::optional<std::string> name_of_written_file( const https_live_stream& h );
             static bool is_complete( const https_live_stream& h );
     };
+
+    // ===========================
+    //  HTTPS Live Stream Session
+    // ===========================
 
     class https_live_stream_session {
         public:
@@ -57,6 +73,10 @@ namespace ntk {
             std::string m_ssl_keys_log;
             friend class https_live_stream_session_friend_helper;
     };
+
+    // =========================================
+    //  HTTPS Live Stream Session Friend Helper
+    // =========================================
 
     class https_live_stream_session_friend_helper {
         public:

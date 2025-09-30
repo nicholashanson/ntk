@@ -50,8 +50,8 @@ namespace ntk {
 	bool https_live_stream::handle_http_request() {
 		auto& decrypted_record = m_decrypted_records->front();
 		m_incomplete_request_response.request = *get_http_request( decrypted_record.payload );
-		if ( is_request_for<file_extension::M3U8>( m_incomplete_request_response.request.value() ) ) {
-			m_expected_data = mime_type::VIDEO_MP2T;
+		if ( is_request_for<file_extension::m3u8>( m_incomplete_request_response.request.value() ) ) {
+			m_expected_data = mime_type::video_mp2t;
 			return true;
 		}
 		return false;
@@ -83,10 +83,10 @@ namespace ntk {
 		if ( m_incomplete_request_response.response->http_response_complete() ) {
 			m_is_complete = true;
 			if ( m_incomplete_request_response.response->content_length ) {
-				m_name_of_written_file = write_to_file( m_incomplete_request_response.response.value().body, file_extension::TS );
+				m_name_of_written_file = write_to_file( m_incomplete_request_response.response.value().body, file_extension::ts );
 			} else {
 				auto decoded_body = decode_chunked_http_body( m_incomplete_request_response.response.value().body );
-				m_name_of_written_file = write_to_file( decoded_body, file_extension::TS );
+				m_name_of_written_file = write_to_file( decoded_body, file_extension::ts );
 			}
 			m_incomplete_request_response.reset();
 		}
@@ -108,10 +108,10 @@ namespace ntk {
 			if ( m_incomplete_request_response.response->http_response_complete() ) {
 				m_is_complete = true;
 				if ( m_incomplete_request_response.response->content_length ) {
-					m_name_of_written_file = write_to_file( m_incomplete_request_response.response.value().body, file_extension::TS );
+					m_name_of_written_file = write_to_file( m_incomplete_request_response.response.value().body, file_extension::ts );
 				} else {
 					auto decoded_body = decode_chunked_http_body( m_incomplete_request_response.response.value().body );
-					m_name_of_written_file = write_to_file( decoded_body, file_extension::TS );
+					m_name_of_written_file = write_to_file( decoded_body, file_extension::ts );
 				}
 				m_incomplete_request_response.reset();
 			}
