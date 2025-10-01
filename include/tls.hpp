@@ -423,6 +423,14 @@ namespace ntk {
         std::vector<uint8_t> iv;
     };
 
+    struct tls_key_block {
+        std::vector<uint8_t> key;
+        std::vector<uint8_t> iv;
+        std::vector<uint8_t> mac_key;
+    };
+
+    std::vector<uint8_t> pkcs7_pad( const std::vector<uint8_t>& data, const std::size_t block_size );
+
     tls_key_material derive_tls_key_iv( const std::vector<uint8_t>& secret, const EVP_MD* hash_func,
                                         size_t key_len, size_t iv_len );
 

@@ -710,6 +710,80 @@ namespace ntk {
         return secret_labels_are_equal( labels, tls_secret_labels );
     }
 
+    // =============
+    //  PKCS #7 Pad
+    // =============
+
+    std::vector<uint8_t> pkcs7_pad( const std::vector<uint8_t>& data, const std::size_t block_size ) {
+        std::vector<uint8_t> padded = data;
+        std::size_t pad_len = block_size - ( data.size() % block_size );
+        padded.insert( padded.end(), pad_len, static_cast<uint8_t>( pad_len ) );
+        return padded;
+    }
+
+    // ===============
+    //  PKCS #7 Unpad
+    // ===============
+
+    std::vector<uint8_t> pkcs7_unpad( const std::vector<uint8_t>& data ) {
+        if ( data.empty() ) { 
+            throw std::runtime_error( "Cannot unpad empty data" );
+        }
+        uint8_t pad_len = data.back();
+        return std::vector<uint8_t>( data.begin(), data.end() - pad_len );
+    }
+
+    // ==============
+    //  Compute HMAC 
+    // ==============
+
+    std::vector<uint8_t> compute_hmac( const std::vector<uint8_t>& mac_key, uint64_t seq_num,
+                                       tls_content_type type, tls_version version, 
+                                       const std::vector<uint8_t>& data ) {
+        std::vector<uint8_t> mac_input( 13 + data.size() );
+        for ( uint8_t i = 0; i < 8; ++i ) {
+            mac_input[ i ] =  ( seq_num >> ( 56 - i * 8 ) ) & 0xff;
+        }
+        auto v = static_cast<uint16_t>( version );
+        mac_input[ 8 ] = static_cast<uint8_t>( type );
+        mac_input[ 9 ] = static_cast<uint8_t>( ( v >> 8 ) & 0xff );
+        mac_input[ 10 ] = static_cast<uint8_t>( v & 0xff );
+        mac_input[ 11 ] = ( data.size() >> 8 ) & 0xff;
+        mac_input[ 12 ] = data.size() & 0xff;
+        std::copy( data.begin(), data.end(), mac_input.begin() + 13 );
+        unsigned int len = 0;
+        std::vector<uint8_t> mac( EVP_MD_size( EVP_sha1() ) );
+        HMAC( EVP_sha1(), mac_key.data(), mac_key.size(), mac_input.data(), mac_input.size(), mac.data(), &len );
+        mac.resize( len );
+        return mac;
+    }
+
+    // =============
+    //  Verify HMAC 
+    // =============
+
+    void verify_hmac( const std::vector<uint8_t>& mac_key, const uint64_t seq_num, 
+                      const tls_content_type content_type, const tls_version version,
+                      const std::vector<uint8_t>& plain_text_with_mac ) {
+        const std::size_t mac_len = 20;
+        auto unpadded = pkcs7_unpad( plain_text_with_mac );
+        std::vector<uint8_t> plain_text( unpadded.begin(), unpadded.end() - mac_len );
+        std::vector<uint8_t> recieved_mac( unpadded.end() - mac_len, unpadded.end() );
+        auto expected_mac = compute_hmac( mac_key, seq_num, content_type, version, plain_text );
+        if ( !std::equal( expected_mac.begin(), expected_mac.end(), recieved_mac.begin() ) ) {
+            throw std::runtime_error( "HMAC verification failed" );
+        } 
+    }
+
+    // ============
+    //  Strip HMAC 
+    // ============
+
+    std::vector<uint8_t> strip_hmac( const std::vector<uint8_t>& padded_plain_text ) {
+        auto unpadded = pkcs7_unpad( padded_plain_text );
+        return std::vector<uint8_t>( unpadded.begin(), unpadded.end() - 20 );
+    }
+
     // ===================
     //  HKDF Expand Label 
     // ===================
@@ -749,12 +823,26 @@ namespace ntk {
     // ===================
 
     tls_key_material derive_tls_key_iv( const std::vector<uint8_t>& secret, const EVP_MD* hash_func,
-                                        size_t key_len, size_t iv_len ) {
+                                        std::size_t key_len, std::size_t iv_len ) {
         tls_key_material km;
         std::vector<uint8_t> context; 
         km.key = hkdf_expand_label( secret, "key", context, key_len, hash_func );
         km.iv = hkdf_expand_label( secret, "iv",  context, iv_len,  hash_func );
         return km;
+    }
+
+    // =======================
+    //  Derive TLS Key IV Mac
+    // =======================
+
+    tls_key_block derive_tls_key_iv_mac( const std::vector<uint8_t>& secret, const EVP_MD* hash_func,
+                                         std::size_t key_len, std::size_t iv_len, std::size_t mac_len ) {
+        tls_key_block kb;
+        std::vector<uint8_t> context; 
+        kb.key = hkdf_expand_label( secret, "key", context, key_len, hash_func );
+        kb.iv = hkdf_expand_label( secret, "iv", context, iv_len, hash_func );
+        kb.mac_key = hkdf_expand_label( secret, "mac", context, mac_len, hash_func );
+        return kb;
     }
 
     // =====================
@@ -804,13 +892,30 @@ namespace ntk {
     }
 
     // =================
+    //  Decrypt AES-CBC 
+    // =================
+
+    std::vector<uint8_t> decrypt_aes_cbc( const std::vector<uint8_t>& key, const std::vector<uint8_t>& iv,
+                                          const std::vector<uint8_t>& cipher_text, const EVP_CIPHER* cipher ) {
+        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+        EVP_DecryptInit_ex( ctx, cipher, nullptr, key.data(), iv.data() );
+        EVP_CIPHER_CTX_set_padding( ctx, 0 );
+        std::vector<uint8_t> plain_text( cipher_text.size() );
+        int out_len_1 = 0;
+        EVP_DecryptUpdate( ctx, plain_text.data(), &out_len_1, cipher_text.data(), cipher_text.size() );
+        int out_len_2 = 0;
+        EVP_DecryptFinal_ex( ctx, plain_text.data() + out_len_1, &out_len_2 );
+        plain_text.resize( out_len_1 + out_len_2 );
+        EVP_CIPHER_CTX_free( ctx );
+        return plain_text;
+    }
+
+    // =================
     //  Encrypt AES-GCM 
     // =================
 
-    std::vector<uint8_t> encrypt_aes_gcm( const std::vector<uint8_t>& key,
-                                          const std::vector<uint8_t>& nonce,
-                                          const std::vector<uint8_t>& aad,
-                                          const std::vector<uint8_t>& plain_text,
+    std::vector<uint8_t> encrypt_aes_gcm( const std::vector<uint8_t>& key, const std::vector<uint8_t>& nonce,
+                                          const std::vector<uint8_t>& aad, const std::vector<uint8_t>& plain_text,
                                           const EVP_CIPHER* cipher ) {
         constexpr std::size_t tag_length = 16;
         std::vector<uint8_t> cipher_text_with_tag( plain_text.size() + tag_length );
@@ -818,18 +923,42 @@ namespace ntk {
         EVP_EncryptInit_ex( ctx, cipher, nullptr, nullptr, nullptr );
         EVP_CIPHER_CTX_ctrl( ctx, EVP_CTRL_GCM_SET_IVLEN, nonce.size(), nullptr );
         EVP_EncryptInit_ex( ctx, nullptr, nullptr, key.data(), nonce.data() );
-
         int len = 0;
         EVP_EncryptUpdate( ctx, nullptr, &len, aad.data(), aad.size() );
-        
         int out_len = 0;
         EVP_EncryptUpdate( ctx, cipher_text_with_tag.data(), &out_len, plain_text.data(), plain_text.size() );
-        
         int final_len = 0;
         EVP_EncryptFinal_ex( ctx, nullptr, &final_len );
         EVP_CIPHER_CTX_ctrl( ctx, EVP_CTRL_GCM_GET_TAG, tag_length, cipher_text_with_tag.data() + plain_text.size() );
         EVP_CIPHER_CTX_free( ctx );
         return cipher_text_with_tag;
+    }
+
+    // =================
+    //  Encrypt AES-CBC 
+    // =================
+
+    std::vector<uint8_t> encrypt_aes_cbc( const tls_key_block& key_block,
+                                          const uint64_t seq_num,
+                                          const tls_content_type content_type,
+                                          const tls_version version,
+                                          const std::vector<uint8_t>& plain_text,
+                                          const EVP_CIPHER* cipher ) {
+        auto mac = compute_hmac( key_block.mac_key, seq_num, content_type, version, plain_text );
+        std::vector<uint8_t> plain_text_with_mac( plain_text );
+        plain_text_with_mac.insert( plain_text_with_mac.end(), mac.begin(), mac.end() );
+        std::vector<uint8_t> padded_plain_text = pkcs7_pad( plain_text_with_mac, 16 );
+        std::vector<uint8_t> cipher_text( padded_plain_text.size() );
+        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+        EVP_EncryptInit_ex( ctx, cipher, nullptr, key_block.key.data(), key_block.iv.data() );
+        int out_len_1 = 0;
+        EVP_CIPHER_CTX_set_padding( ctx, 0 );
+        EVP_EncryptUpdate( ctx, cipher_text.data(), &out_len_1, padded_plain_text.data(), padded_plain_text.size() );
+        int out_len_2 = 0;
+        EVP_EncryptFinal_ex( ctx, cipher_text.data() + out_len_1, &out_len_2 );
+        cipher_text.resize( out_len_1 + out_len_2 );
+        EVP_CIPHER_CTX_free( ctx );
+        return cipher_text;
     }
 
     // ===================
@@ -928,16 +1057,28 @@ namespace ntk {
                 cipher = EVP_chacha20_poly1305();
                 key_len = 32;
                 break;
+            case cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA:
+                hash_fn = EVP_sha1();  
+                cipher = EVP_aes_128_cbc();
+                key_len = 16;
+                break;
             default:
                 throw std::runtime_error( "Unsupported cipher suite" );
         }
         auto secret = get_traffic_secret( session_keys, client_random, secret_label );
-        auto key_material = derive_tls_key_iv( secret, hash_fn, key_len, 12 );
-        auto nonce = build_tls13_nonce( key_material.iv, seq_num );
-        auto aad = build_tls13_aad( record.content_type, record.version, record.payload.size() );
-        auto decrypted_payload = decrypt_aes_gcm( key_material.key, nonce, aad, record.payload, cipher );
-        tls_record result { record.content_type, record.version, decrypted_payload };
-        return result;
+        if ( suite == cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA ) {
+            auto key_block = derive_tls_key_iv_mac( secret, hash_fn, key_len, 16, 20 ); 
+            auto decrypted_payload = decrypt_aes_cbc( key_block.key, key_block.iv, record.payload, cipher );
+            verify_hmac( key_block.mac_key, seq_num, record.content_type, record.version, decrypted_payload );
+            auto stripped_payload = strip_hmac( decrypted_payload );
+            return { record.content_type, record.version, stripped_payload };
+        } else {
+            auto key_material = derive_tls_key_iv( secret, hash_fn, key_len, 12 );
+            auto nonce = build_tls13_nonce( key_material.iv, seq_num );
+            auto aad = build_tls13_aad( record.content_type, record.version, record.payload.size() );
+            auto decrypted_payload = decrypt_aes_gcm( key_material.key, nonce, aad, record.payload, cipher );
+            return { record.content_type, record.version, decrypted_payload };
+        }
     }
 
     // ================
@@ -975,21 +1116,28 @@ namespace ntk {
                 cipher = EVP_chacha20_poly1305();
                 key_len = 32;
                 break;
+            case cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA:
+                hash_fn = EVP_sha1();  
+                cipher = EVP_aes_128_cbc();
+                key_len = 16;
+                break;
             default:
                 throw std::runtime_error( "Unsupported cipher suite" );
         }
         auto secret = get_traffic_secret( session_keys, client_random, secret_label );
+        if (suite == cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA) {
+            auto key_block = derive_tls_key_iv_mac( secret, hash_fn, key_len, 16, 20 );
+            auto cipher_text = encrypt_aes_cbc( key_block, seq_num, record.content_type,
+                                                record.version, record.payload, cipher );
+            return { record.content_type, record.version, cipher_text };
+        }
         auto key_material = derive_tls_key_iv( secret, hash_fn, key_len, 12 );
         std::vector<uint8_t> plain_text = record.payload;
         auto nonce = build_tls13_nonce( key_material.iv, seq_num );
         std::size_t expected_cipher_len = plain_text.size() + tag_length;
         auto aad = build_tls13_aad( record.content_type, record.version, static_cast<uint16_t>( expected_cipher_len ) );
         auto cipher_text_with_tag = encrypt_aes_gcm( key_material.key, nonce, aad, plain_text, cipher );
-        return tls_record {
-            record.content_type,
-            record.version,
-            cipher_text_with_tag
-        };
+        return { record.content_type, record.version, cipher_text_with_tag };
     }
 
     // =====================
