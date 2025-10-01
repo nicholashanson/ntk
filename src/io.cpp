@@ -2,23 +2,24 @@
 
 namespace ntk {
 
+    // ========================
+    //  Read Packets From File
+    // ========================
+
     session read_packets_from_file( const std::string& packet_data_file ) {
         std::vector<std::vector<uint8_t>> packets;
         std::ifstream file_handle( packet_data_file );
-
         if ( !file_handle.is_open() ) {
             std::cerr << "Failed to open file: " << packet_data_file << '\n';
             return packets;
         }
-
         std::string line;
         while ( std::getline( file_handle, line ) ) {
             std::vector<uint8_t> packet;
             std::istringstream iss( line );
             std::string byte_string;
-
             while ( iss >> byte_string ) {
-                uint8_t byte = static_cast<uint8_t>( std::stoul( byte_string, nullptr, 16 ) );
+                const uint8_t byte = static_cast<uint8_t>( std::stoul( byte_string, nullptr, 16 ) );
                 packet.push_back( byte );
             }
 
@@ -26,9 +27,12 @@ namespace ntk {
                 packets.push_back( packet );
             }
         }
-
         return packets;
     }
+
+    // ==============
+    //  Print Vector
+    // ==============
 
     void print_vector( const std::vector<uint8_t>& data ) {
         for ( auto byte : data ) {
@@ -37,6 +41,10 @@ namespace ntk {
         std::cout << std::dec << std::endl;
     }
 
+    // ====================
+    //  Print Packet Array
+    // ====================
+
     void print_packet_array( const unsigned char* packet_data, const size_t packet_len ) {
         for ( size_t i = 0; i < packet_len; ++i ) {
             std::cout << std::hex << std::setw( 2 ) << std::setfill( '0' ) << static_cast<int>( packet_data[ i ] ) << " ";
@@ -44,12 +52,20 @@ namespace ntk {
         std::cout << std::dec << std::endl;
     }
 
-    void print_tcp_stream_info(const std::map<uint32_t, std::vector<uint8_t>>& stream ) {
-        for (const auto& [seq_num, data] : stream) {
+    // =======================
+    //  Print TCP Stream Info
+    // =======================
+
+    void print_tcp_stream_info( const std::map<uint32_t, std::vector<uint8_t>>& stream ) {
+        for ( const auto& [ seq_num, data ] : stream ) {
             std::cout << "Seq: " << seq_num 
                       << ", Size: " << data.size() << " bytes\n";
         }
     }
+
+    // ===================
+    //  Print TCP Options
+    // ===================
 
     void print_tcp_options( const tcp_header& header ) {
         for ( const auto& opt : header.options ) {
@@ -60,71 +76,74 @@ namespace ntk {
             std::cout << std::dec << std::endl;  
         }
     }
+
+    // ================
+    //  Parse Hex Line
+    // ================
     
     std::vector<uint8_t> parse_hex_line( const std::string& line ) {     
         std::vector<uint8_t> bytes;
-        std::istringstream iss(line);
+        std::istringstream iss( line );
         std::string byte_str;
-
         while ( iss >> byte_str ) {
             uint8_t byte = static_cast<uint8_t>( std::stoul( byte_str, nullptr, 16 ) );
             bytes.push_back( byte );
         }
-
         return bytes;
     }
+
+    // ====================
+    //  Index Line Offsets
+    // ====================
 
     std::vector<std::streampos> index_line_offsets( const std::string& filename ) {
         std::ifstream file( filename );
         std::vector<std::streampos> offsets;
-
         if ( !file.is_open() ) {
             std::cerr << "Failed to open file: " << filename << '\n';
             return offsets;
         }
-
         std::string line;
         while ( file ) {
             offsets.push_back( file.tellg() );
             std::getline( file, line );
         }
-
         return offsets;
     }
 
+    // =============================
+    //  Get Packets By Line Numbers 
+    // =============================
+
     std::vector<std::vector<uint8_t>> get_packets_by_line_numbers( const std::string& filename,
                                                                    const std::vector<int>& line_numbers ) {
-    
         std::ifstream file( filename );
         std::vector<std::vector<uint8_t>> packets;
-
         if ( !file.is_open() ) {
             std::cerr << "Failed to open file: " << filename << '\n';
             return packets;
         }
-
         auto offsets = index_line_offsets( filename );
-
         for ( int line_num : line_numbers ) {
-            if ( line_num <= 0 || line_num > static_cast<int>( offsets.size() ) )
+            if ( line_num <= 0 || line_num > static_cast<int>( offsets.size() ) ) {
                 continue;
-
+            }
             file.clear(); 
             file.seekg( offsets[ line_num - 1 ] );
-
             std::string line;
             std::getline( file, line );
             packets.push_back( parse_hex_line( line ) );
         }
-
         return packets;
     }
 
+    // ==================
+    //  Print TCP Option
+    // ==================
+
     void print_tcp_option( const tcp_option& opt, std::ostream& os ) {
-        
         os << "    Option[" << static_cast<int>( opt.type )
            << "]: Type: " << static_cast<int>( opt.type ) << ", Data: [";
-
         for ( size_t i = 0; i < opt.option.size(); ++i ) {
             os << std::hex << std::setw( 2 ) << std::setfill( '0' )
                << static_cast<int>( opt.option[ i ] );
@@ -134,8 +153,11 @@ namespace ntk {
         os << std::dec << std::setfill( ' ' ) << "]\n";
     }
 
-    void print_tcp_header( const tcp_header& header, std::ostream& os ) {
+    // ==================
+    //  Print TCP Header
+    // ==================
 
+    void print_tcp_header( const tcp_header& header, std::ostream& os ) {
         const int label_width = 26;
         os << std::dec << std::setfill( ' ' );
         os << "===== TCP HEADER BEGIN =====\n";
@@ -171,54 +193,86 @@ namespace ntk {
         os << "===== TCP HEADER END =====\n\n";
     }
 
-    void print_tcp_header( const std::vector<uint8_t>& packet, std::ostream& os ) {
-        tcp_header packet_tcp_header = get_parsed_tcp_header( packet );
-        print_tcp_header( packet_tcp_header, os );
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    void print_tcp_header( std::span<const uint8_t> packet, std::ostream& os ) {
+        auto result = get_parsed_tcp_header_from_ethernet( packet );
+        if ( !result ) {
+            os << result.error() << "\n";
+        }
+        print_tcp_header( result.value(), os );
     }
+
+    // ================================
+    //  TCP Live Stream :: Operator <<
+    // ================================
 
     std::ostream& operator<<( std::ostream& os, const tcp_live_stream& live_stream ) {
         os << "===== SYN HEADER BEGIN =====\n";
-        print_tcp_header( get_parsed_tcp_header( live_stream.m_handshake_feed.m_handshake.syn ), os );
+        print_tcp_header( live_stream.m_handshake_feed.m_handshake.syn, os );
         os << "===== SYN HEADER END =====\n";
         os << "===== SYN-ACK HEADER BEGIN =====\n";
-        print_tcp_header( get_parsed_tcp_header( live_stream.m_handshake_feed.m_handshake.syn_ack ), os );
+        print_tcp_header( live_stream.m_handshake_feed.m_handshake.syn_ack, os );
         os << "===== SYN-ACK HEADER END =====\n";
         os << "===== ACK HEADER BEGIN =====\n";
-        print_tcp_header( get_parsed_tcp_header( live_stream.m_handshake_feed.m_handshake.ack ), os );
+        print_tcp_header( live_stream.m_handshake_feed.m_handshake.ack, os );
         os << "===== ACK HEADER END =====\n";
 
         auto& closing_sequence = std::get<fin_ack_fin_ack>( live_stream.m_termination_feed.m_termination.closing_sequence );
 
         os << "===== FIN_1 HEADER BEGIN =====\n";
-        print_tcp_header( get_parsed_tcp_header( closing_sequence.initiator_fin ), os );
+        print_tcp_header( closing_sequence.initiator_fin, os );
         os << "===== FIN_1 HEADER END =====\n";
         os << "===== ACK_1 HEADER BEGIN =====\n";
-        print_tcp_header( get_parsed_tcp_header( closing_sequence.responder_ack ), os );
+        print_tcp_header( closing_sequence.responder_ack, os );
         os << "===== ACK_1 HEADER END =====\n";
         os << "===== FIN_2 HEADER BEGIN =====\n";
-        print_tcp_header( get_parsed_tcp_header( closing_sequence.responder_fin ), os );
+        print_tcp_header( closing_sequence.responder_fin, os );
         os << "===== FIN_2 HEADER END =====\n";
         os << "===== ACK_2 HEADER BEGIN =====\n";
-        print_tcp_header( get_parsed_tcp_header( closing_sequence.initiator_ack ), os );
+        print_tcp_header( closing_sequence.initiator_ack, os );
         os << "===== ACK_2 HEADER END =====\n";
 
         return os;
     }
 
+    // ====================
+    //  Print Client Hello
+    // ====================
+
     void print_client_hello( const client_hello& c_hello, std::ostream& os ) {
         const int label_width = 26;
-        
+
         auto print_field = [&]( const std::string& label, auto value ) {
             os << std::left << std::setw( label_width ) << label << value << "\n";
         };
 
         os << std::dec << std::setfill( ' ' );
         os << "===== CLIENT HELLO BEGIN =====\n";
-        print_field( "Session ID:", session_id_to_hex( c_hello.session_id ) );
-        print_field( "Client Version:", static_cast<uint16_t>( c_hello.client_version ) );
-        print_field( "Client Random:", client_random_to_hex( c_hello.random ) );
+        print_field("Session ID:", session_id_to_hex( c_hello.session_id ) );
+        print_field("Client Version:", tls_version_names.at( c_hello.client_version ) );
+        print_field("Client Random:", client_random_to_hex( c_hello.random ) );
+        os << std::left << std::setw( label_width ) << "Cipher-Suites:";
+        for ( std::size_t i = 0; i + 1 < c_hello.cipher_suites.size(); i += 2 ) {
+            uint16_t val = ( static_cast<uint16_t>( c_hello.cipher_suites[ i ] ) << 8 ) |
+                             c_hello.cipher_suites[ i + 1 ];
+            cipher_suite suite = static_cast<cipher_suite>( val );
+            if ( i != 0 ) {
+                os << std::setw( label_width ) << " ";
+            }
+            auto it = tls_cipher_suite_names.find( suite );
+            if ( it != tls_cipher_suite_names.end() ) {
+                os << it->second;
+            } else {
+                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << val << std::dec;
+            }
+            os << "\n";
+        }
         os << "===== CLIENT HELLO END =====\n\n";
-    } 
+    }
+
+    // ====================
+    //  Print Server Hello
+    // ====================
 
     void print_server_hello( const server_hello& s_hello, std::ostream& os ) {
         const int label_width = 26;
@@ -230,15 +284,24 @@ namespace ntk {
         os << std::dec << std::setfill( ' ' );
         os << "===== SERVER HELLO BEGIN =====\n";
         print_field( "Server Random:", client_random_to_hex( s_hello.random ) );
+        print_field( "TLS Version:", tls_version_names.at( s_hello.server_version ) );
         print_field( "Cipher Suite:", tls_cipher_suite_names.at( static_cast<cipher_suite>( s_hello.cipher_suite ) ) );
         os << "===== SERVER HELLO END =====\n\n";
     } 
+
+    // ================================
+    //  TLS Live Stream :: Operator <<
+    // ================================
 
     std::ostream& operator<<( std::ostream& os, const tls_live_stream& live_stream ) {
         print_client_hello( live_stream.m_client_hello, os );
         print_server_hello( live_stream.m_server_hello, os );
         return os;
     }
+
+    // ============
+    //  Print Four
+    // ============
 
     void print_four( const four_tuple& four, std::ostream& os ) {
         const int label_width = 26;
@@ -249,12 +312,16 @@ namespace ntk {
 
         os << std::dec << std::setfill( ' ' );
         os << "===== FOUR TUPLE BEGIN =====\n";
-        print_field( "Client IP:", four.client_ip );
-        print_field( "Server IP:", four.server_ip );
-        print_field( "Client Port:", four.client_port );
-        print_field( "Server Port:", four.server_port );
+        print_field( "Client IP:", four.src_ip );
+        print_field( "Server IP:", four.dest_ip );
+        print_field( "Client Port:", four.src_port );
+        print_field( "Server Port:", four.dest_port );
         os << "===== FOUR TUPLE END =====\n\n";
     }
+
+    // ===============
+    //  Output Packet
+    // ===============
 
     void output_packet( const std::vector<uint8_t> packet, std::ofstream& ofs ) {
         for ( size_t i = 0; i < packet.size(); ++i ) {
@@ -265,6 +332,10 @@ namespace ntk {
         }
         ofs << '\n';
     };
+
+    // =======================
+    //  Output Stream To File
+    // =======================
 
     void output_stream_to_file( const std::string& filename, const tcp_live_stream& live_stream ) {
         std::ofstream ofs( filename );
@@ -283,7 +354,6 @@ namespace ntk {
         };
 
         const auto& handshake = live_stream.m_handshake_feed.m_handshake;
-
         std::vector<std::vector<uint8_t>> handshake_packets = { handshake.syn, handshake.syn_ack, handshake.ack };
         for ( const auto& packet : handshake_packets ) {
             print_packet( packet );
@@ -299,6 +369,10 @@ namespace ntk {
         }
     }
 
+    // ==================
+    //  Print TLS Record
+    // ==================
+
     void print_tls_record( const tls_record& record ) {
         const int label_width = 26;
 
@@ -309,9 +383,14 @@ namespace ntk {
         std::cout << std::dec << std::setfill( ' ' );
         std::cout << "===== TLS RECORD BEGIN =====\n";
         print_field( "Content Type:", tls_content_type_names.at( record.content_type ) );
-        print_field( "Version:", static_cast<uint16_t>( record.version ) );
+        print_field( "Version:", tls_version_names.at( record.version ) );
+        print_vector( record.payload );
         std::cout << "===== TLS RECORD END =====\n\n";
     }
+
+    // ===================
+    //  Print TLS Secrets
+    // ===================
 
     void print_tls_secrets( const secrets& keys ) {
         const int label_width = 40;
@@ -321,7 +400,6 @@ namespace ntk {
         };
 
         std::cout << std::dec << std::setfill( ' ' );
-
         for ( auto [ client_random, secret ] : keys ) {
             std::cout << "===== TLS SECRETS BEGIN "
                       << client_random
@@ -333,12 +411,20 @@ namespace ntk {
         }
     }
 
+    // ================
+    //  Four To String
+    // ================
+
     std::string four_to_string( const four_tuple& four ) {
-        return ip_to_string( four.client_ip ) + "_" +
-               std::to_string( four.client_port ) + "_" +
-               ip_to_string( four.server_ip ) + "_" +
-               std::to_string( four.server_port) ;
+        return ip_to_string( four.src_ip ) + "_" +
+               std::to_string( four.src_port ) + "_" +
+               ip_to_string( four.dest_ip ) + "_" +
+               std::to_string( four.dest_port) ;
     }
+
+    // ====================
+    //  Print HTTP Request
+    // ====================
 
     void print_http_request( const http_request& request, std::ostream& os ) {
         const int label_width = 20;
@@ -358,6 +444,10 @@ namespace ntk {
         os << "===== HTTP REQUEST END =====\n\n";
     }
 
+    // =====================
+    //  Print HTTP Response
+    // =====================
+
     void print_http_response( const http_response& response, std::ostream& os ) {
         const int label_width = 40;
         os << std::left << std::setfill(' ');
@@ -373,10 +463,13 @@ namespace ntk {
                 os << std::left << std::setw( label_width ) << ( key + ":" ) << value << "\n";
             }
         }
-
         os << std::left << std::setw( label_width ) << "Payload_Length: " << response.body.size() << "\n";
         os << "===== HTTP RESPONSE END =====\n\n";
     };
+
+    // =======================
+    //  Write Payload To File
+    // =======================
 
     void write_payload_to_file( const std::vector<uint8_t>& payload, const std::string& filename ) {
         std::ofstream out( filename, std::ios::binary );
@@ -384,6 +477,29 @@ namespace ntk {
             throw std::runtime_error( "Failed to open file for writing: " + filename );
         }
         out.write( reinterpret_cast<const char*>( payload.data() ), payload.size() );
+    }
+
+    // =======================
+    //  Print TCP Termination
+    // =======================
+
+    void print_tcp_termination( const tcp_termination& termination ) {
+        if ( std::holds_alternative<ntk::fin_ack_fin_ack>( termination.closing_sequence ) ) {
+            for ( auto& packet : std::get<ntk::fin_ack_fin_ack>( termination.closing_sequence ) ) {
+                auto header_result = get_parsed_tcp_header_from_ethernet( packet );
+                if ( !header_result ) {
+                    std::cout << header_result.error() << std::endl;
+                }
+                print_tcp_header( header_result.value() );
+            } 
+        } else {
+            auto& reset = std::get<ntk::rst>( termination.closing_sequence );
+            auto header_result = get_parsed_tcp_header_from_ethernet( reset );
+            if ( !header_result ) {
+                std::cout << header_result.error() << std::endl;
+            } 
+            print_tcp_header( header_result.value() );
+        }
     }
 
 } // namespace ntk

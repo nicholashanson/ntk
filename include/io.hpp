@@ -18,9 +18,9 @@
 
 namespace ntk {
 
-    // ==============================
-    //          Helpers
-    // ==============================
+    // =================
+    //  Parese Hex Line
+    // =================
 
     std::vector<uint8_t> parse_hex_line( const std::string& line );
 
@@ -35,15 +35,27 @@ namespace ntk {
         return true;
     }
 
+    // ================
+    //  Four To String
+    // ================
+
     std::string four_to_string( const four_tuple& four );
 
-    // ==============================
-    //          Print Arrays
-    // ==============================
+    // ==============
+    //  Print Vector
+    // ==============
 
     void print_vector( const std::vector<uint8_t>& data );
 
-    void print_packet_array( const unsigned char* packet_data, const size_t packet_len );
+    // ====================
+    //  Print Packet Array
+    // ====================
+
+    void print_packet_array( const unsigned char* packet_data, const std::size_t packet_len );
+
+    // =============
+    //  Print Array
+    // =============
 
     template<size_t n>
     void print_array( const std::array<uint8_t,n>& data ) {
@@ -53,16 +65,18 @@ namespace ntk {
         std::cout << std::dec << std::endl;
     }
 
-    // ==============================
-    //          File Input
-    // ==============================
+    // ========================
+    //  Read Packets From File
+    // ========================
 
-    // read in a series of packets from a file that was made using packet-capture
     session read_packets_from_file( const std::string& packet_data_file );
+
+    // ==================
+    //  Get Line Numbers
+    // ==================
 
     template<typename Filter>
     std::vector<int> get_line_numbers( const std::string& filename, Filter&& filter ) {
-
         std::ifstream file( filename );
         std::vector<int> line_numbers;
 
@@ -81,16 +95,19 @@ namespace ntk {
                 line_numbers.push_back( line_number );
             }
         }
-
         return line_numbers;
     }
+
+    // =============================
+    //  Get Packets By Line Numbers
+    // =============================
 
     std::vector<std::vector<uint8_t>> get_packets_by_line_numbers( const std::string& filename,
                                                                    const std::vector<int>& line_numbers );
 
-    // ==============================
-    //          File Output
-    // ==============================
+    // =============
+    //  File Output
+    // =============
 
     void output_stream_to_file( const std::string& filename, const tcp_live_stream& live_stream );
 
@@ -98,23 +115,23 @@ namespace ntk {
 
     void write_payload_to_file( const std::vector<uint8_t>& payload, const std::string& filename );
 
-    // ==============================
-    //          Print TCP
-    // ==============================
+    // ===========
+    //  Print TCP
+    // ===========
 
     void print_four( const four_tuple& four, std::ostream& os = std::cout );
 
     void print_tcp_header( const tcp_header& header, std::ostream& os = std::cout ); 
 
-    void print_tcp_header( const std::vector<uint8_t>& packet, std::ostream& os = std::cout );
+    void print_tcp_header( std::span<const uint8_t> packet, std::ostream& os = std::cout );
 
-    void print_tcp_stream_info(const std::map<uint32_t, std::vector<uint8_t>>& stream );
+    void print_tcp_stream_info( const std::map<uint32_t, std::vector<uint8_t>>& stream );
 
     void print_tcp_options( const tcp_header& header );
 
-    // ==============================
-    //          Print TLS
-    // ==============================
+    // ===========
+    //  Print TLS
+    // ===========
 
     void print_tls_record( const tls_record& record );
 
@@ -124,13 +141,15 @@ namespace ntk {
 
     void print_server_hello( const server_hello& s_hello, std::ostream& os = std::cout );
 
-    // ==============================
-    //          Print HTTP
-    // ==============================
+    // ============
+    //  Print HTTP
+    // ============
 
     void print_http_request( const http_request& request, std::ostream& os = std::cout ); 
 
     void print_http_response( const http_response& response, std::ostream& os = std::cout );
+
+    void print_tcp_termination( const tcp_termination& termination ); 
 
 } // namespace ntk
 
