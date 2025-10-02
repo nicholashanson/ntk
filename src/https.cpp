@@ -254,4 +254,99 @@ namespace ntk {
 		return h.m_files_written;
 	}
 
-} // namespace ntk
+	// ==================================
+    //  HTTPS Decryption Context :: Feed
+    // ==================================
+
+    std::expected<bool,std::string> https_decryption_context::feed( std::span<const uint8_t> packet ) {
+    	auto feed_result = tls_decryption_context::feed( packet );
+    	if ( !feed_result ) {
+    		return std::unexpected( feed_result.error() );
+    	}
+    	while ( !m_task_queue.empty() ) {
+    		auto task = std::move( m_task_queue.front() );
+    		m_task_queue.pop();
+    		if ( !m_incomplete_request_response ) {
+    			auto decrypted_record = handle_decryption_task( task ); 
+    			decrypted_record.payload.pop_back();
+    			if ( is_http_response( decrypted_record.payload ) ) {
+    				auto parse_result = get_http_response( decrypted_record.payload );
+    				if ( !parse_result ) {
+    					return std::unexpected( "Failed to parse response" );
+    				}
+    				auto split_result = split_http_payload( decrypted_record.payload );
+    				auto split_http_message = *split_result;
+					auto headers = parse_http_headers( split_http_message.headers );
+					if ( headers[ "Content-Type" ] == "application/vnd.apple.mpegurl" ) {
+						continue;
+					}
+					auto it = headers.find( "Content-Length" );
+					if ( it != headers.end() ) {
+						m_incomplete_request_response->response->content_length = static_cast<std::size_t>( std::stoull( it->second) );
+						m_expected_bytes = m_incomplete_request_response->response->content_length.value();
+					}
+					
+    				m_incomplete_request_response.emplace();
+    				m_incomplete_request_response->response.emplace();
+    				m_incomplete_request_response->response->body = parse_result.value().body;
+    				m_recieved_bytes = m_incomplete_request_response->response->body.size();
+    				continue;
+    			}
+    		}
+    		else {
+    			m_recieved_bytes += task.record.payload.size() - 16 /* tag bytes */ - 1;
+    			decrypt_record_asynchronously( std::move( task ) );
+    			if ( m_recieved_bytes == m_expected_bytes ) {
+    				wait_for_all();
+    				finalize_response();
+    				m_expected_bytes = 0;
+    				m_recieved_bytes = 0;
+    				return true;	
+    			}
+    		}
+    	}
+    	return feed_result.value();
+    }
+
+    // ===============================================
+    //  HTTPS Decryption Context :: Finalize Response
+    // ===============================================
+
+    void https_decryption_context::finalize_response() {
+    	for ( auto& [ seq, record ] : m_decrypted_records ) {
+        	auto& payload = record.payload;
+        	payload.pop_back();
+        	m_incomplete_request_response->response->body.insert(
+            	m_incomplete_request_response->response->body.end(),
+            	payload.begin(),
+            	payload.end()
+        	);
+    	}
+    	m_decrypted_records.clear();
+	}
+
+	// ==========================================================================
+    //  HTTPS Decryption Context Friend Helper :: Get Incomplete Request Respone
+    // ==========================================================================
+
+    std::optional<incomplete_request_response> https_decryption_context_friend_helper::get_incomplete_request_response( const https_decryption_context& h ) {
+    	return h.m_incomplete_request_response;
+    }
+
+    // ==============================================================
+    //  HTTPS Decryption Context Friend Helper :: Get Expected Bytes
+    // ==============================================================
+
+    std::size_t https_decryption_context_friend_helper::get_expected_bytes( const https_decryption_context& h ) {
+    	return h.m_expected_bytes;
+    }
+
+    // ==============================================================
+    //  HTTPS Decryption Context Friend Helper :: Get Recieved Bytes
+    // ==============================================================
+
+    std::size_t https_decryption_context_friend_helper::get_recieved_bytes( const https_decryption_context& h ) {
+    	return h.m_recieved_bytes;
+    }
+
+} // namespace ntk>

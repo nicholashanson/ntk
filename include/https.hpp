@@ -86,6 +86,36 @@ namespace ntk {
             static std::optional<std::vector<std::string>> files_written( const https_live_stream_session& h );
     };
 
+    // ==========================
+    //  HTTPS Decryption Context
+    // ==========================
+
+    class https_decryption_context : public tls_decryption_context {
+        public:
+            https_decryption_context( const four_tuple& four, std::string ssl_keys_log )
+                : tls_decryption_context( four, ssl_keys_log ),
+                  m_expected_bytes( 0 ), 
+                  m_recieved_bytes( 0 ) {}
+            std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
+        private:
+            void finalize_response();
+            std::optional<incomplete_request_response> m_incomplete_request_response;
+            std::size_t m_expected_bytes;
+            std::size_t m_recieved_bytes;
+            friend class https_decryption_context_friend_helper;
+    };
+
+    // ========================================
+    //  HTTPS Decryption Context Friend Helper
+    // ========================================
+
+    class https_decryption_context_friend_helper {
+        public:
+            static std::optional<incomplete_request_response> get_incomplete_request_response( const https_decryption_context& h );
+            static std::size_t get_expected_bytes( const https_decryption_context& h );
+            static std::size_t get_recieved_bytes( const https_decryption_context& h );
+    };
+
 } // namespace ntk
 
-#endif // HTTPS_HPP/
+#endif // HTTPS_HPP
