@@ -1255,7 +1255,7 @@ namespace ntk {
         return std::unexpected( "No Sever Name found" );
     }
 
-     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     std::expected<std::string,std::string> get_sni( const std::vector<uint8_t>& hello ) {
         auto client_hello_result = get_client_hello_from_ethernet_frame( hello );
         if ( !client_hello_result ) {
@@ -1418,7 +1418,7 @@ namespace ntk {
             return tcp_live_stream::feed( packet );
         }
         if ( !m_client_hello_populated ) {
-            auto is_client_hello_result = ntk::is_client_hello( packet );
+            auto is_client_hello_result = is_client_hello( packet );
             if ( !is_client_hello_result ) {
                 return std::unexpected( is_client_hello_result.error() );
             }
@@ -1993,4 +1993,322 @@ namespace ntk {
         return get_tls_record_header( record_header_bytes );
     }
 
+    // =================================================
+    //  TLS Decryption Context :: Populate Client Hello
+    // =================================================
+
+    bool tls_decryption_context::populate_client_hello( std::span<const uint8_t> packet ) {
+        auto parse_result = get_client_hello_from_ethernet_frame( packet );
+        if ( !parse_result ) {
+            return false;
+        }
+        m_handshake.c_hello = parse_result.value();
+        return true;
+    }
+
+    // =================================================
+    //  TLS Decryption Context :: Populate Server Hello
+    // =================================================
+
+    bool tls_decryption_context::populate_server_hello( std::span<const uint8_t> packet ) {
+        auto parse_result = get_server_hello_from_ethernet( packet );
+        if ( !parse_result ) {
+            return false;
+        }
+        m_handshake.s_hello = parse_result.value();
+        return true;
+    } 
+
+    // ================================
+    //  TLS Decryption Context :: Feed
+    // ================================
+
+    std::expected<bool,std::string> tls_decryption_context::feed( std::span<const uint8_t> packet ) {
+        auto feed_result = feed_packet( packet );
+        if ( !feed_result ) {
+            return std::unexpected( feed_result.error() );
+        }
+        return feed_result.value();
+    }
+
+    // =======================================
+    //  TLS Decryption Context :: Feed Packet
+    // =======================================
+
+    std::expected<bool,std::string> tls_decryption_context::feed_packet( std::span<const uint8_t> packet ) {
+        if ( !m_handshake_feed.m_complete ) { 
+            return tcp_live_stream::feed( packet );
+        }
+        if ( !m_handshake.is_complete() ) {
+            if ( !m_handshake.c_hello ) {
+                auto is_client_hello_result = is_client_hello( packet );
+                if ( !is_client_hello_result ) {
+                    return std::unexpected( is_client_hello_result.error() );
+                }
+                if ( is_client_hello_result.value() ) { 
+                    return populate_client_hello( packet ); 
+                }
+            }
+            if ( !m_handshake.s_hello ) {
+                auto is_server_hello_result = is_server_hello( packet );
+                if ( !is_server_hello_result ) {
+                    return std::unexpected( is_server_hello_result.error() );
+                }
+                if ( is_server_hello_result.value() ) {
+                    populate_server_hello( packet );
+                }
+                if ( m_handshake.s_hello ) {
+                    if ( !m_ssl_keys_log.is_open() ) { 
+                        return true;
+                    }
+                    auto [ secrets, line_reached ] = get_tls_secrets_dynamically( m_ssl_keys_log, m_handshake.c_hello.value().random );
+                    m_secrets = secrets;
+                    return true;
+                }
+            }
+        }
+        auto is_data_packet_result = is_data_packet( packet );
+        if ( !is_data_packet_result ) {
+            return std::unexpected( is_data_packet_result.error() );
+        }
+        auto is_server_packet_result = is_server_packet( packet );
+        if ( !is_server_packet_result ) {
+            return std::unexpected( is_server_packet_result.error() );
+        }
+        if ( is_data_packet_result.value() && is_server_packet_result.value() ) {
+            return handle_server_data_packet( packet );
+        }
+        return false;
+    }
+
+    // =====================================================
+    //  TLS Decryption Context :: Handle Server Data Packet 
+    // =====================================================
+
+    std::expected<bool,std::string> tls_decryption_context::handle_server_data_packet( std::span<const uint8_t> server_data_packet ) {
+        auto is_tls_result = is_tls( server_data_packet );
+        if ( !is_tls_result ) { 
+            return std::unexpected( is_tls_result.error() );
+        }
+        if ( !is_tls_result.value() && !m_incomplete_record ) {
+            return false;
+        }
+        auto payload_result = get_tcp_payload( server_data_packet );
+        if ( !payload_result ) {
+            return std::unexpected( payload_result.error() );
+        }
+        auto& payload = *payload_result.value();
+        std::span<const uint8_t> payload_span( payload.data(), payload.size() ); 
+        while ( !payload_span.empty() ) {
+            if ( m_incomplete_record ) {
+                handle_incomplete_record( server_data_packet, payload_span );
+            } else {
+                auto result = handle_complete_record( payload_span );
+                if ( !result ) {
+                    return std::unexpected( result.error() );
+                }
+            }
+        }
+        return false;
+    }
+
+    // ==================================================
+    //  TLS Decryption Context :: Handle Complete Record
+    // ==================================================
+
+    std::expected<bool,std::string> tls_decryption_context::handle_complete_record( std::span<const uint8_t>& payload_span ) {
+        auto split_result = split_tls_records( payload_span );
+        if ( !split_result ) {
+            return false;
+        } else {
+            auto [ records, offset_reached ] = split_result.value();
+            if ( records.empty() ) {
+                auto empty_record_result = get_empty_tls_record_from_payload( payload_span );
+                if ( !empty_record_result ) {
+                    return std::unexpected( empty_record_result.error() );
+                }
+                auto record_header = get_tls_record_header_from_payload( payload_span ).value();
+                empty_record_result.value().payload.assign( payload_span.begin() + constants::record_header_len, payload_span.end() );
+                m_incomplete_record = incomplete_tls_record {
+                    empty_record_result.value(),
+                    record_header.payload_length
+                };
+                payload_span = payload_span.subspan( 0, 0 ); 
+            } else {
+                for ( std::size_t i = 0; i < records.size(); ++i ) {
+                    m_task_queue.push( { records[ i ], m_server_traffic_seq_number } );
+                    ++m_server_traffic_seq_number;
+                }
+                payload_span = payload_span.subspan( offset_reached );
+            }
+        }
+        return true;
+    } 
+
+    // ====================================================
+    //  TLS Decryption Context :: Handle Incomplete Record
+    // ====================================================
+
+    void tls_decryption_context::handle_incomplete_record( std::span<const uint8_t> server_data_packet,
+                                                           std::span<const uint8_t>& payload_span ) {
+        std::size_t payload_size_before = m_incomplete_record.value().record.payload.size();
+        auto record_variant = append_to_incomplete_record( m_incomplete_record.value(), server_data_packet );
+        if ( std::holds_alternative<tls_record>( record_variant ) ) {
+            std::size_t payload_size_after = std::get<tls_record>( record_variant ).payload.size();
+            m_task_queue.push( { std::get<tls_record>( record_variant ), m_server_traffic_seq_number } );
+            ++m_server_traffic_seq_number;
+            std::size_t bytes_consumed = payload_size_after - payload_size_before;
+            payload_span = payload_span.subspan( bytes_consumed );
+            m_incomplete_record.reset();
+        } else {
+            m_incomplete_record.value().record.payload.insert( m_incomplete_record.value().record.payload.end(), 
+                                                               payload_span.begin(), payload_span.end() );
+            payload_span = payload_span.subspan( 0, 0 );
+        }
+    }
+
+    // =========================================================
+    //  TLS Decryption Context :: Decrypt Record Asynchronously
+    // =========================================================
+
+    void tls_decryption_context::decrypt_record_asynchronously( tls_decryption_task decryption_task ) {
+        auto seq_num = decryption_task.seq_num; 
+        auto record  = std::move( decryption_task.record ); 
+        std::future<tls_record> f = std::async(
+            std::launch::async,
+            [ this, record = std::move( record ), seq_num = seq_num ]() mutable {
+                return decrypt_record(
+                    m_handshake.c_hello.value().random,
+                    m_handshake.s_hello.value().random,
+                    record.version,
+                    m_handshake.s_hello.value().cipher_suite,
+                    record,
+                    m_secrets.value(),
+                    "SERVER_TRAFFIC_SECRET_0",
+                    seq_num
+                );
+            }
+        );
+        {
+            std::lock_guard<std::mutex> lock( m_future_mutex );
+            m_pending_futures.emplace_back( std::move( f ), seq_num );
+        }
+    }
+
+    // ==================================================
+    //  TLS Decryption Context :: Handle Decryption Task 
+    // ==================================================
+
+    tls_record tls_decryption_context::handle_decryption_task( const tls_decryption_task& decryption_task ) {
+        auto decrypted_record = decrypt_record( m_handshake.c_hello.value().random,
+                                                m_handshake.s_hello.value().random,
+                                                decryption_task.record.version,
+                                                m_handshake.s_hello.value().cipher_suite,
+                                                decryption_task.record,
+                                                m_secrets.value(),
+                                                "SERVER_TRAFFIC_SECRET_0",
+                                                decryption_task.seq_num );
+        return decrypted_record;
+    }
+
+    // ========================================
+    //  TLS Decryption Context :: Wait For All
+    // ========================================
+
+    void tls_decryption_context::wait_for_all() {
+        std::vector<std::pair<std::future<tls_record>,uint64_t>> futures_copy;
+        {
+            std::lock_guard<std::mutex> lock( m_future_mutex );
+            futures_copy.swap( m_pending_futures );
+        }
+        for ( auto &entry : futures_copy ) {
+            auto decrypted = entry.first.get();
+            {
+                std::lock_guard<std::mutex> lock( m_decrypted_mutex );
+                m_decrypted_records[ entry.second ] = std::move( decrypted );
+            }
+        }
+    }
+
+    // =======================================================
+    //  TLS Decryption Context Friend Helper :: Get Handshake 
+    // =======================================================
+
+    tls_handshake tls_decryption_context_friend_helper::get_handshake( const tls_decryption_context& t ) {
+        return t.m_handshake;
+    }
+
+    // =======================================================================
+    //  TLS Decryption Context Friend Helper :: Get Client Traffic Seq Number 
+    // =======================================================================
+
+    uint64_t tls_decryption_context_friend_helper::get_client_traffic_seq_number( const tls_decryption_context& t ) {
+        return t.m_client_traffic_seq_number;
+    } 
+
+    // =======================================================================
+    //  TLS Decryption Context Friend Helper :: Get Server Traffic Seq Number 
+    // =======================================================================
+
+    uint64_t tls_decryption_context_friend_helper::get_server_traffic_seq_number( const tls_decryption_context& t ) {
+        return t.m_server_traffic_seq_number;
+    }
+
+    // ===================================================================
+    //  TLS Decryption Context Friend Helper :: Is Client Hello Populated 
+    // ===================================================================
+
+    bool tls_decryption_context_friend_helper::is_client_hello_populated( const tls_decryption_context& t ) {
+        if ( t.m_handshake.c_hello ) {
+            return true;
+        }
+        return false;
+    }
+
+    // ===================================================================
+    //  TLS Decryption Context Friend Helper :: Is Server Hello Populated 
+    // ===================================================================
+
+    bool tls_decryption_context_friend_helper::is_server_hello_populated( const tls_decryption_context& t ) {
+        if ( t.m_handshake.s_hello ) {
+            return true;
+        }
+        return false;
+    }
+
+    // =====================================================
+    //  TLS Decryption Context Friend Helper :: Has Secrets 
+    // =====================================================
+
+    bool tls_decryption_context_friend_helper::has_secrets( const tls_decryption_context& t ) {
+        if ( t.m_secrets ) {
+            return true;
+        }
+        return false;
+    }
+
+    // =============================================================
+    //  TLS Decryption Context Friend Helper :: Get Task Queue Size 
+    // =============================================================
+
+    std::size_t tls_decryption_context_friend_helper::get_task_queue_size( const tls_decryption_context& t ) {
+        return t.m_task_queue.size();
+    }
+
+    // ========================================================
+    //  TLS Decryption Context Friend Helper :: Get Task Queue
+    // ========================================================
+
+    std::queue<tls_decryption_task> tls_decryption_context_friend_helper::get_task_queue( const tls_decryption_context& t ) {
+        return t.m_task_queue;
+    }
+
+    // ===============================================================
+    //  TLS Decryption Context Friend Helper :: Get Decrypted Records
+    // ===============================================================
+
+    std::map<uint64_t,tls_record> tls_decryption_context_friend_helper::get_decrypted_records( const tls_decryption_context& t ) {
+        return t.m_decrypted_records;
+    }
+ 
 } // namespace ntk

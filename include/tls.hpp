@@ -1,23 +1,24 @@
 #ifndef TLS_HPP
 #define TLS_HPP
 
-#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+
 #include <algorithm>
+#include <array>
+#include <expected>
+#include <fstream>
+#include <future>
+#include <iomanip>
+#include <iostream>
 #include <map>
-#include <vector>
 #include <ranges>
 #include <span>
 #include <string>
-#include <expected>
-#include <fstream>
 #include <sstream>
-#include <iostream>
-#include <iomanip>
 #include <variant>
-
-#include <cstdint>
-#include <cstddef>
-#include <cstring>
+#include <vector>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -222,12 +223,12 @@ namespace ntk {
     std::expected<bool,std::string> is_tls_payload( const std::span<const uint8_t> payload );
 
     std::expected<
-        std::tuple<std::vector<tls_record>,size_t>, 
+        std::tuple<std::vector<tls_record>,std::size_t>, 
         std::string
     > split_tls_records( std::span<const uint8_t> tls_payload );
 
     std::expected<
-        std::tuple<std::vector<tls_record>,size_t>,
+        std::tuple<std::vector<tls_record>,std::size_t>,
         std::string
     > get_tls_records_from_ethernet( std::span<const uint8_t> packet );
 
@@ -432,7 +433,7 @@ namespace ntk {
     std::vector<uint8_t> pkcs7_pad( const std::vector<uint8_t>& data, const std::size_t block_size );
 
     tls_key_material derive_tls_key_iv( const std::vector<uint8_t>& secret, const EVP_MD* hash_func,
-                                        size_t key_len, size_t iv_len );
+                                        std::size_t key_len, std::size_t iv_len );
 
     std::vector<tls_record> decrypt_tls_data(
         const std::array<uint8_t,32>& client_random,
@@ -470,6 +471,93 @@ namespace ntk {
     // =============
 
     std::vector<uint8_t> extract_certificate( const std::vector<uint8_t>& handshake_payload );
+
+    // =================
+    //  TLS Certificate 
+    // =================
+
+    struct tls_certificate {};
+
+    // ===============
+    //  TLS Handshake 
+    // ===============
+
+    struct tls_handshake {
+        std::optional<client_hello> c_hello;
+        std::optional<server_hello> s_hello;
+        std::optional<tls_certificate> certificate;
+
+        bool is_complete() const {
+            return c_hello && s_hello;
+        }
+    };
+
+    // =====================
+    //  TLS Decryption Task 
+    // =====================
+
+    struct tls_decryption_task {
+        tls_record record;
+        uint64_t seq_num;
+    };
+
+    // ========================
+    //  TLS Decryption Context 
+    // ========================
+
+    class tls_decryption_context : public tcp_live_stream {
+        public:
+            std::queue<tls_decryption_task> m_task_queue;
+            std::mutex m_queue_mutex;
+            std::mutex m_decrypted_mutex;
+            std::map<uint64_t,tls_record> m_decrypted_records;
+            std::mutex m_future_mutex;
+            std::vector<std::pair<std::future<tls_record>,uint64_t>> m_pending_futures;
+
+            tls_decryption_context( const four_tuple& four )
+                : tcp_live_stream( four ),
+                  m_client_traffic_seq_number( 0 ),
+                  m_server_traffic_seq_number( 0 ) {}
+            tls_decryption_context( const four_tuple& four, const std::string ssl_keys_log )
+                : tcp_live_stream( four ),
+                  m_client_traffic_seq_number( 0 ),
+                  m_server_traffic_seq_number( 0 ),
+                  m_ssl_keys_log( ssl_keys_log ) {}
+            ~tls_decryption_context() = default;
+
+            std::expected<bool,std::string> feed( std::span<const uint8_t> packet );
+            std::expected<bool,std::string> feed_packet( std::span<const uint8_t> packet );
+            bool populate_client_hello( std::span<const uint8_t> packet );
+            bool populate_server_hello( std::span<const uint8_t> packet );
+            std::expected<bool,std::string> handle_server_data_packet( std::span<const uint8_t> server_data_packet );
+            void handle_incomplete_record( std::span<const uint8_t> server_data_packet, std::span<const uint8_t>& payload_span );
+            std::expected<bool,std::string> handle_complete_record( std::span<const uint8_t>& payload_span ); 
+            
+            tls_record handle_decryption_task( const tls_decryption_task& decryption_task );
+            void decrypt_record_asynchronously( tls_decryption_task decryption_task );
+            void wait_for_all();
+
+            tls_handshake m_handshake;
+            uint64_t m_client_traffic_seq_number;
+            uint64_t m_server_traffic_seq_number;
+            std::optional<secrets> m_secrets;  
+            std::ifstream m_ssl_keys_log;
+            std::optional<incomplete_tls_record> m_incomplete_record;
+            friend class tls_decryption_context_friend_helper;
+    };
+
+    class tls_decryption_context_friend_helper {
+        public:
+            static tls_handshake get_handshake( const tls_decryption_context& t );
+            static uint64_t get_client_traffic_seq_number( const tls_decryption_context& t );
+            static uint64_t get_server_traffic_seq_number( const tls_decryption_context& t );
+            static bool is_client_hello_populated( const tls_decryption_context& t );
+            static bool is_server_hello_populated( const tls_decryption_context& t );
+            static bool has_secrets( const tls_decryption_context& t );
+            static std::size_t get_task_queue_size( const tls_decryption_context& t );
+            static std::queue<tls_decryption_task> get_task_queue( const tls_decryption_context& t ); 
+            static std::map<uint64_t,tls_record> get_decrypted_records( const tls_decryption_context& t );
+    };
 
     // =========
     //  Classes 
