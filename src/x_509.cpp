@@ -3,6 +3,14 @@
 
 namespace ntk {
 
+	bool is_constructed_type_tag( const uint8_t tag_byte ) {
+    	return ( tag_byte & 0x20 ) != 0;
+	}
+
+	bool is_constructed_type_tag( const tag_type tag ) {
+    	return is_constructed_type_tag( static_cast<uint8_t>( tag ) );
+	}
+
 	// ===================
     //  Parse Ans1 Length 
     // ===================
@@ -40,22 +48,15 @@ namespace ntk {
 		return parse_length_result{ header_len, node_len };
 	}
 
-	// ==============
-    //  Get Tag Type 
-    // ==============
-
-    std::optional<tag_type> get_tag_type( std::span<const uint8_t> bytes ) {
-    	if ( bytes.front() == 0x30 ) return tag_type::sequence;
-    	if ( bytes.front() == 0x03 ) return tag_type::bit_string;
-    	return std::nullopt;
-    }
-
     // ===============
     //  Get Raw Bytes 
     // ===============
 
    	std::expected<void,std::string> get_raw_bytes( asn1_node& node, std::span<const uint8_t> certificate_bytes, 
    											       const parse_length_result& length_result ) {
+   		if ( certificate_bytes.size() < length_result.header_len + length_result.node_len ) {
+   			return std::unexpected( "Certificate Node is truncated" );
+   		}
    	   	node.raw_bytes = std::span<const uint8_t>( certificate_bytes.data() + length_result.header_len, length_result.node_len ); 
    	   	return {};
    	}
@@ -65,6 +66,9 @@ namespace ntk {
     // ================
 
     std::expected<void,std::string> parse_children( asn1_node& parent ) {
+    	if ( parent.leaf ) {
+    		return {};
+    	}
     	auto bytes = parent.raw_bytes;
     	while ( !bytes.empty() ) {
     		auto child = std::make_unique<asn1_node>();
@@ -76,13 +80,22 @@ namespace ntk {
     		if ( !result ) {
     			return std::unexpected( result.error() );
     		}
-    		auto tag_opt = get_tag_type( bytes );
+    		auto tag_opt = get_tag_type( bytes.front() );
     		if ( !tag_opt ) {
     			return std::unexpected( "Unrecognized Tag Type" );
     		}
     		child->tag = tag_opt.value();
+    		if ( !is_constructed_type_tag( child->tag ) ) {
+    			child->leaf = true;
+    		}
     		parent.children.push_back( std::move( child ) );
     		bytes = bytes.subspan( length_result.value().header_len + length_result.value().node_len );
+    	}
+    	for ( auto& child : parent.children ) {
+    		auto parse_result = parse_children( *child );
+    		if ( !parse_result ) {
+    			return std::unexpected( parse_result.error() ); 
+    		}
     	}
     	return {};
     }
@@ -94,17 +107,25 @@ namespace ntk {
     std::expected<certificate,std::string> get_parsed_certificate( std::span<const uint8_t> certificate_bytes ) {
     	certificate cert;
     	auto head = std::make_unique<asn1_node>();
-    	auto tag_opt = get_tag_type( certificate_bytes );
+    	auto tag_opt = get_tag_type( certificate_bytes.front() );
     	if ( !tag_opt ) {
     		return std::unexpected( "Unrecognized Tag Type" );
     	}
     	head->tag = tag_opt.value();
+    	if ( !is_constructed_type_tag( head->tag ) ) {
+    		head->leaf = true;
+    	}
   		auto length_result = parse_ans1_length( certificate_bytes );
   		if ( !length_result ) {
   			return std::unexpected( length_result.error() );
   		}
     	get_raw_bytes( *head, certificate_bytes, length_result.value() );
-    	parse_children( *head );
+    	if ( !head->leaf ) {
+	    	auto parse_result = parse_children( *head );
+	    	if ( !parse_result ) {
+	    		return std::unexpected( parse_result.error() );
+	    	}
+	    }
     	cert.head = std::move( head );
     	return cert;
     }

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <utils.hpp>
+
 namespace ntk {
 
 	// =====================
@@ -22,14 +24,44 @@ namespace ntk {
     // ==========
 
 	enum class tag_type : uint8_t {
-		bit_string = 0x03,
-		sequence   = 0x30
+		boolean           = 0x01,
+		integer           = 0x02,
+		bit_string        = 0x03,
+		octet_string      = 0x04,
+		object_identifier = 0x06,
+		printable_string  = 0x13,
+		utc_time		  = 0x17,
+		sequence   		  = 0x30,
+		set        	      = 0x31,
+		context_0  		  = 0xa0,
+		context_3  		  = 0xa3
 	};
+
+	namespace look_up {
+
+        constexpr std::array<tag_type,11/* entries in enum tag_type */> tag_types = {
+            tag_type::boolean,
+			tag_type::integer,        
+			tag_type::bit_string,        
+			tag_type::octet_string,    
+			tag_type::object_identifier,
+			tag_type::printable_string, 
+			tag_type::utc_time,		  
+			tag_type::sequence,   		 
+			tag_type::set,        	      
+			tag_type::context_0,  		  
+			tag_type::context_3  		
+        };
+
+    } // namespace look_up
+
+    inline auto get_tag_type = make_lookup( look_up::tag_types );
 
 	struct asn1_node {
 		tag_type tag;
 		std::span<const uint8_t> raw_bytes;
 		std::vector<std::unique_ptr<asn1_node>> children;
+		bool leaf = false;
 	};
 
 	struct certificate {
