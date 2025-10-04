@@ -68,8 +68,36 @@ namespace ntk {
 		std::unique_ptr<asn1_node> head;
 	};
 
+	// =================
+    //  Tbs Certificate
+    // =================
+
+    struct tbs_certificate {
+    	std::optional<uint8_t> version;
+    	std::vector<uint8_t> serial_number;
+    	std::vector<uint8_t> algorithm_identifier;
+    	std::vector<uint8_t> issuer_rnd;
+    	std::vector<uint8_t> validity;
+    	std::vector<uint8_t> subject_rnd;
+    	std::vector<uint8_t> subject_public_key_info;
+    	std::optional<std::vector<uint8_t>> extensions;
+    };
+
+    // =================
+    //  ECDSA Signature
+    // =================
+
+    struct ecdsa_signature {
+    	std::vector<uint8_t> r;
+    	std::vector<uint8_t> s;
+    };
+
 	std::expected<parse_length_result,std::string> parse_ans1_length( std::span<const uint8_t> certificate_bytes );
 
-	std::expected<certificate,std::string> get_parsed_certificate( std::span<const uint8_t> certificate_bytes );
+	std::expected<certificate,std::string> get_parsed_certificate( std::span<const uint8_t> certificate_bytes, int target_depth = -1 );
+
+	std::expected<tbs_certificate,std::string> get_tbs_certificate( std::span<const uint8_t> certificate_bytes );
+
+	std::expected<ecdsa_signature,std::string> get_ecdsa_signature( std::span<const uint8_t> certificate_bytes );
 
 } // namespace ntk

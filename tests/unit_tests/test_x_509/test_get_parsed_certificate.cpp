@@ -70,3 +70,12 @@ TEST( UnitTest, GetParsedCertificate_RelativeDistinguishedName ) {
 	EXPECT_EQ( rdn.head->tag, ntk::tag_type::set );
 	EXPECT_EQ( rdn.head->children.size(), 1 );
 } 
+
+TEST( UnitTest, GetParsedCertificate_Signature_Sequence ) {
+	auto s = std::span<const uint8_t>( test::tls_certificate );
+	s = s.subspan( 868, 71 ); 
+	auto parse_result = ntk::get_parsed_certificate( s );
+	ASSERT_TRUE( parse_result ) << parse_result.error() << std::endl;
+	auto& sequence = parse_result.value();
+	EXPECT_EQ( sequence.head->children.size(), 2 );
+} 

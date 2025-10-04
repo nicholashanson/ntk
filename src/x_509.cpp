@@ -3,13 +3,17 @@
 
 namespace ntk {
 
+	// =========================
+    //  Is Constructed Type Tag
+    // =========================
+
 	bool is_constructed_type_tag( const uint8_t tag_byte ) {
     	return ( tag_byte & 0x20 ) != 0;
 	}
 
 	bool is_constructed_type_tag( const tag_type tag ) {
     	return is_constructed_type_tag( static_cast<uint8_t>( tag ) );
-	}
+    }
 
 	// ===================
     //  Parse Ans1 Length 
@@ -65,8 +69,11 @@ namespace ntk {
     //  Parse Children 
     // ================
 
-    std::expected<void,std::string> parse_children( asn1_node& parent ) {
-    	if ( parent.leaf ) {
+    std::expected<void,std::string> parse_children( asn1_node& parent, int target_depth, int current_depth ) {
+    	if ( target_depth >= 0 && current_depth >= target_depth ) {
+    		return {};
+    	}
+   		if ( parent.leaf ) {
     		return {};
     	}
     	auto bytes = parent.raw_bytes;
@@ -92,7 +99,7 @@ namespace ntk {
     		bytes = bytes.subspan( length_result.value().header_len + length_result.value().node_len );
     	}
     	for ( auto& child : parent.children ) {
-    		auto parse_result = parse_children( *child );
+    		auto parse_result = parse_children( *child, target_depth, current_depth + 1 );
     		if ( !parse_result ) {
     			return std::unexpected( parse_result.error() ); 
     		}
@@ -104,7 +111,8 @@ namespace ntk {
     //  Get Parsed Certificate
     // ========================
 
-    std::expected<certificate,std::string> get_parsed_certificate( std::span<const uint8_t> certificate_bytes ) {
+    std::expected<certificate,std::string> get_parsed_certificate( std::span<const uint8_t> certificate_bytes, int target_depth ) {
+    	int current_depth{};
     	certificate cert;
     	auto head = std::make_unique<asn1_node>();
     	auto tag_opt = get_tag_type( certificate_bytes.front() );
@@ -121,13 +129,103 @@ namespace ntk {
   		}
     	get_raw_bytes( *head, certificate_bytes, length_result.value() );
     	if ( !head->leaf ) {
-	    	auto parse_result = parse_children( *head );
+	    	auto parse_result = parse_children( *head, target_depth, current_depth );
 	    	if ( !parse_result ) {
 	    		return std::unexpected( parse_result.error() );
 	    	}
 	    }
     	cert.head = std::move( head );
     	return cert;
+    }
+
+    std::vector<uint8_t> get_raw_bytes( auto& it ) {
+    	auto bytes = std::vector<uint8_t>{ ( *it )->raw_bytes.begin(), ( *it )->raw_bytes.end() };
+    	++it;
+    	return bytes;
+    } 
+
+    // =====================
+    //  Get Tbs Certificate
+    // =====================
+
+    std::expected<tbs_certificate,std::string> get_tbs_certificate( std::span<const uint8_t> certificate_bytes ) {
+    	tbs_certificate certificate;
+    	auto parse_result = get_parsed_certificate( certificate_bytes, 2 /* parse to tbs certificate children */ );
+    	if ( !parse_result ) {
+    		return std::unexpected( parse_result.error() );
+    	}
+    	auto& parsed_tbs_certificate = parse_result.value().head->children.front();
+    	if ( parsed_tbs_certificate->children.empty() ) {
+    		return std::unexpected( "Tbs Certificate has no fields" );
+    	}
+    	if ( parsed_tbs_certificate->children.front()->tag == tag_type::context_0 ) {
+    		certificate.version = parsed_tbs_certificate->children.front()->raw_bytes.front();
+    	} else {
+    		certificate.version = std::nullopt;
+    	}
+    	std::size_t fields_required = certificate.version ? 7 : 6;
+    	if ( parsed_tbs_certificate->children.size() < fields_required ) {
+    		return std::unexpected( "Tbs Certificate does not have enough fields" ); 
+    	}
+    	auto it = parsed_tbs_certificate->children.begin();
+    	if ( certificate.version ) {
+    		it = std::next( it );
+    	}
+    	certificate.serial_number = std::move( get_raw_bytes( it ) );    	
+    	certificate.algorithm_identifier = std::move( get_raw_bytes( it ) );
+    	certificate.issuer_rnd = std::move( get_raw_bytes( it ) );
+    	certificate.validity = std::move( get_raw_bytes( it ) );
+    	certificate.subject_rnd = std::move( get_raw_bytes( it ) );
+    	certificate.subject_public_key_info = std::move( get_raw_bytes( it ) );
+    	if ( it != parsed_tbs_certificate->children.end() ) {
+    		certificate.extensions = std::move( get_raw_bytes( it ) );
+    	} else {
+    		certificate.extensions = std::nullopt;
+    	}
+    	return certificate;
+    }
+
+    // ===============
+    //  Get Signature
+    // ===============
+
+    std::expected<ecdsa_signature,std::string> get_ecdsa_signature( std::span<const uint8_t> certificate_bytes ) {
+    	ecdsa_signature signature;
+    	auto certificate_parse_result = get_parsed_certificate( certificate_bytes, 1 /* parse to signature */ );
+    	if ( !certificate_parse_result ) {
+    		return std::unexpected( certificate_parse_result.error() );
+    	}
+    	auto& parsed_ecdsa_signature = certificate_parse_result.value().head->children.back();
+    	auto sequence_bytes = parsed_ecdsa_signature->raw_bytes;
+    	auto integer_bytes = sequence_bytes;
+    	{
+    		auto length_result = parse_ans1_length( sequence_bytes );
+	    	if ( !length_result ) {
+	    		return std::unexpected( length_result.error() );
+	    	}
+    		auto [ header_len, node_len ] = length_result.value();
+    		integer_bytes = sequence_bytes.subspan( header_len );
+    	}
+    	{
+    		auto length_result = parse_ans1_length( integer_bytes );
+    		if ( !length_result ) {
+    			return std::unexpected( length_result.error() ); 
+    		}
+    		auto [ header_len, node_len ] = length_result.value();
+    		integer_bytes = integer_bytes.subspan( header_len );
+    		signature.r = { integer_bytes.begin(), integer_bytes.begin() + node_len };
+    		integer_bytes = integer_bytes.subspan( node_len );
+    	}
+    	{
+    		auto length_result = parse_ans1_length( integer_bytes );
+    		if ( !length_result ) {
+    			return std::unexpected( length_result.error() ); 
+    		}
+    		auto [ header_len, node_len ] = length_result.value();
+    		integer_bytes = integer_bytes.subspan( header_len );
+    		signature.s = { integer_bytes.begin(), integer_bytes.begin() + node_len };
+    	}
+    	return signature;
     }
 
 } // namespace ntk
