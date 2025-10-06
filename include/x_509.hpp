@@ -105,5 +105,7 @@ namespace ntk {
 	std::expected<std::vector<std::vector<uint8_t>>,std::string> get_children_from_raw_bytes( std::span<const uint8_t> certificate_bytes );
 
 	std::expected<std::vector<uint8_t>,std::string> get_signature_algorithm( std::span<const uint8_t> certificate_bytes );
-	
+
+	std::expected<std::vector<std::vector<uint8_t>>,std::string> get_extensions( std::span<const uint8_t> certificate_bytes );
+
 } // namespace ntk

@@ -262,4 +262,24 @@ namespace ntk {
    		return children.front(); 
     }
 
+    // ================
+    //  Get Extensions
+    // ================
+
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> get_extensions( std::span<const uint8_t> certificate_bytes ) {
+    	auto certificate_result = get_tbs_certificate( certificate_bytes );
+    	if ( !certificate_result ) {
+    		return std::unexpected( certificate_result.error() );
+    	}
+    	auto& certificate = certificate_result.value();
+    	if ( !certificate.extensions ) {
+    		return std::unexpected( "Tbs Certificate does not have Extensions" );
+    	}
+    	auto children_result = get_children( certificate.extensions.value() );
+    	if ( !children_result ) {
+    		return std::unexpected( children_result.error() );
+    	}
+    	return children_result.value();
+    }
+
 } // namespace ntk
