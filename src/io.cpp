@@ -34,7 +34,7 @@ namespace ntk {
     //  Print Vector
     // ==============
 
-    void print_vector( const std::vector<uint8_t>& data ) {
+    void print_vector( std::span<const uint8_t> data ) {
         for ( auto byte : data ) {
             std::cout << std::hex << std::setw( 2 ) << std::setfill( '0' ) << ( static_cast<int>( byte ) & 0xff ) << " ";
         }
@@ -384,7 +384,11 @@ namespace ntk {
         std::cout << "===== TLS RECORD BEGIN =====\n";
         print_field( "Content Type:", tls_content_type_names.at( record.content_type ) );
         print_field( "Version:", tls_version_names.at( record.version ) );
-        print_vector( record.payload );
+        if ( is_http_response( record.payload ) ) {
+            print_http_response( record.payload );
+        } else {
+            print_vector( record.payload );
+        }
         std::cout << "===== TLS RECORD END =====\n\n";
     }
 
@@ -444,6 +448,14 @@ namespace ntk {
         os << "===== HTTP REQUEST END =====\n\n";
     }
 
+    void print_http_request( std::span<const uint8_t> payload, std::ostream& os ) {
+        auto parse_result = get_http_request( payload );
+        if ( !parse_result ) {
+            return;
+        } 
+        print_http_request( parse_result.value() );
+    }
+
     // =====================
     //  Print HTTP Response
     // =====================
@@ -466,6 +478,14 @@ namespace ntk {
         os << std::left << std::setw( label_width ) << "Payload_Length: " << response.body.size() << "\n";
         os << "===== HTTP RESPONSE END =====\n\n";
     };
+
+    void print_http_response( std::span<const uint8_t> payload, std::ostream& os ) {
+        auto parse_result = get_http_response( payload );
+        if ( !parse_result ) {
+            std::cout << parse_result.error() << std::endl;
+        }
+        print_http_response( parse_result.value(), os );
+    }
 
     // =======================
     //  Write Payload To File
@@ -499,6 +519,35 @@ namespace ntk {
                 std::cout << header_result.error() << std::endl;
             } 
             print_tcp_header( header_result.value() );
+        }
+    }
+
+    // =======================
+    //  Print Tbs Certificate
+    // =======================
+
+    void print_tbs_certificate( std::span<const uint8_t> certificate ) {
+        auto extensions_result = get_extensions( certificate );
+        if ( !extensions_result ) {
+            std::cout << extensions_result.error() << std::endl;
+            return;
+        }
+        print_tbs_extensions( extensions_result.value() );
+    }
+
+    void print_tbs_extension( const extension& ext ) {
+        auto dotted_string_result = convert_oid_to_dotted_string( ext.id );
+        if ( !dotted_string_result ) {
+            std::cout << "Failed to convert OID to Dotted String" << dotted_string_result.error() << std::endl;
+            return;
+        }
+        auto& dotted_string = dotted_string_result.value();
+        std::cout << tbs_extension_names.at( dotted_string ) << " (" << dotted_string << ')' << std::endl;
+    }
+
+    void print_tbs_extensions( std::span<extension> extensions ) {
+        for ( auto& extension : extensions ) {
+            print_tbs_extension( extension );
         }
     }
 

@@ -1,3 +1,6 @@
+#ifndef X_509_HPP
+#define X_509_HPP
+
 #include <cstdint>
 
 #include <expected>
@@ -93,6 +96,19 @@ namespace ntk {
     	std::optional<bool> critical;
     };
 
+    std::map<std::string,std::string> tbs_extension_names = {
+    	{ "2.5.29.15",                                       "Key Usage" },
+		{ "2.5.29.37",							         "Ext Key Usage" },
+		{ "2.5.29.19", 								 "Basic Constraints" },
+		{ "2.5.29.14",							"Subject Key Identifier" },
+		{ "2.5.29.35",				          "Authority Key Identifier" },
+		{ "1.3.6.1.5.5.7.1.1", 					 "Authority Info Access" },
+		{ "2.5.29.17",						          "Subject Alt Name" },
+		{ "2.5.29.32", 							  "Certificate Policies" },
+		{ "2.5.29.31",						   "CRL Distribution Points" },
+		{ "1.3.6.1.4.1.121.2.4.2", "Google Signed Certificate Timestamp" }
+    };
+
     // =================
     //  ECDSA Signature
     // =================
@@ -116,10 +132,18 @@ namespace ntk {
 
 	std::expected<std::vector<uint8_t>,std::string> get_signature_algorithm( std::span<const uint8_t> certificate_bytes );
 
-	std::expected<std::vector<std::vector<uint8_t>>,std::string> get_extensions( std::span<const uint8_t> certificate_bytes );
+	std::expected<std::vector<extension>,std::string> get_extensions( std::span<const uint8_t> certificate_bytes );
 
+	std::expected<std::vector<extension>,std::string> get_extensions( const std::vector<std::vector<uint8_t>>& extensions_bytes );
+	
 	std::expected<extension,std::string> get_extension( std::span<const uint8_t> extension_bytes );
 
 	std::expected<std::string,std::string> convert_oid_to_dotted_string( std::span<const uint8_t> oid_bytes );
-	
+
+	std::expected<std::vector<std::vector<uint8_t>>,std::string> get_nodes( std::span<const uint8_t> certificate_bytes );
+
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> get_nodes_from_raw_bytes( std::span<const uint8_t> certificate_bytes );
+
 } // namespace ntk
+
+#endif // X_509_HPP

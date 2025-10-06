@@ -1,5 +1,6 @@
 #include <x_509.hpp>
 #include <iostream>
+#include <iomanip>
 
 namespace ntk {
 
@@ -211,12 +212,48 @@ namespace ntk {
 	    		return std::unexpected( length_result.error() ); 
 	    	}
 	    	auto [ header_len, node_len ] = length_result.value();
+	    	if ( certificate_bytes.size() < header_len + node_len ) {
+	    		return std::unexpected( "Child is truncated" );
+	    	}
 	    	certificate_bytes = certificate_bytes.subspan( header_len );
 	    	children.emplace_back( certificate_bytes.begin(), 
 	    						   certificate_bytes.begin() + node_len );
 	    	certificate_bytes = certificate_bytes.subspan( node_len );
     	}
     	return children;
+    }
+
+    // ===========
+    //  Get Nodes
+    // ===========
+
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> get_nodes( std::span<const uint8_t> certificate_bytes ) {
+    	auto length_result = parse_ans1_length( certificate_bytes );
+	    if ( !length_result ) {
+	    	return std::unexpected( length_result.error() );
+	    }
+    	auto [ header_len, node_len ] = length_result.value();
+    	certificate_bytes = certificate_bytes.subspan( header_len );
+    	return get_nodes_from_raw_bytes( certificate_bytes );
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> get_nodes_from_raw_bytes( std::span<const uint8_t> certificate_bytes ) {
+    	std::vector<std::vector<uint8_t>> nodes;
+    	while ( !certificate_bytes.empty() ) {
+	    	auto length_result = parse_ans1_length( certificate_bytes );
+	    	if ( !length_result ) {
+	    		return std::unexpected( length_result.error() ); 
+	    	}
+	    	auto [ header_len, node_len ] = length_result.value();
+	    	if ( certificate_bytes.size() < header_len + node_len ) {
+	    		return std::unexpected( "Child is truncated" );
+	    	}
+	    	nodes.emplace_back( certificate_bytes.begin(), 
+	    						   certificate_bytes.begin() + header_len + node_len );
+	    	certificate_bytes = certificate_bytes.subspan( header_len + node_len );
+    	}
+    	return nodes;
     }
 
     // ===============
@@ -266,7 +303,7 @@ namespace ntk {
     //  Get Extensions
     // ================
 
-    std::expected<std::vector<std::vector<uint8_t>>,std::string> get_extensions( std::span<const uint8_t> certificate_bytes ) {
+    std::expected<std::vector<extension>,std::string> get_extensions( std::span<const uint8_t> certificate_bytes ) {
     	auto certificate_result = get_tbs_certificate( certificate_bytes );
     	if ( !certificate_result ) {
     		return std::unexpected( certificate_result.error() );
@@ -275,11 +312,23 @@ namespace ntk {
     	if ( !certificate.extensions ) {
     		return std::unexpected( "Tbs Certificate does not have Extensions" );
     	}
-    	auto children_result = get_children( certificate.extensions.value() );
-    	if ( !children_result ) {
-    		return std::unexpected( children_result.error() );
+    	auto extensions_list_result = get_nodes( certificate.extensions.value() );
+    	if ( !extensions_list_result ) {
+    		return std::unexpected( extensions_list_result.error() );
     	}
-    	return children_result.value();
+    	return get_extensions( extensions_list_result.value() );
+    }
+
+    std::expected<std::vector<extension>,std::string> get_extensions( const std::vector<std::vector<uint8_t>>& extensions_bytes ) {
+    	std::vector<extension> extensions;
+    	for ( auto& extension_bytes : extensions_bytes ) {
+    		auto parse_result = get_extension( extension_bytes );
+    		if ( !parse_result ) {
+    			return std::unexpected( parse_result.error() );
+    		}
+    		extensions.push_back( std::move( parse_result.value() ) );
+    	}
+    	return extensions;
     }
 
     // ===============

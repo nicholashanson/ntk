@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <io.hpp>
 #include <x_509.hpp>
 
 #include <test_constants.hpp>

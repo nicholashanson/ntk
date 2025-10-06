@@ -15,6 +15,7 @@
 #include <ipv4.hpp>
 #include <tls.hpp>
 #include <http.hpp>
+#include <x_509.hpp>
 
 namespace ntk {
 
@@ -45,7 +46,7 @@ namespace ntk {
     //  Print Vector
     // ==============
 
-    void print_vector( const std::vector<uint8_t>& data );
+    void print_vector( std::span<const uint8_t> data );
 
     // ====================
     //  Print Packet Array
@@ -147,9 +148,23 @@ namespace ntk {
 
     void print_http_request( const http_request& request, std::ostream& os = std::cout ); 
 
+    void print_http_request( std::span<const uint8_t> payload, std::ostream& os = std::cout );
+
     void print_http_response( const http_response& response, std::ostream& os = std::cout );
 
+    void print_http_response( std::span<const uint8_t> payload, std::ostream& os = std::cout );
+
     void print_tcp_termination( const tcp_termination& termination ); 
+
+    // =======================
+    //  Print Tbs Certificate
+    // =======================
+
+    void print_tbs_certificate( std::span<const uint8_t> certificate );
+
+    void print_tbs_extension( const extension& ext );
+
+    void print_tbs_extensions( std::span<extension> extensions );
 
 } // namespace ntk
 
