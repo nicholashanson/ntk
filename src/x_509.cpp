@@ -313,4 +313,31 @@ namespace ntk {
     	return ext;
     }
 
+    // ==============================
+    //  Convert OID to Dotted String
+    // ==============================
+
+    std::expected<std::string,std::string> convert_oid_to_dotted_string( std::span<const uint8_t> oid_bytes ) {
+    	if ( oid_bytes.empty() ) {
+    		return std::unexpected( "OID is empty" );
+    	}
+    	std::vector<uint8_t> oid;
+    	oid.push_back( oid_bytes.front() / 40 );
+    	oid.push_back( oid_bytes.front() % 40 );
+    	std::size_t value = 0;
+    	for ( std::size_t i = 1; i < oid_bytes.size(); ++i ) {
+    		value = ( value << 7 ) | ( oid_bytes[ i ] & 0x7f );
+    		if ( ( oid_bytes[ i ] & 0x80 ) == 0 ) {
+				oid.push_back( value );
+				value = 0;
+			}
+    	}
+    	std::string dotted_string;
+    	for ( std::size_t i = 0; i < oid.size(); ++i ) {
+    		dotted_string += std::to_string( oid[ i ] );
+    		if ( i != oid.size() - 1 ) dotted_string += ".";
+    	}
+    	return dotted_string;
+    }
+
 } // namespace ntk

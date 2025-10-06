@@ -120,4 +120,6 @@ namespace ntk {
 
 	std::expected<extension,std::string> get_extension( std::span<const uint8_t> extension_bytes );
 
+	std::expected<std::string,std::string> convert_oid_to_dotted_string( std::span<const uint8_t> oid_bytes );
+	
 } // namespace ntk
