@@ -11,6 +11,7 @@ namespace ntk {
     	return ( tag_byte & 0x20 ) != 0;
 	}
 
+	// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	bool is_constructed_type_tag( const tag_type tag ) {
     	return is_constructed_type_tag( static_cast<uint8_t>( tag ) );
     }
@@ -40,7 +41,6 @@ namespace ntk {
 			}
 			header_len = minimum_len + num_len_bytes;
 		}
-
 		if ( certificate_bytes.front() == 0x03 ) {
 			if ( certificate_bytes.size() < header_len + 1 ) {
            		return std::unexpected( "Truncated BIT STRING (missing unused-bits byte)" );
@@ -48,7 +48,6 @@ namespace ntk {
         	header_len += 1;
         	node_len -= 1;
 		}
-
 		return parse_length_result{ header_len, node_len };
 	}
 
@@ -64,6 +63,13 @@ namespace ntk {
    	   	node.raw_bytes = std::span<const uint8_t>( certificate_bytes.data() + length_result.header_len, length_result.node_len ); 
    	   	return {};
    	}
+
+   	// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+   	std::vector<uint8_t> get_raw_bytes( auto& it ) {
+    	auto bytes = std::vector<uint8_t>{ ( *it )->raw_bytes.begin(), ( *it )->raw_bytes.end() };
+    	++it;
+    	return bytes;
+    } 
 
    	// ================
     //  Parse Children 
@@ -127,7 +133,10 @@ namespace ntk {
   		if ( !length_result ) {
   			return std::unexpected( length_result.error() );
   		}
-    	get_raw_bytes( *head, certificate_bytes, length_result.value() );
+    	auto result = get_raw_bytes( *head, certificate_bytes, length_result.value() );
+    	if ( !result ) {
+    		return std::unexpected( result.error() );
+    	}
     	if ( !head->leaf ) {
 	    	auto parse_result = parse_children( *head, target_depth, current_depth );
 	    	if ( !parse_result ) {
@@ -137,12 +146,6 @@ namespace ntk {
     	cert.head = std::move( head );
     	return cert;
     }
-
-    std::vector<uint8_t> get_raw_bytes( auto& it ) {
-    	auto bytes = std::vector<uint8_t>{ ( *it )->raw_bytes.begin(), ( *it )->raw_bytes.end() };
-    	++it;
-    	return bytes;
-    } 
 
     // =====================
     //  Get Tbs Certificate
@@ -185,6 +188,26 @@ namespace ntk {
     	return certificate;
     }
 
+    // ==============
+    //  Get Children
+    // ==============
+
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> get_children( std::span<const uint8_t> certificate_bytes ) {
+    	std::vector<std::vector<uint8_t>> children;
+    	while ( !certificate_bytes.empty() ) {
+	    	auto length_result = parse_ans1_length( certificate_bytes );
+	    	if ( !length_result ) {
+	    		return std::unexpected( length_result.error() ); 
+	    	}
+	    	auto [ header_len, node_len ] = length_result.value();
+	    	certificate_bytes = certificate_bytes.subspan( header_len );
+	    	children.emplace_back( certificate_bytes.begin(), 
+	    						   certificate_bytes.begin() + node_len );
+	    	certificate_bytes = certificate_bytes.subspan( node_len );
+    	}
+    	return children;
+    }
+
     // ===============
     //  Get Signature
     // ===============
@@ -197,34 +220,21 @@ namespace ntk {
     	}
     	auto& parsed_ecdsa_signature = certificate_parse_result.value().head->children.back();
     	auto sequence_bytes = parsed_ecdsa_signature->raw_bytes;
-    	auto integer_bytes = sequence_bytes;
     	{
     		auto length_result = parse_ans1_length( sequence_bytes );
 	    	if ( !length_result ) {
 	    		return std::unexpected( length_result.error() );
 	    	}
     		auto [ header_len, node_len ] = length_result.value();
-    		integer_bytes = sequence_bytes.subspan( header_len );
+    		sequence_bytes = sequence_bytes.subspan( header_len );
     	}
-    	{
-    		auto length_result = parse_ans1_length( integer_bytes );
-    		if ( !length_result ) {
-    			return std::unexpected( length_result.error() ); 
-    		}
-    		auto [ header_len, node_len ] = length_result.value();
-    		integer_bytes = integer_bytes.subspan( header_len );
-    		signature.r = { integer_bytes.begin(), integer_bytes.begin() + node_len };
-    		integer_bytes = integer_bytes.subspan( node_len );
+    	auto children_result = get_children( sequence_bytes );
+    	if ( !children_result ) {
+    		return std::unexpected( children_result.error() );
     	}
-    	{
-    		auto length_result = parse_ans1_length( integer_bytes );
-    		if ( !length_result ) {
-    			return std::unexpected( length_result.error() ); 
-    		}
-    		auto [ header_len, node_len ] = length_result.value();
-    		integer_bytes = integer_bytes.subspan( header_len );
-    		signature.s = { integer_bytes.begin(), integer_bytes.begin() + node_len };
-    	}
+    	auto& children = children_result.value();
+    	signature.r = std::move( children.front() );
+    	signature.s = std::move( children.back() );
     	return signature;
     }
 
