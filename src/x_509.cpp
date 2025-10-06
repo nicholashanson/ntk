@@ -282,4 +282,35 @@ namespace ntk {
     	return children_result.value();
     }
 
+    // ===============
+    //  Get Extension
+    // ===============
+
+    std::expected<extension,std::string> get_extension( std::span<const uint8_t> extension_bytes ) {
+    	extension ext;
+    	auto children_result = get_children( extension_bytes );
+    	if ( !children_result ) {
+    		return std::unexpected( children_result.error() );
+    	}
+    	auto& children = children_result.value();
+    	if ( children.size() < 2 ) {
+    		return std::unexpected( "Extension does not have enough Fields" );
+    	}
+    	if ( children.size() > 3 ) {
+    		return std::unexpected( "Extension has too many Fields" );
+    	}
+    	ext.id = children.front();
+    	if ( children.size() == 3 ) {
+    		if ( children[ 1 ].front() == 0xff ) {
+    			ext.critical = true;	
+    		} else if ( children[ 1 ].front() == 0x00 ) {
+    			ext.critical = false;
+    		} else {
+    			return std::unexpected( "Extension Critical is not a valid value" );
+    		}
+    	}
+    	ext.value = children.back();
+    	return ext;
+    }
+
 } // namespace ntk

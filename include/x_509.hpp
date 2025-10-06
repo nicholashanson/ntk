@@ -83,6 +83,16 @@ namespace ntk {
     	std::optional<std::vector<uint8_t>> extensions;
     };
 
+    // ===========
+    //  Extension
+    // ===========
+
+    struct extension {
+    	std::vector<uint8_t> id;
+    	std::vector<uint8_t> value;
+    	std::optional<bool> critical;
+    };
+
     // =================
     //  ECDSA Signature
     // =================
@@ -107,5 +117,7 @@ namespace ntk {
 	std::expected<std::vector<uint8_t>,std::string> get_signature_algorithm( std::span<const uint8_t> certificate_bytes );
 
 	std::expected<std::vector<std::vector<uint8_t>>,std::string> get_extensions( std::span<const uint8_t> certificate_bytes );
+
+	std::expected<extension,std::string> get_extension( std::span<const uint8_t> extension_bytes );
 
 } // namespace ntk
