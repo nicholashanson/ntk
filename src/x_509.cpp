@@ -193,6 +193,17 @@ namespace ntk {
     // ==============
 
     std::expected<std::vector<std::vector<uint8_t>>,std::string> get_children( std::span<const uint8_t> certificate_bytes ) {
+    	auto length_result = parse_ans1_length( certificate_bytes );
+	    if ( !length_result ) {
+	    	return std::unexpected( length_result.error() );
+	    }
+    	auto [ header_len, node_len ] = length_result.value();
+    	certificate_bytes = certificate_bytes.subspan( header_len );
+    	return get_children_from_raw_bytes( certificate_bytes );
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> get_children_from_raw_bytes( std::span<const uint8_t> certificate_bytes ) {
     	std::vector<std::vector<uint8_t>> children;
     	while ( !certificate_bytes.empty() ) {
 	    	auto length_result = parse_ans1_length( certificate_bytes );
@@ -220,14 +231,6 @@ namespace ntk {
     	}
     	auto& parsed_ecdsa_signature = certificate_parse_result.value().head->children.back();
     	auto sequence_bytes = parsed_ecdsa_signature->raw_bytes;
-    	{
-    		auto length_result = parse_ans1_length( sequence_bytes );
-	    	if ( !length_result ) {
-	    		return std::unexpected( length_result.error() );
-	    	}
-    		auto [ header_len, node_len ] = length_result.value();
-    		sequence_bytes = sequence_bytes.subspan( header_len );
-    	}
     	auto children_result = get_children( sequence_bytes );
     	if ( !children_result ) {
     		return std::unexpected( children_result.error() );
@@ -236,6 +239,27 @@ namespace ntk {
     	signature.r = std::move( children.front() );
     	signature.s = std::move( children.back() );
     	return signature;
+    }
+
+    // =========================
+    //  Get Signature Algorithm
+    // =========================
+
+    std::expected<std::vector<uint8_t>,std::string> get_signature_algorithm( std::span<const uint8_t> certificate_bytes ) {
+    	auto certificate_parse_result = get_parsed_certificate( certificate_bytes, 1 /* parse to signature */ );
+    	if ( !certificate_parse_result ) {
+    		return std::unexpected( certificate_parse_result.error() );
+    	}
+    	if ( certificate_parse_result.value().head->children.size() < 2 ) {
+    		return std::unexpected( "Certificate does not contain a Signature Algorithm" );
+    	}
+    	auto& sequence = certificate_parse_result.value().head->children[ 1 ];
+   		auto children_result = get_children_from_raw_bytes( sequence->raw_bytes );
+   		if ( !children_result ) {
+   			return std::unexpected( children_result.error() );   		
+   		}
+   		auto& children = children_result.value();
+   		return children.front(); 
     }
 
 } // namespace ntk
