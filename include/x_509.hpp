@@ -92,6 +92,15 @@ namespace ntk {
     	{ "1.2.840.10045.4.3.2", "ECDSA with SHA256" }
     };
 
+	// =========
+    //  Tbs Rdn
+    // =========
+
+    struct tbs_rdn {
+    	std::vector<uint8_t> oid;
+    	std::string value;
+    }; 
+
     // ==============
     //  Tbs Validity
     // ==============
@@ -99,6 +108,16 @@ namespace ntk {
     struct tbs_validity {
     	std::chrono::system_clock::time_point not_before;
     	std::chrono::system_clock::time_point not_after;
+    };
+
+    // =========================
+    //  Subject Public Key Info
+    // =========================
+
+    struct subject_public_key_info {
+    	std::vector<uint8_t> algorithm;
+    	std::vector<uint8_t> parameters;
+    	std::vector<uint8_t> key;
     };
 
     // ===========
@@ -111,7 +130,10 @@ namespace ntk {
     	std::optional<bool> critical;
     };
 
-    inline std::map<std::string,std::string> tbs_extension_names = {
+    inline std::map<std::string,std::string> object_identifier_names = {
+    	{ "2.5.4.6", 								      "Country Name" },
+    	{ "2.5.4.10", 								 "Organization Name" },
+    	{ "2.5.4.3", 								       "Common Name" },
     	{ "2.5.29.15",                                       "Key Usage" },
 		{ "2.5.29.37",							         "Ext Key Usage" },
 		{ "2.5.29.19", 								 "Basic Constraints" },
@@ -162,6 +184,12 @@ namespace ntk {
     std::expected<std::chrono::system_clock::time_point,std::string> parse_utc_time( std::span<const uint8_t> utc_time_bytes );
 
     std::expected<tbs_validity,std::string> get_tbs_validity( std::span<const uint8_t> validity_bytes );
+
+    std::expected<std::vector<tbs_rdn>,std::string> get_tbs_rdns( std::span<const uint8_t> rdn_bytes );
+
+    std::expected<subject_public_key_info,std::string> get_subject_public_key_info( std::span<const uint8_t> public_key_bytes );
+
+    std::expected<std::string,std::string> get_algorithm_identifier( std::span<const uint8_t> algorithm_bytes );
 
 } // namespace ntk
 

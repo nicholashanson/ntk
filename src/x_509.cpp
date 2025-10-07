@@ -370,7 +370,7 @@ namespace ntk {
     	if ( oid_bytes.empty() ) {
     		return std::unexpected( "OID is empty" );
     	}
-    	std::vector<uint8_t> oid;
+    	std::vector<std::size_t> oid;
     	oid.push_back( oid_bytes.front() / 40 );
     	oid.push_back( oid_bytes.front() % 40 );
     	std::size_t value = 0;
@@ -444,6 +444,72 @@ namespace ntk {
     	}
     	validity.not_after = not_after_result.value();
     	return validity;
+    }
+
+    // ==============
+    //  Get Tbs Rdns
+    // ==============
+
+    std::expected<std::vector<tbs_rdn>,std::string> get_tbs_rdns( std::span<const uint8_t> rdn_bytes ) {
+    	std::vector<tbs_rdn> t_rdns;
+    	auto rdns_result = get_children_from_raw_bytes( rdn_bytes );
+    	if ( !rdns_result ) {
+    		return std::unexpected( rdns_result.error() );
+    	}
+    	auto& rdns = rdns_result.value();
+    	for ( auto& rdn : rdns ) {
+    		tbs_rdn t_rdn;
+    		auto children_result = get_children( rdn );
+    		if ( !children_result ) {
+    			return std::unexpected( children_result.error() );
+    		}
+    		auto& children = children_result.value();
+    		if ( children.size() != 2 ) {
+    			return std::unexpected( "RDN does not have the correct number of fields" );
+    		}
+    		t_rdn.oid = children.front();
+    		t_rdn.value = std::string( children.back().begin(), children.back().end() );
+    		t_rdns.push_back( std::move( t_rdn ) );
+    	}
+    	return t_rdns;
+    }
+
+    // ==========================
+    //  Get Algorithm Identifier
+    // ==========================
+
+    std::expected<std::string,std::string> get_algorithm_identifier( std::span<const uint8_t> algorithm_bytes ) {
+    	auto children_result = get_children_from_raw_bytes( algorithm_bytes );
+    	if ( !children_result ) {
+    		return std::unexpected( children_result.error() );
+    	}
+    	auto string_result = convert_oid_to_dotted_string( children_result.value().front() );
+    	if ( !string_result ) {
+    		return std::unexpected( string_result.error() );
+    	}
+    	return string_result.value();
+    }
+
+    // =============================
+    //  Get Subject Public Key Info
+    // =============================
+
+    std::expected<subject_public_key_info,std::string> get_subject_public_key_info( std::span<const uint8_t> public_key_bytes ) {
+    	subject_public_key_info public_key_info;
+    	auto children_result = get_children_from_raw_bytes( public_key_bytes );
+    	if ( !children_result ) {
+    		return std::unexpected( children_result.error() );
+    	}
+    	auto& children = children_result.value();
+    	auto algorithm_children_result = get_children_from_raw_bytes( children.front() );
+    	if ( !algorithm_children_result ) {
+    		return std::unexpected( algorithm_children_result.error() );
+    	}
+    	auto& algorithm_children = algorithm_children_result.value();
+    	public_key_info.algorithm = algorithm_children.front();
+    	public_key_info.parameters = algorithm_children.back();
+    	public_key_info.key = children.back();
+    	return public_key_info;
     }
 
 } // namespace ntk
