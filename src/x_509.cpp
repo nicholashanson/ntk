@@ -389,4 +389,61 @@ namespace ntk {
     	return dotted_string;
     }
 
+    // ================
+    //  Parse UTC Time
+    // ================
+
+    std::expected<std::chrono::system_clock::time_point,std::string> parse_utc_time( std::span<const uint8_t> utc_time_bytes ) {
+    	if ( utc_time_bytes.empty() ) {
+    		return std::unexpected( "Empty UTC Time" );
+    	}
+    	auto digit = []( uint8_t b ) -> int {
+        	return b - '0';
+    	};
+	    int year   = digit( utc_time_bytes[ 0 ]  ) * 10 + digit( utc_time_bytes[ 1 ] );
+	    int month  = digit( utc_time_bytes[ 2 ]  ) * 10 + digit( utc_time_bytes[ 3 ] );
+	    int day    = digit( utc_time_bytes[ 4 ]  ) * 10 + digit( utc_time_bytes[ 5 ] );
+	    int hour   = digit( utc_time_bytes[ 6 ]  ) * 10 + digit( utc_time_bytes[ 7 ] );
+	    int minute = digit( utc_time_bytes[ 8 ]  ) * 10 + digit( utc_time_bytes[ 9 ] );
+	    int second = digit( utc_time_bytes[ 10 ] ) * 10 + digit( utc_time_bytes[ 11 ] );
+	    if ( year < 50 ) { 
+	    	year += 2000;
+	    } else {          
+	    	year += 1900;
+	    }
+	    std::tm tm{};
+	    tm.tm_year = year - 1900; 
+	    tm.tm_mon  = month - 1;   
+	    tm.tm_mday = day;
+	    tm.tm_hour = hour;
+	    tm.tm_min  = minute;
+	    tm.tm_sec  = second;
+	    std::time_t t = timegm( &tm ); 
+	    return std::chrono::system_clock::from_time_t( t );
+	}
+
+    // ==================
+    //  Get Tbs Validity
+    // ==================
+
+    std::expected<tbs_validity,std::string> get_tbs_validity( std::span<const uint8_t> validity_bytes ) {
+    	tbs_validity validity;
+    	auto children_result = get_children( validity_bytes );
+    	if ( !children_result ) {
+    		return std::unexpected( children_result.error() );
+    	}
+    	auto& children = children_result.value();
+    	auto not_before_result = parse_utc_time( children.front() );
+    	if ( !not_before_result ) {
+    		return std::unexpected( "Failed to Parse Not Before UTC Time: " + not_before_result.error() );
+    	}
+    	validity.not_before = not_before_result.value();
+    	auto not_after_result = parse_utc_time( children.back() );
+    	if ( !not_after_result ) {
+    		return std::unexpected( "Failed to Parse Not After UTC Time: " + not_after_result.error() );
+    	}
+    	validity.not_after = not_after_result.value();
+    	return validity;
+    }
+
 } // namespace ntk

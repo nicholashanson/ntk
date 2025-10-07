@@ -3,7 +3,9 @@
 
 #include <cstdint>
 
+#include <chrono>
 #include <expected>
+#include <map>
 #include <memory>
 #include <span>
 #include <string>
@@ -86,6 +88,19 @@ namespace ntk {
     	std::optional<std::vector<uint8_t>> extensions;
     };
 
+    inline std::map<std::string,std::string> algorithm_identifier_names = {
+    	{ "1.2.840.10045.4.3.2", "ECDSA with SHA256" }
+    };
+
+    // ==============
+    //  Tbs Validity
+    // ==============
+
+    struct tbs_validity {
+    	std::chrono::system_clock::time_point not_before;
+    	std::chrono::system_clock::time_point not_after;
+    };
+
     // ===========
     //  Extension
     // ===========
@@ -96,7 +111,7 @@ namespace ntk {
     	std::optional<bool> critical;
     };
 
-    std::map<std::string,std::string> tbs_extension_names = {
+    inline std::map<std::string,std::string> tbs_extension_names = {
     	{ "2.5.29.15",                                       "Key Usage" },
 		{ "2.5.29.37",							         "Ext Key Usage" },
 		{ "2.5.29.19", 								 "Basic Constraints" },
@@ -143,6 +158,10 @@ namespace ntk {
 	std::expected<std::vector<std::vector<uint8_t>>,std::string> get_nodes( std::span<const uint8_t> certificate_bytes );
 
     std::expected<std::vector<std::vector<uint8_t>>,std::string> get_nodes_from_raw_bytes( std::span<const uint8_t> certificate_bytes );
+
+    std::expected<std::chrono::system_clock::time_point,std::string> parse_utc_time( std::span<const uint8_t> utc_time_bytes );
+
+    std::expected<tbs_validity,std::string> get_tbs_validity( std::span<const uint8_t> validity_bytes );
 
 } // namespace ntk
 
