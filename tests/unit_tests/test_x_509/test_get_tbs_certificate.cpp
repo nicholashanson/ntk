@@ -13,7 +13,7 @@ TEST( UnitTest, GetTbsCertificate ) {
 	EXPECT_EQ( certificate.serial_number.size(), 16 );
 	EXPECT_EQ( certificate.algorithm_identifier.size(), 10 );
 	EXPECT_EQ( certificate.validity.size(), 30 );
-	EXPECT_EQ( certificate.subject_rnd.size(), 23 );
+	EXPECT_EQ( certificate.subject_rdn.size(), 23 );
 	EXPECT_EQ( certificate.subject_public_key_info.size(), 89 );
 	ASSERT_TRUE( certificate.extensions );
 	EXPECT_EQ( certificate.extensions.value().size(), 597 );

@@ -527,13 +527,54 @@ namespace ntk {
     // =======================
 
     void print_tbs_certificate( std::span<const uint8_t> certificate ) {
-        auto extensions_result = get_extensions( certificate );
-        if ( !extensions_result ) {
-            std::cout << extensions_result.error() << std::endl;
+        auto tbs_parse_result = get_tbs_certificate( certificate );
+        if ( !tbs_parse_result ) {
+            std::cout << tbs_parse_result.error() << std::endl;
             return;
         }
-        print_tbs_extensions( extensions_result.value() );
+        auto& tbs_cert = tbs_parse_result.value();
+        auto algorithm_result = get_algorithm_identifier( tbs_cert.algorithm_identifier );
+        if ( !algorithm_result ) {
+            std::cout << algorithm_result.error() << std::endl;
+            return;
+        }
+        std::cout << "Signature: " << algorithm_result.value() << std::endl;
+        auto issuer_rdn_result = get_tbs_rdns( tbs_cert.issuer_rdn );
+        if ( !issuer_rdn_result ) {
+            std::cout << issuer_rdn_result.error() << std::endl;
+            return;
+        } 
+        print_rdns( issuer_rdn_result.value() );
+        auto validity_result = get_tbs_validity( tbs_cert.validity );
+        if ( !validity_result ) {
+            std::cout << validity_result.error() << std::endl;
+            return;
+        }
+        auto subject_rdn_reuslt = get_tbs_rdns( tbs_cert.subject_rdn );
+        if ( !subject_rdn_reuslt ) {
+            std::cout << subject_rdn_reuslt.error() << std::endl;
+            return;
+        }
+        print_rdns( subject_rdn_reuslt.value() );
+        auto public_key_info_result = get_subject_public_key_info( tbs_cert.subject_public_key_info );
+        if ( !public_key_info_result ) {
+            std::cout << public_key_info_result.error() << std::endl;
+            return;
+        }
+        print_subject_public_key_info( public_key_info_result.value() );
+        if ( tbs_cert.extensions ) {
+            auto extensions_result = get_extensions( tbs_cert );
+            if ( !extensions_result ) {
+                std::cout << extensions_result.error() << std::endl;
+                return;
+            }
+            print_tbs_extensions( extensions_result.value() );
+        }
     }
+
+    // =====================
+    //  Print Tbs Extension
+    // =====================
 
     void print_tbs_extension( const extension& ext ) {
         auto dotted_string_result = convert_oid_to_dotted_string( ext.id );
@@ -542,13 +583,53 @@ namespace ntk {
             return;
         }
         auto& dotted_string = dotted_string_result.value();
-        std::cout << tbs_extension_names.at( dotted_string ) << " (" << dotted_string << ')' << std::endl;
+        std::cout << object_identifier_names.at( dotted_string ) << " (" << dotted_string << ')' << std::endl;
     }
+
+    // ======================
+    //  Print Tbs Extensions
+    // ======================
 
     void print_tbs_extensions( std::span<extension> extensions ) {
         for ( auto& extension : extensions ) {
             print_tbs_extension( extension );
         }
+    }
+
+    // ============
+    //  Print RDNs
+    // ============
+
+    void print_rdns( std::span<const tbs_rdn> rdns ) {
+        for ( auto& rdn : rdns ) {
+            auto string_result = convert_oid_to_dotted_string( rdn.oid );
+            if ( !string_result ) {
+                std::cout << "Failed to convert RDN OID to string" << std::endl;
+                continue;
+            }
+            auto& oid = string_result.value();
+            std::cout << oid << ": " << rdn.value << std::endl;
+        }
+    }
+
+    // ===============================
+    //  Print Subject Public Key Info
+    // ===============================
+
+    void print_subject_public_key_info( const subject_public_key_info& public_key_info ) {
+        auto algorithm_result = convert_oid_to_dotted_string( public_key_info.algorithm );
+        if ( !algorithm_result ) {
+            std::cout << algorithm_result.error() << std::endl;
+            return;
+        }
+        std::cout << object_identifier_names.at( algorithm_result.value() ) << std::endl;
+        auto parameters_result = convert_oid_to_dotted_string( public_key_info.parameters );
+        if ( !parameters_result ) {
+            std::cout << parameters_result.error() << std::endl;
+            return;
+        }
+        std::cout << object_identifier_names.at( parameters_result.value() ) << std::endl;
+        std::cout << "Key: " << bytes_to_hex_string( public_key_info.key ) << std::endl;
     }
 
 } // namespace ntk

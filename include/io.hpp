@@ -166,6 +166,10 @@ namespace ntk {
 
     void print_tbs_extensions( std::span<extension> extensions );
 
+    void print_rdns( std::span<const tbs_rdn> rdns );
+
+    void print_subject_public_key_info( const subject_public_key_info& public_key_info );
+
 } // namespace ntk
 
 #endif

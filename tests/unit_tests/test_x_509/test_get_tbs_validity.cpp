@@ -6,7 +6,7 @@
 
 TEST( UnitTest, GetTbsValidity ) {
 	auto certificate_bytes = std::span<const uint8_t>( test::tls_certificate );
-    certificate_bytes = certificate_bytes.subspan( 104, 32 );
+    certificate_bytes = certificate_bytes.subspan( 106, 30 );
 	auto validity_result = ntk::get_tbs_validity( certificate_bytes );
     ASSERT_TRUE( validity_result ) << validity_result.error() << std::endl;
     std::tm tm{};

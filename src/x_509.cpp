@@ -177,9 +177,9 @@ namespace ntk {
     	}
     	certificate.serial_number = std::move( get_raw_bytes( it ) );    	
     	certificate.algorithm_identifier = std::move( get_raw_bytes( it ) );
-    	certificate.issuer_rnd = std::move( get_raw_bytes( it ) );
+    	certificate.issuer_rdn = std::move( get_raw_bytes( it ) );
     	certificate.validity = std::move( get_raw_bytes( it ) );
-    	certificate.subject_rnd = std::move( get_raw_bytes( it ) );
+    	certificate.subject_rdn = std::move( get_raw_bytes( it ) );
     	certificate.subject_public_key_info = std::move( get_raw_bytes( it ) );
     	if ( it != parsed_tbs_certificate->children.end() ) {
     		certificate.extensions = std::move( get_raw_bytes( it ) );
@@ -319,6 +319,16 @@ namespace ntk {
     	return get_extensions( extensions_list_result.value() );
     }
 
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::vector<extension>,std::string> get_extensions( const tbs_certificate& cert ) {
+    	auto nodes_result = get_nodes( cert.extensions.value() );
+    	if ( !nodes_result ) {
+    		return std::unexpected( nodes_result.error() ); 
+    	}
+    	return get_extensions( nodes_result.value() );
+    } 
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     std::expected<std::vector<extension>,std::string> get_extensions( const std::vector<std::vector<uint8_t>>& extensions_bytes ) {
     	std::vector<extension> extensions;
     	for ( auto& extension_bytes : extensions_bytes ) {
@@ -339,7 +349,7 @@ namespace ntk {
     	extension ext;
     	auto children_result = get_children( extension_bytes );
     	if ( !children_result ) {
-    		return std::unexpected( children_result.error() );
+    		return std::unexpected( "Failed to Extract Children from TBS Extensions: " + children_result.error() );
     	}
     	auto& children = children_result.value();
     	if ( children.size() < 2 ) {
@@ -428,9 +438,9 @@ namespace ntk {
 
     std::expected<tbs_validity,std::string> get_tbs_validity( std::span<const uint8_t> validity_bytes ) {
     	tbs_validity validity;
-    	auto children_result = get_children( validity_bytes );
+    	auto children_result = get_children_from_raw_bytes( validity_bytes );
     	if ( !children_result ) {
-    		return std::unexpected( children_result.error() );
+    		return std::unexpected( "Failed to Extract Children from TBS Validity: " + children_result.error() );
     	}
     	auto& children = children_result.value();
     	auto not_before_result = parse_utc_time( children.front() );
@@ -454,14 +464,14 @@ namespace ntk {
     	std::vector<tbs_rdn> t_rdns;
     	auto rdns_result = get_children_from_raw_bytes( rdn_bytes );
     	if ( !rdns_result ) {
-    		return std::unexpected( rdns_result.error() );
+    		return std::unexpected( "Failed to Extract RDBs: " + rdns_result.error() );
     	}
     	auto& rdns = rdns_result.value();
     	for ( auto& rdn : rdns ) {
     		tbs_rdn t_rdn;
     		auto children_result = get_children( rdn );
     		if ( !children_result ) {
-    			return std::unexpected( children_result.error() );
+    			return std::unexpected( "Failed to Extract Children from RDN: " + children_result.error() );
     		}
     		auto& children = children_result.value();
     		if ( children.size() != 2 ) {
@@ -481,11 +491,11 @@ namespace ntk {
     std::expected<std::string,std::string> get_algorithm_identifier( std::span<const uint8_t> algorithm_bytes ) {
     	auto children_result = get_children_from_raw_bytes( algorithm_bytes );
     	if ( !children_result ) {
-    		return std::unexpected( children_result.error() );
+    		return std::unexpected( "Failed to Extract Children from Algorithm Identifier: " + children_result.error() );
     	}
     	auto string_result = convert_oid_to_dotted_string( children_result.value().front() );
     	if ( !string_result ) {
-    		return std::unexpected( string_result.error() );
+    		return std::unexpected( "Failed to Convert Algorithm Identifier Object ID to String: " + string_result.error() );
     	}
     	return string_result.value();
     }
@@ -498,12 +508,12 @@ namespace ntk {
     	subject_public_key_info public_key_info;
     	auto children_result = get_children_from_raw_bytes( public_key_bytes );
     	if ( !children_result ) {
-    		return std::unexpected( children_result.error() );
+    		return std::unexpected( "Failed to Extract Children from Subject Public Key Info: " + children_result.error() );
     	}
     	auto& children = children_result.value();
     	auto algorithm_children_result = get_children_from_raw_bytes( children.front() );
     	if ( !algorithm_children_result ) {
-    		return std::unexpected( algorithm_children_result.error() );
+    		return std::unexpected( "Failed to Extract Children from Public Key Algorithm: " + algorithm_children_result.error() );
     	}
     	auto& algorithm_children = algorithm_children_result.value();
     	public_key_info.algorithm = algorithm_children.front();

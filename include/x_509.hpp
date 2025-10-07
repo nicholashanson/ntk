@@ -81,9 +81,9 @@ namespace ntk {
     	std::optional<uint8_t> version;
     	std::vector<uint8_t> serial_number;
     	std::vector<uint8_t> algorithm_identifier;
-    	std::vector<uint8_t> issuer_rnd;
+    	std::vector<uint8_t> issuer_rdn;
     	std::vector<uint8_t> validity;
-    	std::vector<uint8_t> subject_rnd;
+    	std::vector<uint8_t> subject_rdn;
     	std::vector<uint8_t> subject_public_key_info;
     	std::optional<std::vector<uint8_t>> extensions;
     };
@@ -131,19 +131,21 @@ namespace ntk {
     };
 
     inline std::map<std::string,std::string> object_identifier_names = {
-    	{ "2.5.4.6", 								      "Country Name" },
-    	{ "2.5.4.10", 								 "Organization Name" },
-    	{ "2.5.4.3", 								       "Common Name" },
-    	{ "2.5.29.15",                                       "Key Usage" },
-		{ "2.5.29.37",							         "Ext Key Usage" },
-		{ "2.5.29.19", 								 "Basic Constraints" },
-		{ "2.5.29.14",							"Subject Key Identifier" },
-		{ "2.5.29.35",				          "Authority Key Identifier" },
-		{ "1.3.6.1.5.5.7.1.1", 					 "Authority Info Access" },
-		{ "2.5.29.17",						          "Subject Alt Name" },
-		{ "2.5.29.32", 							  "Certificate Policies" },
-		{ "2.5.29.31",						   "CRL Distribution Points" },
-		{ "1.3.6.1.4.1.121.2.4.2", "Google Signed Certificate Timestamp" }
+    	{ "1.2.840.10045.2.1",                             "EC Public Key" },
+    	{ "1.2.840.10045.3.1.7",                  "prime256v1 (secp256r1)" },
+    	{ "2.5.4.6", 								        "Country Name" },
+    	{ "2.5.4.10", 								   "Organization Name" },
+    	{ "2.5.4.3", 								         "Common Name" },
+    	{ "2.5.29.15",                                         "Key Usage" },
+		{ "2.5.29.37",							           "Ext Key Usage" },
+		{ "2.5.29.19", 							       "Basic Constraints" },
+		{ "2.5.29.14",							  "Subject Key Identifier" },
+		{ "2.5.29.35",				            "Authority Key Identifier" },
+		{ "1.3.6.1.5.5.7.1.1", 				   	   "Authority Info Access" },
+		{ "2.5.29.17",						            "Subject Alt Name" },
+		{ "2.5.29.32", 							    "Certificate Policies" },
+		{ "2.5.29.31",						     "CRL Distribution Points" },
+		{ "1.3.6.1.4.1.11129.2.4.2", "Google Signed Certificate Timestamp" }
     };
 
     // =================
@@ -170,6 +172,8 @@ namespace ntk {
 	std::expected<std::vector<uint8_t>,std::string> get_signature_algorithm( std::span<const uint8_t> certificate_bytes );
 
 	std::expected<std::vector<extension>,std::string> get_extensions( std::span<const uint8_t> certificate_bytes );
+
+	std::expected<std::vector<extension>,std::string> get_extensions( const tbs_certificate& cert );
 
 	std::expected<std::vector<extension>,std::string> get_extensions( const std::vector<std::vector<uint8_t>>& extensions_bytes );
 	
