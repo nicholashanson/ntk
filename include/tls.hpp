@@ -35,11 +35,164 @@ namespace ntk {
     //  TLS Extension 
     // ===============   
 
-    enum class tls_extension : uint16_t {
-        server_name        = 0x0000,
-        supported_versions = 0x002b,
-        key_share          = 0x0033
+    enum class tls_extension_type : uint16_t {
+        application_layer_protocol_negotiation = 0x0010,
+        delegated_credential                   = 0x0022,
+        ec_point_formats                       = 0x000b,
+        extended_main_secret                   = 0x0017,
+        pre_shared_key                         = 0x0029,
+        psk_key_exchange_modes                 = 0x002d,
+        renegotiation_info                     = 0xff01,
+        server_name                            = 0x0000,
+        status_request                         = 0x0005,
+        signature_algorithms                   = 0x000d,
+        supported_groups                       = 0x000a,
+        supported_versions                     = 0x002b,
+        key_share                              = 0x0033,
+        record_size_limit                      = 0x001c
     };
+
+    struct tls_extension {
+        std::optional<tls_extension_type> type;
+        uint16_t raw_type;
+        std::vector<uint8_t> value;
+    };
+
+    static const std::unordered_map<tls_extension_type,std::string> tls_extension_type_names = {
+        { tls_extension_type::application_layer_protocol_negotiation, "Application Layer Protocol Negotiation" },
+        { tls_extension_type::delegated_credential,                                     "Delegated Credential" },
+        { tls_extension_type::ec_point_formats,                                             "EC Point Formats" },
+        { tls_extension_type::extended_main_secret,                                     "Extended Main Secret" },
+        { tls_extension_type::pre_shared_key,                                                 "Pre-Shared Key" },
+        { tls_extension_type::psk_key_exchange_modes,                                 "PSK Key-Exchange Modes" },
+        { tls_extension_type::renegotiation_info,                                         "Renegotiation Info" },
+        { tls_extension_type::server_name,                                                       "Server Name" },
+        { tls_extension_type::signature_algorithms,                                     "Signature Algorithms" },
+        { tls_extension_type::status_request,                                                 "Status Request" },
+        { tls_extension_type::supported_groups,                                             "Supported Groups" },
+        { tls_extension_type::supported_versions,                                         "Supported Versions" },
+        { tls_extension_type::key_share,                                                           "Key Share" },
+        { tls_extension_type::record_size_limit,                                            "Record Size Limit"}
+    };
+
+    constexpr std::array<tls_extension_type,14> default_tls_extensions = {
+        tls_extension_type::application_layer_protocol_negotiation,
+        tls_extension_type::delegated_credential,
+        tls_extension_type::ec_point_formats,
+        tls_extension_type::extended_main_secret,
+        tls_extension_type::pre_shared_key,
+        tls_extension_type::psk_key_exchange_modes,
+        tls_extension_type::renegotiation_info,
+        tls_extension_type::server_name,
+        tls_extension_type::status_request,
+        tls_extension_type::signature_algorithms,
+        tls_extension_type::supported_groups,
+        tls_extension_type::supported_versions,
+        tls_extension_type::key_share,
+        tls_extension_type::record_size_limit
+    };
+
+    namespace look_up {
+
+        constexpr std::array<tls_extension_type,14/* entries in enum tls_extension_type */> tls_extensions = {
+            tls_extension_type::application_layer_protocol_negotiation,
+            tls_extension_type::delegated_credential,
+            tls_extension_type::ec_point_formats,
+            tls_extension_type::extended_main_secret,
+            tls_extension_type::pre_shared_key,
+            tls_extension_type::psk_key_exchange_modes,
+            tls_extension_type::renegotiation_info,
+            tls_extension_type::server_name,
+            tls_extension_type::status_request,
+            tls_extension_type::signature_algorithms,
+            tls_extension_type::supported_groups,
+            tls_extension_type::supported_versions,
+            tls_extension_type::key_share,
+            tls_extension_type::record_size_limit
+        };
+
+    } // namespace look_up
+
+    inline auto get_tls_extension_type = make_lookup( look_up::tls_extensions );
+
+    // ======================
+    //  Delegated Credential 
+    // ======================
+
+    enum signatue_algorithm {
+        ecdsa_sha1             = 0x0203,
+        ecdsa_secp256r1_sha256 = 0x0403,
+        ecdsa_secp384r1_sha384 = 0x0503,
+        ecdsa_secp521r1_sha512 = 0x0603
+    };
+
+    namespace look_up {
+
+        constexpr std::array<signatue_algorithm,4/* entires in enum named_group */> signature_algorithms = {
+            signatue_algorithm::ecdsa_sha1,
+            signatue_algorithm::ecdsa_secp256r1_sha256,
+            signatue_algorithm::ecdsa_secp384r1_sha384,
+            signatue_algorithm::ecdsa_secp521r1_sha512
+        };
+
+    } // namespace look_up
+
+    inline auto get_tls_signature_algorithm = make_lookup( look_up::signature_algorithms );
+
+    inline std::map<signatue_algorithm,std::string> signatue_algorithm_names = {
+        { signatue_algorithm::ecdsa_sha1,                         "ecdsa_sha1" },
+        { signatue_algorithm::ecdsa_secp256r1_sha256, "ecdsa_secp256r1_sha256" },
+        { signatue_algorithm::ecdsa_secp384r1_sha384, "ecdsa_secp384r1_sha384" },
+        { signatue_algorithm::ecdsa_secp521r1_sha512, "ecdsa_secp521r1_sha512" }
+    };
+
+    constexpr std::array<signatue_algorithm,4> default_signature_algorithms = {
+        signatue_algorithm::ecdsa_sha1,
+        signatue_algorithm::ecdsa_secp256r1_sha256,
+        signatue_algorithm::ecdsa_secp384r1_sha384,
+        signatue_algorithm::ecdsa_secp521r1_sha512
+    };
+
+    std::expected<std::vector<signatue_algorithm>,std::string> parse_client_hello_delegated_credential( std::span<const uint8_t> dedicated_credential_bytes );
+
+    struct delegated_credential {
+        uint32_t valid_time;              
+        uint16_t expected_verify_algorithm;    
+        std::vector<uint8_t> credential;      
+        std::vector<uint8_t> signature; 
+    };
+
+    // =================
+    //  Key Share Entry 
+    // =================
+
+    struct key_share_entry {
+        uint16_t group;
+        std::vector<uint8_t> key_data;
+    };
+
+    enum named_group : uint16_t {
+        secp256r1 = 0x0017,
+        x25519    = 0x001d
+    };
+
+    namespace look_up {
+
+        constexpr std::array<named_group,2/* entires in enum named_group */> named_groups = {
+            named_group::secp256r1,
+            named_group::x25519
+        };
+
+    } // namespace look_up
+
+    inline auto get_tls_named_group = make_lookup( look_up::named_groups );
+
+    inline std::map<named_group,std::string> named_group_names = {
+        { named_group::secp256r1, "secp256r1" },
+        { named_group::x25519,       "x25519" }   
+    };
+
+    std::expected<std::vector<key_share_entry>,std::string> parse_key_share_entries( std::span<const uint8_t> key_share_entries_bytes );
 
     // =============
     //  TLS Version 
@@ -345,6 +498,8 @@ namespace ntk {
     std::expected<bool,std::string> is_server_hello( const std::vector<uint8_t>& packet );
 
     bool is_server_hello( const tls_record& record );
+
+    std::expected<std::vector<tls_extension>,std::string> parse_tls_extensions( std::span<const uint8_t> extensions_bytes );
 
     // =======
     //  Alert 

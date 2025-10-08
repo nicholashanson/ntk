@@ -396,6 +396,113 @@ namespace ntk {
         return parse_server_hello( server_hello_bytes ); 
     }
 
+    // ==================
+    //  Parse Extensions 
+    // ==================
+
+    std::expected<std::vector<tls_extension>,std::string> parse_tls_extensions( std::span<const uint8_t> extensions_bytes ) {
+        std::vector<tls_extension> extensions;
+        while ( !extensions_bytes.empty() ) {
+            tls_extension ext;
+            if ( extensions_bytes.size() < 4 ) {
+                return std::unexpected( "TLS Extension Header is truncated" );
+            }
+            auto type = read_uint16_be( extensions_bytes, 0 );
+            auto extension_type_opt = get_tls_extension_type( type );
+            if ( !extension_type_opt ) {
+                ext.type = std::nullopt;
+            } else {
+                ext.type = extension_type_opt.value();
+            }
+            ext.raw_type = type;
+            auto len = read_uint16_be( extensions_bytes, 2 );
+            if ( extensions_bytes.size() < len + 4 ) {
+                return std::unexpected( "TLS Extension Field is truncated" );
+            }
+            ext.value = { extensions_bytes.begin() + 4, extensions_bytes.begin() + 4 + len };
+            extensions.push_back( std::move( ext ) );
+            extensions_bytes = extensions_bytes.subspan( 4 + len );
+        }
+        return extensions;
+    }
+
+    // ============================
+    //  Parse Dedicated Credential 
+    // ============================
+
+    std::expected<delegated_credential,std::string> parse_dedicated_credential( std::span<const uint8_t> delegated_credential_bytes ) {
+        delegated_credential credential;
+        if ( delegated_credential_bytes.size() < 4 ) {
+            return std::unexpected( "Dedicated Credential Bytes not long enough for Valid Time" );
+        }
+        credential.valid_time = read_uint32_be( delegated_credential_bytes, 0 );
+        if ( delegated_credential_bytes.size() < 6 ) {
+            return std::unexpected( "Dedicated Credential Bytes not long enough for Expected Verify Algorithm" );
+        }
+        credential.expected_verify_algorithm = read_uint16_be( delegated_credential_bytes, 4 );
+        if ( delegated_credential_bytes.size() < 8 ) {
+            return std::unexpected( "Dedicated Credential Bytes not long enough for Credential Length" );
+        }
+        auto credential_len = read_uint16_be( delegated_credential_bytes, 6 );
+        delegated_credential_bytes = delegated_credential_bytes.subspan( 4 + 2 + 2 );
+        if ( delegated_credential_bytes.size() < credential_len ) {
+            return std::unexpected( "Credential is truncated" );
+        }
+        credential.credential = { delegated_credential_bytes.begin(), delegated_credential_bytes.begin() + credential_len };
+        delegated_credential_bytes = delegated_credential_bytes.subspan( credential_len );
+        if ( delegated_credential_bytes.size() < 8 ) {
+            return std::unexpected( "Dedicated Credential Bytes not long enough for Signature Length" );
+        }
+        auto signature_len = read_uint16_be( delegated_credential_bytes, 0 );
+        if ( delegated_credential_bytes.size() < 2 + signature_len ) {
+            return std::unexpected( "Signature is truncated" );
+        }
+        credential.signature = { delegated_credential_bytes.begin() + 2, delegated_credential_bytes.begin() + 2 + signature_len };
+        return credential;
+    }
+
+    // =========================================
+    //  Parse Client Hello Dedicated Credential 
+    // =========================================
+
+    std::expected<std::vector<signatue_algorithm>,std::string> parse_client_hello_delegated_credential( std::span<const uint8_t> delegated_credential_bytes ) {
+        delegated_credential_bytes = delegated_credential_bytes.subspan( 2 );
+        std::vector<signatue_algorithm> algorithms;
+        while ( !delegated_credential_bytes.empty() ) {
+            auto algorithm_opt = get_tls_signature_algorithm( read_uint16_be( delegated_credential_bytes, 0 ) );
+            if ( !algorithm_opt ) {
+                return std::unexpected( "Unrecognized Signature Algorithm" );
+            }
+            algorithms.push_back( algorithm_opt.value() );
+            delegated_credential_bytes = delegated_credential_bytes.subspan( 2 );
+        }
+        return algorithms;
+    }
+
+    // =========================
+    //  Parse Key Share Entries 
+    // =========================
+
+    std::expected<std::vector<key_share_entry>,std::string> parse_key_share_entries( std::span<const uint8_t> key_share_entries_bytes ) {
+        key_share_entries_bytes = key_share_entries_bytes.subspan( 2 /* client shares vector length */ );
+        std::vector<key_share_entry> key_share_entries;
+        while ( !key_share_entries_bytes.empty() ) {
+            key_share_entry entry;
+            if ( key_share_entries_bytes.size() < 4 ) {
+                return std::unexpected( "Key Share Entry Header is truncated" );
+            }
+            entry.group = read_uint16_be( key_share_entries_bytes, 0 );
+            auto len = read_uint16_be( key_share_entries_bytes, 2 );
+            if ( key_share_entries_bytes.size() < len + 4 ) {
+                return std::unexpected( "Key Share Entry Data is truncated" );
+            }
+            entry.key_data = { key_share_entries_bytes.begin() + 4, key_share_entries_bytes.begin() + 4 + len };
+            key_share_entries.push_back( std::move( entry ) );
+            key_share_entries_bytes = key_share_entries_bytes.subspan( 4 + len );
+        }
+        return key_share_entries;   
+    }
+
     // ===================
     //  Split TLS Records 
     // ===================
@@ -686,6 +793,10 @@ namespace ntk {
             }
 
             if ( client_random_hex == client_random_h ) {
+                if ( label == "CLIENT_RANDOM" ) {
+                    tls_secrets[ client_random_hex ][ "MASTER_SECRET" ] = secret;
+                    break;
+                }
                 tls_secrets[ client_random_hex ][ label ] = secret;
                 if ( is_complete_secrets( tls_secrets[ client_random_hex ] ) )
                     break;
