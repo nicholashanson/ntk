@@ -119,41 +119,79 @@ namespace ntk {
     //  Delegated Credential 
     // ======================
 
-    enum signatue_algorithm {
+    enum signature_algorithm {
         ecdsa_sha1             = 0x0203,
         ecdsa_secp256r1_sha256 = 0x0403,
         ecdsa_secp384r1_sha384 = 0x0503,
-        ecdsa_secp521r1_sha512 = 0x0603
+        ecdsa_secp521r1_sha512 = 0x0603,
+        rsa_pss_rsae_sha256    = 0x0804,
+        rsa_pss_rsae_sha384    = 0x0805,
+        rsa_pss_rsae_sha512    = 0x0806,
+        rsa_pkcs1_sha256       = 0x0401,
+        rsa_pkcs1_sha384       = 0x0501,
+        rsa_pkcs1_sha512       = 0x0601,
+        rsa_pkcs1_sha1         = 0x0201
     };
 
     namespace look_up {
 
-        constexpr std::array<signatue_algorithm,4/* entires in enum named_group */> signature_algorithms = {
-            signatue_algorithm::ecdsa_sha1,
-            signatue_algorithm::ecdsa_secp256r1_sha256,
-            signatue_algorithm::ecdsa_secp384r1_sha384,
-            signatue_algorithm::ecdsa_secp521r1_sha512
+        constexpr std::array<signature_algorithm,11/* entires in enum named_group */> signature_algorithms = {
+            signature_algorithm::ecdsa_sha1,
+            signature_algorithm::ecdsa_secp256r1_sha256,
+            signature_algorithm::ecdsa_secp384r1_sha384,
+            signature_algorithm::ecdsa_secp521r1_sha512,
+            signature_algorithm::rsa_pss_rsae_sha256,
+            signature_algorithm::rsa_pss_rsae_sha384,
+            signature_algorithm::rsa_pss_rsae_sha512,
+            signature_algorithm::rsa_pkcs1_sha256,
+            signature_algorithm::rsa_pkcs1_sha384,
+            signature_algorithm::rsa_pkcs1_sha512,
+            signature_algorithm::rsa_pkcs1_sha1 
         };
 
     } // namespace look_up
 
     inline auto get_tls_signature_algorithm = make_lookup( look_up::signature_algorithms );
 
-    inline std::map<signatue_algorithm,std::string> signatue_algorithm_names = {
-        { signatue_algorithm::ecdsa_sha1,                         "ecdsa_sha1" },
-        { signatue_algorithm::ecdsa_secp256r1_sha256, "ecdsa_secp256r1_sha256" },
-        { signatue_algorithm::ecdsa_secp384r1_sha384, "ecdsa_secp384r1_sha384" },
-        { signatue_algorithm::ecdsa_secp521r1_sha512, "ecdsa_secp521r1_sha512" }
+    inline std::map<signature_algorithm,std::string> signature_algorithm_names = {
+        { signature_algorithm::ecdsa_sha1,                         "ecdsa_sha1" },
+        { signature_algorithm::ecdsa_secp256r1_sha256, "ecdsa_secp256r1_sha256" },
+        { signature_algorithm::ecdsa_secp384r1_sha384, "ecdsa_secp384r1_sha384" },
+        { signature_algorithm::ecdsa_secp521r1_sha512, "ecdsa_secp521r1_sha512" },
+        { signature_algorithm::rsa_pss_rsae_sha256,       "rsa_pss_rsae_sha256" },
+        { signature_algorithm::rsa_pss_rsae_sha384,       "rsa_pss_rsae_sha384" },
+        { signature_algorithm::rsa_pss_rsae_sha512,       "rsa_pss_rsae_sha512" },
+        { signature_algorithm::rsa_pkcs1_sha256,             "rsa_pkcs1_sha256" },
+        { signature_algorithm::rsa_pkcs1_sha384,             "rsa_pkcs1_sha384" },
+        { signature_algorithm::rsa_pkcs1_sha512,             "rsa_pkcs1_sha512" },
+        { signature_algorithm::rsa_pkcs1_sha1,                 "rsa_pkcs1_sha1" }
     };
 
-    constexpr std::array<signatue_algorithm,4> default_signature_algorithms = {
-        signatue_algorithm::ecdsa_sha1,
-        signatue_algorithm::ecdsa_secp256r1_sha256,
-        signatue_algorithm::ecdsa_secp384r1_sha384,
-        signatue_algorithm::ecdsa_secp521r1_sha512
+    constexpr std::array<signature_algorithm,4> default_delegated_credential_signature_algorithms = {
+        signature_algorithm::ecdsa_sha1,
+        signature_algorithm::ecdsa_secp256r1_sha256,
+        signature_algorithm::ecdsa_secp384r1_sha384,
+        signature_algorithm::ecdsa_secp521r1_sha512
     };
 
-    std::expected<std::vector<signatue_algorithm>,std::string> parse_client_hello_delegated_credential( std::span<const uint8_t> dedicated_credential_bytes );
+    constexpr std::array<signature_algorithm,11> default_signature_algorithms = {
+        signature_algorithm::ecdsa_sha1,
+        signature_algorithm::ecdsa_secp256r1_sha256,
+        signature_algorithm::ecdsa_secp384r1_sha384,
+        signature_algorithm::ecdsa_secp521r1_sha512,
+        signature_algorithm::rsa_pss_rsae_sha256,
+        signature_algorithm::rsa_pss_rsae_sha384,
+        signature_algorithm::rsa_pss_rsae_sha512,
+        signature_algorithm::rsa_pkcs1_sha256,
+        signature_algorithm::rsa_pkcs1_sha384,
+        signature_algorithm::rsa_pkcs1_sha512,
+        signature_algorithm::rsa_pkcs1_sha1  
+    };
+
+
+    std::expected<std::vector<signature_algorithm>,std::string> parse_signature_algorithms( std::span<const uint8_t> signature_algorithms_bytes );
+
+    std::expected<std::vector<signature_algorithm>,std::string> parse_client_hello_delegated_credential( std::span<const uint8_t> dedicated_credential_bytes );
 
     struct delegated_credential {
         uint32_t valid_time;              
@@ -169,6 +207,10 @@ namespace ntk {
     struct key_share_entry {
         uint16_t group;
         std::vector<uint8_t> key_data;
+
+        bool operator==( const key_share_entry& other ) const {
+            return group == other.group;
+        }
     };
 
     enum named_group : uint16_t {
@@ -209,7 +251,7 @@ namespace ntk {
         named_group::x25519
     };
 
-    constexpr std::array<named_group,6> defualt_supported_groups {
+    constexpr std::array<named_group,6> default_supported_groups {
         named_group::ffdhe2048,
         named_group::ffdhe3072,
         named_group::secp256r1,
@@ -217,6 +259,13 @@ namespace ntk {
         named_group::secp521r1,
         named_group::x25519
     };
+
+    constexpr std::array<std::string,2> default_alpn = {
+        "h2",
+        "http/1.1"
+    };
+
+    std::expected<std::vector<std::string>,std::string> parse_client_hello_alpn( std::span<const uint8_t> alpn_bytes );
 
     std::expected<std::vector<key_share_entry>,std::string> parse_key_share_entries( std::span<const uint8_t> key_share_entries_bytes );
 
@@ -249,6 +298,8 @@ namespace ntk {
     } // namespace look_up
 
     inline auto get_tls_version = make_lookup( look_up::tls_versions );
+
+    std::expected<std::vector<tls_version>,std::string> parse_supported_versions( std::span<const uint8_t> supported_versions_bytes );
 
     // ===============
     //  Cipher Suites 
@@ -293,6 +344,33 @@ namespace ntk {
         { cipher_suite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,     "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256" },
         { cipher_suite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256" }
     };
+
+    namespace look_up {
+
+        constexpr std::array<cipher_suite,17> cipher_suites = {
+            cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA,                  
+            cipher_suite::TLS_RSA_WITH_AES_256_CBC_SHA,                  
+            cipher_suite::TLS_RSA_WITH_AES_128_GCM_SHA256,               
+            cipher_suite::TLS_RSA_WITH_AES_256_GCM_SHA384,               
+            cipher_suite::TLS_AES_128_GCM_SHA256,                        
+            cipher_suite::TLS_AES_256_GCM_SHA384,                        
+            cipher_suite::TLS_CHACHA20_POLY1305_SHA256,                  
+            cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,       
+            cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,          
+            cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,          
+            cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,            
+            cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,            
+            cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,       
+            cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,         
+            cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,         
+            cipher_suite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,   
+            cipher_suite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 
+        };
+
+    } // namespace look_up
+
+
+    inline auto get_cipher_suite = make_lookup( look_up::cipher_suites );
 
     // ==================
     //  TLS Content Type 
@@ -459,6 +537,32 @@ namespace ntk {
         }
     };
 
+    struct client_hello_extensions {
+        std::optional<bool> renegotiation_info;
+        std::optional<std::vector<named_group>> supported_groups;
+        std::optional<std::vector<tls_version>> supported_versions;
+        std::optional<std::vector<signature_algorithm>> signature_algorithms;
+        std::optional<std::vector<std::string>> alpn;
+        std::optional<std::vector<key_share_entry>> key_share_entries;
+
+        bool operator==( const client_hello_extensions& other ) const {
+            return renegotiation_info == other.renegotiation_info &&
+                   equal_unordered_optional_vec( supported_groups, other.supported_groups ) &&
+                   equal_unordered_optional_vec( supported_versions, other.supported_versions ) &&
+                   equal_unordered_optional_vec( signature_algorithms, other.signature_algorithms ) &&
+                   equal_unordered_optional_vec( alpn, other.alpn ) &&
+                   equal_unordered_optional_vec( key_share_entries, other.key_share_entries );
+        }
+    };
+
+    struct client_hello_info {
+        tls_version client_version;
+        std::array<uint8_t,32> random;
+        std::vector<uint8_t> session_id;
+        std::vector<cipher_suite> cipher_suites;
+        std::optional<client_hello_extensions> extensions;
+    };
+
     std::expected<client_hello,std::string> parse_client_hello( const std::span<const uint8_t> client_hello_bytes );
 
     std::expected<std::vector<uint8_t>,std::string> extract_client_hello_cipher_suites( const std::span<const uint8_t> client_hello_bytes,
@@ -480,6 +584,12 @@ namespace ntk {
     std::expected<bool,std::string> is_client_hello( std::span<const uint8_t> packet );
 
     bool is_client_hello( const tls_record& record );
+
+    std::expected<client_hello_info,std::string> get_client_hello_info( std::span<const uint8_t> client_hello_bytes );
+
+    std::expected<client_hello_info,std::string> get_client_hello_info_from_ethernet( std::span<const uint8_t> packet );
+
+    std::expected<client_hello_extensions,std::string> parse_client_hello_extensions( std::span<const tls_extension> extensions );
 
     inline auto client_hello_filter = [] ( const auto& packet ) {
         auto result = is_client_hello( packet );

@@ -142,6 +142,12 @@ namespace ntk {
 
     void print_server_hello( const server_hello& s_hello, std::ostream& os = std::cout );
 
+    void print_tls_extensions( std::span<const tls_extension> extensions, std::ostream& os = std::cout );
+
+    void print_key_share_entries( std::span<const key_share_entry> key_share_entries, std::ostream& os = std::cout ); 
+    
+    std::ostream& operator<<( std::ostream& os, const client_hello_extensions& extensions );
+
     // ============
     //  Print HTTP
     // ============

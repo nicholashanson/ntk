@@ -1,13 +1,64 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include <span>
 #include <cassert>
 #include <cstdint>
-#include <stdexcept>
+
+#include <algorithm>
+#include <array>
 #include <concepts>
+#include <iomanip>
+#include <optional>
+#include <span>
+#include <stdexcept>
+#include <sstream>
+#include <vector>
+
+#include <iostream>
 
 namespace ntk {
+
+    // ================================
+    //  Unequal Unordered Optional Vec
+    // ================================
+
+    template<typename T>
+    bool equal_unordered_optional_vec( const std::optional<std::vector<T>>& a, const std::optional<std::vector<T>>& b ) {
+        if ( !a && !b ) { 
+            return true;
+        }
+        if ( a && b ) {
+            return std::is_permutation( a->begin(), a->end(), b->begin(), b->end() );
+        }
+        return false;
+    }
+
+    // ==========================
+    //  Big Endian Byte Encoding
+    // ==========================
+
+    template<typename T,std::size_t N>
+    std::array<uint8_t,N> get_big_endian_byte_encoding( const T bytes ) {
+        std::array<uint8_t,N> encoded_bytes;
+        for ( std::size_t i = 0; i < N; ++i ) {
+            encoded_bytes[ N - 1 - i ] = ( bytes >> ( i * 8 ) ) & 0xff;
+        }
+        return encoded_bytes;
+    }
+
+    // Add a concept so that value_raw is the same type as the underlying type of the enum
+    template<typename EnumT,std::size_t N>
+    constexpr auto make_lookup( const std::array<EnumT,N>& valid_values ) {
+        return [ &valid_values ]( auto value_raw ) -> std::optional<EnumT> {
+            EnumT value = static_cast<EnumT>( value_raw );
+            auto it = std::find_if( valid_values.begin(), valid_values.end(),
+                [ value_raw ]( EnumT enum_value ) {
+                    return static_cast<std::underlying_type_t<EnumT>>( enum_value ) == static_cast<std::underlying_type_t<EnumT>>( value_raw );
+                });
+            if ( it == valid_values.end() ) return std::nullopt;
+            return *it;
+        };
+    }
 
     // ==============================
     //            BITMASK
@@ -23,6 +74,8 @@ namespace ntk {
     // ==============================
 
     uint16_t read_uint16_be( const unsigned char* buffer, size_t offset );
+
+    uint16_t read_uint16_be( std::initializer_list<const char> bytes );
 
     template<typename Index> 
     uint16_t read_uint16_be( std::span<const uint8_t> buffer, Index offset ) {
@@ -156,6 +209,8 @@ namespace ntk {
         assert( window.size() == 3 ); 
         return triple<T>{ window[ 0 ], window[ 1 ], window[ 2 ] };
     }
+
+    std::string bytes_to_hex_string( std::span<const uint8_t> bytes );
 
 } // namespace ntk
 

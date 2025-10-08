@@ -235,6 +235,72 @@ namespace ntk {
         return os;
     }
 
+    // ========================================
+    //  Client Hello Extensions :: Operator <<
+    // ========================================
+
+    std::ostream& operator<<( std::ostream& os, const client_hello_extensions& extensions ) {
+        const int label_width = 26;
+        os << std::dec << std::setfill( ' ' );
+
+        auto print_field = [&]( const std::string& label, auto value ) {
+            os << std::left << std::setw( label_width ) << label << value << "\n";
+        };
+
+        if ( extensions.renegotiation_info ) {
+            print_field( "Renegotiation Info:", extensions.renegotiation_info.value() );
+        }
+        os << std::left << std::setw( label_width ) << "Supported Groups:";
+        if ( extensions.supported_groups ) {
+            for ( std::size_t i = 0; i < extensions.supported_groups.value().size(); ++i ) {
+                if ( i != 0 ) {
+                    os << std::setw( label_width ) << " ";
+                }
+                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << named_group_names.at( extensions.supported_groups.value()[ i ] ) << std::dec;
+                os << "\n";
+            }
+        }
+        os << std::left << std::setw( label_width ) << "Supported Groups:";
+        if ( extensions.supported_versions ) {
+            for ( std::size_t i = 0; i < extensions.supported_versions.value().size(); ++i ) {
+                if ( i != 0 ) {
+                    os << std::setw( label_width ) << " ";
+                }
+                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << tls_version_names.at( extensions.supported_versions.value()[ i ] ) << std::dec;
+                os << "\n";
+            }
+        }
+        if ( extensions.signature_algorithms ) {
+            for ( std::size_t i = 0; i < extensions.signature_algorithms.value().size(); ++i ) {
+                if ( i != 0 ) {
+                    os << std::setw( label_width ) << " ";
+                }
+                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << signature_algorithm_names.at( extensions.signature_algorithms.value()[ i ] ) << std::dec;
+                os << "\n";
+            }
+        }
+        if ( extensions.alpn ) {
+            for ( std::size_t i = 0; i < extensions.alpn.value().size(); ++i ) {
+                if ( i != 0 ) {
+                    os << std::setw( label_width ) << " ";
+                }
+                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << extensions.alpn.value()[ i ] << std::dec;
+                os << "\n";
+            }
+        }
+
+        if ( extensions.key_share_entries ) {
+            for ( std::size_t i = 0; i < extensions.key_share_entries.value().size(); ++i ) {
+                if ( i != 0 ) {
+                    os << std::setw( label_width ) << " ";
+                }
+                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << named_group_names.at( static_cast<named_group>( extensions.key_share_entries.value()[ i ].group ) ) << std::dec;
+                os << "\n";
+            }
+        }
+        return os;
+    }
+
     // ====================
     //  Print Client Hello
     // ====================
@@ -267,6 +333,12 @@ namespace ntk {
             }
             os << "\n";
         }
+        auto parse_result = parse_tls_extensions( c_hello.extensions );
+        if ( !parse_result ) {
+            std::cout << parse_result.error() << std::endl;
+            return;
+        }
+        print_tls_extensions( parse_result.value() );
         os << "===== CLIENT HELLO END =====\n\n";
     }
 
@@ -413,6 +485,51 @@ namespace ntk {
             }
             std::cout << "===== TLS SECRETS END =====\n\n";
         }
+    }
+
+    // ======================
+    //  Print Tls Extensions
+    // ======================
+
+    void print_tls_extensions( std::span<const tls_extension> extensions, std::ostream& os ) {
+        const int label_width = 26;
+        for ( const auto& ext : extensions ) {
+            if ( !ext.type.has_value() ) {
+                os << std::left << std::setw( label_width ) << "Extension Type:"
+                   << "0x" << std::uppercase << std::hex
+                   << std::setw( 4 ) << std::setfill( '0' ) << ext.raw_type
+                   << std::dec << std::setfill( ' ' );
+                os <<  "  (Unrecognized)";
+            } else {
+                os << tls_extension_type_names.at( ext.type.value() );
+            }
+            if ( ext.type == tls_extension_type::record_size_limit ) {
+                std::cout << ' ' << read_uint16_be( ext.value, 0 );
+            }
+            if ( ext.type == tls_extension_type::key_share ) {
+                os << "\n";
+                auto parse_result = parse_key_share_entries( ext.value );
+                if ( !parse_result ) {
+                    std::cout << parse_result.error() << std::endl;
+                    break;
+                }
+                print_key_share_entries( parse_result.value(), os );
+            }
+            if ( ext.type == tls_extension_type::key_share ) {
+                ntk::print_vector( ext.value );
+            }
+            os << "\n";
+        }
+    }
+
+    void print_key_share_entries( std::span<const key_share_entry> key_share_entries, std::ostream& os ) {
+        const int label_width = 26;
+        os << std::setfill( ' ' );
+        for ( auto& key_share_entry : key_share_entries ) {
+            os << std::left << std::setw( label_width ) << "Key Share Group:"
+               << named_group_names.at( static_cast<named_group>( key_share_entry.group ) );
+            os << "\n";
+        }   
     }
 
     // ================

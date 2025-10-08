@@ -231,6 +231,152 @@ namespace ntk {
                static_cast<tls_handshake_type>( record.payload.front() ) == tls_handshake_type::client_hello;
     }
 
+    // =====================
+    //  Parse Cipher Suites
+    // =====================
+
+    std::expected<std::vector<cipher_suite>,std::string> parse_cipher_suites( std::span<const uint8_t> cipher_suites_bytes ) {
+        std::vector<cipher_suite> cipher_suites;
+        while ( !cipher_suites_bytes.empty() ) {
+            auto cipher_opt = get_cipher_suite( read_uint16_be( cipher_suites_bytes, 0 ) );
+            if ( !cipher_opt ) {
+                return std::unexpected( "Unrecognized Cipher Suite" );
+            }
+            cipher_suites.push_back( cipher_opt.value() );
+            cipher_suites_bytes = cipher_suites_bytes.subspan( 2 );
+        }
+        return cipher_suites;
+    }
+
+    // ============================
+    //  Parse Signature Algorithms
+    // ============================
+
+    std::expected<std::vector<signature_algorithm>,std::string> parse_signature_algorithms( std::span<const uint8_t> signature_algorithms_bytes ) {
+        signature_algorithms_bytes = signature_algorithms_bytes.subspan( 2 /* list length bytes */ );
+        std::vector<signature_algorithm> algorithms;
+        while ( !signature_algorithms_bytes.empty() ) {
+            auto algorithm_opt = get_tls_signature_algorithm( read_uint16_be( signature_algorithms_bytes, 0 ) );
+            if ( !algorithm_opt ) {
+                return std::unexpected( "Unrecognized Signature Algorithm" );
+            }
+            algorithms.push_back( algorithm_opt.value() );
+            signature_algorithms_bytes = signature_algorithms_bytes.subspan( 2 );
+        } 
+        return algorithms;
+    }
+
+    // =======================
+    //  Get Client Hello Info 
+    // =======================
+
+    std::expected<client_hello_info,std::string> get_client_hello_info( std::span<const uint8_t> client_hello_bytes ) {
+        auto client_hello_result = parse_client_hello( client_hello_bytes );
+        if ( !client_hello_result ) {
+            return std::unexpected( "Failed to parse Client Hello: " + client_hello_result.error() );
+        }
+        auto& client_hello = client_hello_result.value();
+        client_hello_info info;
+        info.session_id = std::move( client_hello.session_id );
+        info.random = std::move( client_hello.random );
+        auto cipher_suites_result = parse_cipher_suites( client_hello.cipher_suites );
+        if ( !cipher_suites_result ) {
+            return std::unexpected( "Failed to parse Client Hello Cipher Suites: " + cipher_suites_result.error() );
+        }  
+        info.cipher_suites = std::move( cipher_suites_result.value() );
+        auto extensions_result = parse_tls_extensions( client_hello.extensions );
+        if ( !extensions_result ) {
+            return std::unexpected( "Falied to parse Client Hello Extensions: " + extensions_result.error() );
+        }
+        auto client_hello_extensions_result = parse_client_hello_extensions( extensions_result.value() );
+        if ( !client_hello_extensions_result ) {
+            return std::unexpected( "Failed to parse Client Hello Extensions into Structured Form: " + client_hello_extensions_result.error() );
+        } 
+        info.extensions = std::move( client_hello_extensions_result.value() );
+        return info;
+    }
+
+    // =======================
+    //  Get Client Hello Info 
+    // =======================
+
+    std::expected<client_hello_info,std::string> get_client_hello_info_from_ethernet( std::span<const uint8_t> packet ) {
+        auto parse_result = get_tls_record_from_ethernet( packet );
+        if ( !parse_result ) {
+            return std::unexpected( parse_result.error() );
+        }
+        auto& client_hello_record = parse_result.value();
+        auto s = std::span<const uint8_t>( client_hello_record.payload );
+        s = s.subspan( 4 /* handshake header bytes */ );
+        return get_client_hello_info( s );
+    }
+
+    // ===============================
+    //  Parse Client Hello Extensions 
+    // ===============================
+
+    std::expected<client_hello_extensions,std::string> parse_client_hello_extensions( std::span<const tls_extension> extensions ) {
+        client_hello_extensions c_hello_exts;
+        for ( const auto& ext : extensions ) {
+            if ( !ext.type ) {
+                continue;
+            }
+            switch ( ext.type.value() ) {
+                case tls_extension_type::renegotiation_info: {
+                    if ( ext.value.front() == 0x00 ) {
+                        c_hello_exts.renegotiation_info = true;
+                    } else {
+                        c_hello_exts.renegotiation_info = false;
+                    }
+                    break;
+                }
+                case tls_extension_type::supported_groups: {
+                    auto parse_result = parse_supported_groups( ext.value );
+                    if ( !parse_result ) {
+                        return std::unexpected( "Failed to parse Supported Groups: " + parse_result.error() );
+                    }
+                    c_hello_exts.supported_groups = std::move( parse_result.value() );
+                    break;
+                }
+                case tls_extension_type::supported_versions: {
+                    auto parse_result = parse_supported_versions( ext.value );
+                    if ( !parse_result ) {
+                        return std::unexpected( "Failed to parse Supported Versions: " + parse_result.error() );
+                    }
+                    c_hello_exts.supported_versions = std::move( parse_result.value() );
+                    break;
+                } 
+                case tls_extension_type::signature_algorithms: {
+                    auto parse_result = parse_signature_algorithms( ext.value );
+                    if ( !parse_result ) {
+                        return std::unexpected( "Failed to parse Signature Algorithms: " + parse_result.error() );
+                    }
+                    c_hello_exts.signature_algorithms = std::move( parse_result.value() );
+                    break;
+                }
+                case tls_extension_type::application_layer_protocol_negotiation: {
+                    auto parse_result = parse_client_hello_alpn( ext.value );
+                    if ( !parse_result ) {
+                        return std::unexpected( "Failed to parse ALPN: " + parse_result.error() );
+                    }
+                    c_hello_exts.alpn = std::move( parse_result.value() );
+                    break;
+                } 
+                case tls_extension_type::key_share: {
+                    auto parse_result = parse_key_share_entries( ext.value );
+                    if ( !parse_result ) {
+                        return std::unexpected( "Failed to parse Key Share Entries: " + parse_result.error() );
+                    }
+                    c_hello_exts.key_share_entries = std::move( parse_result.value() );
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+        return c_hello_exts;
+    }
+
     // ====================
     //  Parse Server Hello 
     // ====================
@@ -397,7 +543,7 @@ namespace ntk {
     }
 
     // ==================
-    //  Parse Extensions 
+    //  Parse TLS Extensions 
     // ==================
 
     std::expected<std::vector<tls_extension>,std::string> parse_tls_extensions( std::span<const uint8_t> extensions_bytes ) {
@@ -465,9 +611,9 @@ namespace ntk {
     //  Parse Client Hello Dedicated Credential 
     // =========================================
 
-    std::expected<std::vector<signatue_algorithm>,std::string> parse_client_hello_delegated_credential( std::span<const uint8_t> delegated_credential_bytes ) {
+    std::expected<std::vector<signature_algorithm>,std::string> parse_client_hello_delegated_credential( std::span<const uint8_t> delegated_credential_bytes ) {
         delegated_credential_bytes = delegated_credential_bytes.subspan( 2 );
-        std::vector<signatue_algorithm> algorithms;
+        std::vector<signature_algorithm> algorithms;
         while ( !delegated_credential_bytes.empty() ) {
             auto algorithm_opt = get_tls_signature_algorithm( read_uint16_be( delegated_credential_bytes, 0 ) );
             if ( !algorithm_opt ) {
@@ -495,6 +641,40 @@ namespace ntk {
             supported_groups_bytes = supported_groups_bytes.subspan( 2 );
         }
         return groups;
+    }
+
+    // ========================
+    //  Parse Supported Groups 
+    // ========================
+
+    std::expected<std::vector<tls_version>,std::string> parse_supported_versions( std::span<const uint8_t> supported_versions_bytes ) {
+        supported_versions_bytes = supported_versions_bytes.subspan( 1 /* list length byte */ );
+        std::vector<tls_version> versions;
+        while ( !supported_versions_bytes.empty() ) {
+            auto version_opt = get_tls_version( read_uint16_be( supported_versions_bytes, 0 ) );
+            if ( !version_opt ) {
+                return std::unexpected( "Unsupported TLS Version" );
+            }
+            versions.push_back( version_opt.value() ); 
+            supported_versions_bytes = supported_versions_bytes.subspan( 2 );
+        }
+        return versions;
+    }
+
+    // ===================
+    //  Parse Client ALPN
+    // ===================
+
+    std::expected<std::vector<std::string>,std::string> parse_client_hello_alpn( std::span<const uint8_t> alpn_bytes ) {
+        alpn_bytes = alpn_bytes.subspan( 2 );
+        std::vector<std::string> protocols;
+        while ( !alpn_bytes.empty() ) {
+            uint8_t protocol_len = alpn_bytes.front();
+            std::string protocol( alpn_bytes.begin() + 1, alpn_bytes.begin() + 1 + protocol_len );
+            protocols.push_back( std::move( protocol ) );
+            alpn_bytes = alpn_bytes.subspan( 1 + protocol_len );
+        }
+        return protocols;
     }
 
     // =========================

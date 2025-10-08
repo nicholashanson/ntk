@@ -8,4 +8,6 @@ TEST( UnitTest, ParseClientHelloAlpn ) {
 	ASSERT_TRUE( parse_result ) << parse_result.error() << std::endl;
 	auto& protocols = parse_result.value();
 	EXPECT_EQ( protocols.size(), 2 );
+	EXPECT_EQ( protocols.front(), "h2" );
+	EXPECT_EQ( protocols.back(), "http/1.1" );
 }
