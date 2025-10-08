@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <span>
-
 #include <tls.hpp>
 #include <io.hpp>
 
@@ -11,6 +8,7 @@
 
 TEST( IntegrationTest, DecryptRecord_TlsApplicationData_Client ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
+    ASSERT_FALSE( packet_data.empty() );
     auto& client_hello_packet = packet_data[ 3 ];
     auto client_hello_result = ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
     ASSERT_TRUE( client_hello_result );
@@ -42,6 +40,7 @@ TEST( IntegrationTest, DecryptRecord_TlsApplicationData_Client ) {
 
 TEST( IntegrationTest, DecrytRecod_TlsApplicationData_Server ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
+    ASSERT_FALSE( packet_data.empty() );
     auto& client_hello_packet = packet_data[ 3 ];
     auto client_hello_result = ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
     ASSERT_TRUE( client_hello_result );

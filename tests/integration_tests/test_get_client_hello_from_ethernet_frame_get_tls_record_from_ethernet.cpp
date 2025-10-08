@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
 #include <tls.hpp>
 
 #include <test_constants.hpp>

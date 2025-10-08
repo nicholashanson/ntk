@@ -7,7 +7,7 @@
 
 TEST( UnitTest, WriteToFile ) {
     std::vector<uint8_t> data = { 'h', 'e', 'l', 'l', 'o' };
-    ntk::file_extension extension = ntk::file_extension::TS;
+    ntk::file_extension extension = ntk::file_extension::ts;
     auto filename = ntk::write_to_file( data, extension );
     ASSERT_TRUE( std::filesystem::exists( filename ) );
     std::ifstream in( filename, std::ios::binary );

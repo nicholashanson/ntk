@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <vector>
-
-#include <ipv4.hpp>
 #include <tcp.hpp>
 
 #include <test_tcp_handshake_packets.hpp>

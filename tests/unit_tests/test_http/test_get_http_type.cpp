@@ -11,7 +11,7 @@ TEST( UnitTest, GetHttpType_Request ) {
     auto& payload = *payload_result.value(); 
     auto type_result = ntk::get_http_type( payload );
     ASSERT_TRUE( type_result ) << "TCP Payload is too short to be a HTTP Message" << std::endl; 
-    ASSERT_EQ( type_result.value(), ntk::http_type::REQUEST );
+    ASSERT_EQ( type_result.value(), ntk::http_type::request );
 }
 
 TEST( UnitTest, GetHttpType_Response ) {
@@ -21,5 +21,5 @@ TEST( UnitTest, GetHttpType_Response ) {
     auto& payload = *payload_result.value(); 
     auto type_result = ntk::get_http_type( payload );
     ASSERT_TRUE( type_result ) << "TCP Payload is too short to be a HTTP Message" << std::endl; 
-    ASSERT_EQ( type_result.value(), ntk::http_type::RESPONSE );
+    ASSERT_EQ( type_result.value(), ntk::http_type::response );
 }

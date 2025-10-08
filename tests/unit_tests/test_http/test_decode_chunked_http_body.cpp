@@ -6,8 +6,8 @@
 
 TEST( UnitTest, DecodeChunkedHttpBody ) {
     std::vector<uint8_t> chunked_data = {
-        '4', '\r', '\n', 'W', 'i', 'k', 'i', '\r', '\n',
-        '5', '\r', '\n', 'p', 'e', 'd', 'i', 'a', '\r', '\n',
+        '4', '\r', '\n', 'W',  'i', 'k', 'i', '\r', '\n',
+        '5', '\r', '\n', 'p',  'e', 'd', 'i', 'a',  '\r', '\n',
         '0', '\r', '\n', '\r', '\n'
     };
     auto actual_decoded_data = ntk::decode_chunked_http_body( chunked_data ); 

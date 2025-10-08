@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <vector>
-#include <span>
-
 #include <tcp.hpp>
 
 #include <test_constants.hpp>

@@ -39,6 +39,13 @@ namespace test_constants {
         0x03, 0x03, 0x09                                                // window scale factor 
     };
 
+    inline const ntk::four_tuple tcp_syn_four = {
+        .src_ip = 0xc0a80014,
+        .dest_ip = 0xc0a80015,
+        .src_port = 0xac18,
+        .dest_port = 0x0bb8
+    };
+
     inline const unsigned char tcp_syn_ipv4_header[] = {
         /* ipv4 header */                                               /* ipv4 header */
         0x45,                                                           // version = 4, header-length = 5 * 4 = 20 bytes
@@ -66,7 +73,7 @@ namespace test_constants {
         0x00, 0x00,                                                     // urgent pointer
         /* tcp options */                                               /* tcp options */
         0x02, 0x04, 0x05, 0xb4,                                         // maximum segment size ( MSS ) = 1460
-        0x04, 0x02,                                                     // selective acknowledgment permitted
+        0x04, 0x02,                                                     // selective acknocledgment permitted
         0x08, 0x0a, 0x02, 0x0d, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00,     // timestamp option
         0x01,                                                           // no operation
         0x03, 0x03, 0x09                                                // window scale factor 
@@ -77,16 +84,17 @@ namespace test_constants {
         .dest_port = 3000,                
         .seq_number = 0xb920c9b3,           
         .ack_number = 0,               
-        .data_offset = 10,                                          
+        .data_offset = 10,
+        .flags = 0x02,                                          
         .window_size = 65535,                                            
         .checksum = 5998,                                                
         .urgent_ptr = 0,                                             
         .options = {                                                        
-            { ntk::option_type::MSS, { 0x05, 0xb4 } },                            
-            { ntk::option_type::SACK_PERMITTED, {} },                                              
-            { ntk::option_type::TIMESTAMP, { 0x02, 0x0d, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00 } },   
-            { ntk::option_type::NOP, {} },                                                 
-            { ntk::option_type::WINDOW_SCALE, { 0x09 } }                                   
+            { ntk::tcp_option_type::mss, { 0x05, 0xb4 } },                            
+            { ntk::tcp_option_type::sack_permitted, {} },                                              
+            { ntk::tcp_option_type::timestamp, { 0x02, 0x0d, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00 } },   
+            { ntk::tcp_option_type::nop, {} },                                                 
+            { ntk::tcp_option_type::window_scale, { 0x09 } }                                   
         }
     }; 
 
@@ -124,6 +132,13 @@ namespace test_constants {
         0x03, 0x03, 0x07                                                // window scale
     };
 
+    inline const ntk::four_tuple tcp_synack_four = {
+        .src_ip = 0xc0a80014,
+        .dest_ip = 0xc0a80015,
+        .src_port = 0xac18,
+        .dest_port = 0x0bb8
+    };
+
     inline const unsigned char tcp_synack_raw_tcp_header[] = {
         /* tcp header */                                                /* tcp header */
         0x0b, 0xb8,                                                     // source port = 3000
@@ -148,16 +163,17 @@ namespace test_constants {
         .dest_port = 44056,                                        
         .seq_number = 0xd3c1ea09,           
         .ack_number = 0xb920c9b4,     
-        .data_offset = 10,                   
+        .data_offset = 10,
+        .flags = 0x12,                   
         .window_size = 0xfe88,                   
         .checksum = 0x81a8,                      
         .urgent_ptr = 0x0000,                
         .options = {
-            { ntk::option_type::MSS, { 0x05, 0xb4 } },                                         
-            { ntk::option_type::SACK_PERMITTED, {} },                                                 
-            { ntk::option_type::TIMESTAMP, { 0x58, 0x64, 0xbc, 0x69, 0x02, 0x0d, 0x72, 0x64 } },      
-            { ntk::option_type::NOP, {} },                                                   
-            { ntk::option_type::WINDOW_SCALE, { 0x07 } }                                       
+            { ntk::tcp_option_type::mss, { 0x05, 0xb4 } },                                         
+            { ntk::tcp_option_type::sack_permitted, {} },                                                 
+            { ntk::tcp_option_type::timestamp, { 0x58, 0x64, 0xbc, 0x69, 0x02, 0x0d, 0x72, 0x64 } },      
+            { ntk::tcp_option_type::nop, {} },                                                   
+            { ntk::tcp_option_type::window_scale, { 0x07 } }                                       
         }
     };
 
@@ -215,14 +231,15 @@ namespace test_constants {
         .dest_port = 3000,                                     
         .seq_number = 0xb920c9b4,             
         .ack_number = 0xd3c1ea0a,       
-        .data_offset = 8,                                             
+        .data_offset = 8, 
+        .flags = 0x10,                                            
         .window_size = 0x0080,                     
         .checksum = 0x72de,                        
         .urgent_ptr = 0x0000,                  
         .options = {
-            { ntk::option_type::NOP, {} },                                                  
-            { ntk::option_type::NOP, {} },                                                 
-            { ntk::option_type::TIMESTAMP, { 0x02, 0x0d, 0x72, 0x97, 0x58, 0x64, 0xbc, 0x69 } }   
+            { ntk::tcp_option_type::nop, {} },                                                  
+            { ntk::tcp_option_type::nop, {} },                                                 
+            { ntk::tcp_option_type::timestamp, { 0x02, 0x0d, 0x72, 0x97, 0x58, 0x64, 0xbc, 0x69 } }   
         }
     };
 

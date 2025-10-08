@@ -19,10 +19,10 @@ TEST( UnitTest, EndsWithZeroChunk ) {
 
 TEST( UnitTest, EndsWithZeroChunk_Body ) {
     std::vector<uint8_t> body = {
-        '4','\r','\n',
-        't','e','s','t','\r','\n',
-        '0','\r','\n',
-        '\r','\n'
+         '4', '\r', '\n',
+         't',  'e',  's', 't', '\r', '\n',
+         '0', '\r', '\n',
+        '\r', '\n'
     };
     EXPECT_TRUE( ntk::ends_with_zero_chunk( body ) );
 }

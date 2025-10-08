@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <span>
-
 #include <tls.hpp>
 #include <io.hpp>
 
@@ -10,13 +7,10 @@
 
 TEST( IntegrationTest, GetLineNumbersGetPacketsByLineNumbers ) {
     auto client_hello_line_numbers = ntk::get_line_numbers( test::packet_data_files[ "earth_cam_live_stream" ], 
-                                                            []( const auto& packet) {
-                                                                auto result = ntk::is_client_hello( packet ); 
-                                                                return result && result.value();
-                                                            } );
-    ASSERT_TRUE( !client_hello_line_numbers.empty() );
+                                                            ntk::client_hello_filter );
+    ASSERT_FALSE( client_hello_line_numbers.empty() );
     auto client_hello_packets = ntk::get_packets_by_line_numbers( test::packet_data_files[ "earth_cam_live_stream" ], client_hello_line_numbers );
-    ASSERT_TRUE( !client_hello_packets.empty() );
+    ASSERT_FALSE( client_hello_packets.empty() );
     ASSERT_EQ( client_hello_line_numbers.size(), client_hello_packets.size() );
     auto secrets = ntk::get_tls_secrets( "sslkeys.log" );
     std::vector<ntk::client_hello> client_hellos;

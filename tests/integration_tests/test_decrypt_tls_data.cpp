@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <span>
-
 #include <tls.hpp>
 #include <io.hpp>
 
@@ -17,19 +14,14 @@ TEST( IntegrationTest, DecryptTlsData ) {
     auto second_packet_pos = std::next( first_packet_pos );
     auto second_packet = second_packet_pos->second;
     auto session_keys = ntk::get_tls_secrets( "tls_session_keys.log" );
-
     auto [ first_records, first_offset ] = *ntk::split_tls_records( 
         std::span( first_packet.data(), first_packet.size() ) );
-
     std::vector<uint8_t> remainder( first_packet.data() + first_offset, first_packet.data() + first_packet.size() );
     remainder.insert( remainder.end(), second_packet.data(), second_packet.data() + second_packet.size() );
-
     auto [ second_records, second_offset ] = *ntk::split_tls_records( remainder );
-
     auto& client_hello_packet = packet_data[ 3 ];
     auto client_hello = *ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
     auto server_hello = *ntk::get_server_hello( first_records.front() );
-
     auto decrypted_records = ntk::decrypt_tls_data( client_hello.random, 
                                                     server_hello.random, 
                                                     server_hello.server_version, 
@@ -45,17 +37,13 @@ TEST( IntegrationTest, DecryptTlsData_TlsCombinedRecords ) {
     auto client_hello = *ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
     auto& server_hello_packet = packet_data[ 5 ];
     auto server_hello = *ntk::get_server_hello_from_ethernet( server_hello_packet );
-    
     auto [ records, offset_reached ] = *ntk::split_tls_records( test_constants::tls_combined_records ); 
     ASSERT_EQ( offset_reached, sizeof( test_constants::tls_combined_records ) );
     ASSERT_EQ( records.size(), 2 );
-
     auto session_keys = ntk::get_tls_secrets( "tls_session_keys.log" );
     ASSERT_TRUE( !session_keys.empty() );
-
     std::vector<ntk::tls_record> encrypted_records( records.begin() + 1, records.end() );
     ASSERT_EQ( encrypted_records[ 0 ].payload.size(), 69 );
-
     auto decrypted_records = ntk::decrypt_tls_data( client_hello.random,
                                                     server_hello.random,
                                                     server_hello.server_version,
@@ -77,7 +65,6 @@ TEST( IntegrationTest, DecryptTlsData_ShortStream ) {
     auto client_hello = *ntk::get_client_hello( client_records.front() );
     auto server_hello = *ntk::get_server_hello( server_records.front() );
     auto secrets = ntk::get_tls_secrets( "sslkeys.log", client_hello.random );
-    
     auto decrypted_record_1 = ntk::decrypt_record( client_hello.random,
                                                    server_hello.random,
                                                    server_hello.server_version,
@@ -105,11 +92,9 @@ TEST( IntegrationTest, DecryptTlsData_LongStream ) {
     auto server_records = ntk::extract_tls_records( server_payloads ).records;
     auto client_hello = *ntk::get_client_hello( client_records.front() );
     auto server_hello = *ntk::get_server_hello( server_records.front() );
-
     std::vector<ntk::tls_record> client_records_to_decrypt( client_records.begin() + 3, client_records.end() );
     std::vector<ntk::tls_record> server_records_to_decrypt( server_records.begin() + 3, server_records.end() );
     auto secrets = ntk::get_tls_secrets( "sslkeys.log", client_hello.random );
-    
     auto decrypted_client_records = ntk::decrypt_tls_data( client_hello.random,
                                                            server_hello.random,
                                                            server_hello.server_version,
@@ -143,10 +128,8 @@ TEST( IntegrationTest, DecryptTlsData_IsHttpRequest ) {
     auto server_records = ntk::extract_tls_records( server_payloads ).records;
     auto client_hello = *ntk::get_client_hello( client_records.front() );
     auto server_hello = *ntk::get_server_hello( server_records.front() );
-
     std::vector<ntk::tls_record> client_records_to_decrypt( client_records.begin() + 3, client_records.end() );
     auto secrets = ntk::get_tls_secrets( "sslkeys.log", client_hello.random );
-    
     auto decrypted_client_records = ntk::decrypt_tls_data( client_hello.random,
                                                            server_hello.random,
                                                            server_hello.server_version,
@@ -168,10 +151,8 @@ TEST( IntegrationTest, DecryptTlsData_IsHttpResponse ) {
     auto server_records = ntk::extract_tls_records( server_payloads ).records;
     auto client_hello = *ntk::get_client_hello( client_records.front() );
     auto server_hello = *ntk::get_server_hello( server_records.front() );
-
     std::vector<ntk::tls_record> server_records_to_decrypt( server_records.begin() + 3, server_records.end() );
     auto secrets = ntk::get_tls_secrets( "sslkeys.log", client_hello.random );
-    
     auto decrypted_server_records = ntk::decrypt_tls_data( client_hello.random,
                                                            server_hello.random,
                                                            server_hello.server_version,

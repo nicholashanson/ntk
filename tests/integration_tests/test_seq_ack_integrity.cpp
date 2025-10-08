@@ -20,7 +20,6 @@ TEST( IntegrationTest, SeqAckIntegrity ) {
     auto& server_traffic = ntk::tcp_transfer_friend_helper::server_traffic( tls_transfer );
     auto& client_acks = ntk::tcp_transfer_friend_helper::client_acks( tls_transfer );
     auto& server_acks = ntk::tcp_transfer_friend_helper::server_acks( tls_transfer );
-
     for ( auto& server_packet : server_traffic ) {
         auto payload_result = ntk::get_tcp_payload( server_packet );
         ASSERT_TRUE( payload_result ) << payload_result.error();

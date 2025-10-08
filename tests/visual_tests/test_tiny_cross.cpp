@@ -16,7 +16,7 @@ TEST( VisualTest, TinyCross ) {
     auto response = *std::find_if( tcp_stream.begin(), tcp_stream.end(), 
         [] ( const auto& pair ) { 
             auto& [ unused, http_payload ] = pair;
-            return ntk::get_http_type( http_payload ) == ntk::http_type::RESPONSE;
+            return ntk::get_http_type( http_payload ) == ntk::http_type::response;
         } 
     );
     auto maybe_split_http_message = ntk::split_http_payload( response.second );

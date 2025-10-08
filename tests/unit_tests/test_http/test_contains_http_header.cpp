@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdlib>
-#include <vector>
-
 #include <http.hpp>
 #include <io.hpp>
 

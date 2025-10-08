@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <span>
-
 #include <tcp.hpp>
 #include <io.hpp>
 
@@ -10,8 +7,9 @@
 
 TEST( UnitTest, GetHandshake_TLSHandshake ) {
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
+    ASSERT_FALSE( packet_data.empty() );
     auto four_tuples = ntk::get_four_tuples( packet_data );
-    ASSERT_TRUE( !four_tuples.empty() );
+    ASSERT_FALSE( four_tuples.empty() );
     auto four_tuple = *four_tuples.begin();
     auto handshake_opt = ntk::get_handshake( packet_data );
     ASSERT_TRUE( handshake_opt ) << "No TCP Handshake found" << std::endl;

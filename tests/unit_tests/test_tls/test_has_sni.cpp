@@ -9,6 +9,7 @@
 TEST( UnitTest, HasSni ) {
     auto client_hello_result = ntk::get_client_hello_from_ethernet_frame( test_constants::tls_client_hello_packet );
     ASSERT_TRUE( client_hello_result ) << client_hello_result.error() << std::endl;
+    auto& client_hello = client_hello_result.value();
     auto has_sni_result = ntk::has_sni( client_hello, "earthcam.com" );
     ASSERT_TRUE( has_sni_result ) << has_sni_result.error() << std::endl;
     EXPECT_TRUE( has_sni_result.value() );
@@ -20,6 +21,7 @@ TEST( UnitTest, HasSni_TlsHandshake ) {
     ASSERT_FALSE( client_hello_packets.empty() );
     auto client_hello_result = ntk::get_client_hello_from_ethernet_frame( client_hello_packets.front() );
     ASSERT_TRUE( client_hello_result ) << client_hello_result.error() << std::endl;
+    auto& client_hello = client_hello_result.value();
     auto has_sni_result = ntk::has_sni( client_hello, "earthcam.com" );
     ASSERT_TRUE( has_sni_result ) << has_sni_result.error() << std::endl;
     EXPECT_TRUE( has_sni_result.value() );

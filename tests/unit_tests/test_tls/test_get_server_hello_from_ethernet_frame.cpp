@@ -13,6 +13,7 @@ TEST( UnitTest, GetServerHelloFromEthernetFrame ) {
     const std::size_t random_pos = 2;
     auto server_hello_result = ntk::get_server_hello_from_ethernet( server_hello_packet );
     ASSERT_TRUE( server_hello_result ) << server_hello_result.error() << std::endl;
+    auto& server_hello = server_hello_result.value();
     auto expected_server_version = ntk::tls_version::tls_1_2;
     std::array<uint8_t,32> expected_random;
     std::copy_n( std::begin( test_constants::tls_server_hello ) + random_pos, expected_random.size(), expected_random.begin() );

@@ -121,7 +121,7 @@ TEST( UnitTest, HttpsLiveStream_ExpectedData_MimeType ) {
 		live_stream.feed( packet_data[ i ] );
 	}
 	auto expected_data = ntk::https_live_stream_friend_helper::expected_data( live_stream );	
-	ASSERT_EQ( expected_data, ntk::mime_type::VIDEO_MP2T );
+	ASSERT_EQ( expected_data, ntk::mime_type::video_mp2t );
 }
 
 TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse ) {
@@ -140,11 +140,11 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse
 	auto incomplete_request_response = ntk::https_live_stream_friend_helper::get_incomplete_request_response( live_stream );
 	auto decrypted_records = ntk::tls_live_stream_friend_helper::decrypted_records( live_stream ); 
 	ASSERT_TRUE( decrypted_records );
-	ASSERT_TRUE( decrypted_records.value().size() );
+	EXPECT_EQ( decrypted_records.value().size(), 1 );
 	ASSERT_TRUE( incomplete_request_response.response );
-	ASSERT_EQ( ( *incomplete_request_response.response ).body.size(), 15848 );
-	ASSERT_EQ( ( *incomplete_request_response.response ).content_length, 384836 );
-	ASSERT_FALSE( ( *incomplete_request_response.response ).http_response_complete() );
+	EXPECT_EQ( ( *incomplete_request_response.response ).body.size(), 15848 );
+	EXPECT_EQ( ( *incomplete_request_response.response ).content_length, 384836 );
+	EXPECT_FALSE( ( *incomplete_request_response.response ).http_response_complete() );
 }
 
 TEST( UnitTest, HttpsLiveStream_IsComplete_BecomesTrue ) {
@@ -161,7 +161,7 @@ TEST( UnitTest, HttpsLiveStream_IsComplete_BecomesTrue ) {
 		live_stream.feed( packet_data[ i ] );
 	}
 	auto is_complete = ntk::https_live_stream_friend_helper::is_complete( live_stream );
-	( is_complete );
+	EXPECT_TRUE( is_complete );
 }
 
 TEST( UnitTest, HttpsLiveStream_IsComplete_BecomesFalse ) {
@@ -177,7 +177,7 @@ TEST( UnitTest, HttpsLiveStream_IsComplete_BecomesFalse ) {
 		live_stream.feed( packet );
 	}
 	auto is_complete = ntk::https_live_stream_friend_helper::is_complete( live_stream );
-	ASSERT_FALSE( is_complete );
+	EXPECT_FALSE( is_complete );
 }
 
 TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse_ContentLength ) {
@@ -194,8 +194,9 @@ TEST( UnitTest, HttpsLiveStream_IncompleteRequestResponse_IncompleteHttpResponse
 		live_stream.feed( packet_data[ i ] );
 	}
 	auto incomplete_request_response = ntk::https_live_stream_friend_helper::get_incomplete_request_response( live_stream );
-	ASSERT_EQ( ( *incomplete_request_response.response ).content_length, 384836 );
-	ASSERT_FALSE( ( *incomplete_request_response.response ).body.empty() );
+	ASSERT_TRUE( incomplete_request_response.response );
+	EXPECT_EQ( ( *incomplete_request_response.response ).content_length, 384836 );
+	EXPECT_FALSE( ( *incomplete_request_response.response ).body.empty() );
 }
 
 TEST( UnitTest, HttpsLiveStream_NameOfWrittenFile ) {
@@ -229,8 +230,9 @@ TEST( UnitTest, HttpsLiveStream_FileWrittenToDisk ) {
 		live_stream.feed( packet_data[ i ] );
 	}
 	auto output_file = ntk::https_live_stream_friend_helper::name_of_written_file( live_stream );
+	ASSERT_TRUE( output_file );
 	ASSERT_TRUE( std::filesystem::exists( output_file.value() ) );
-    ASSERT_GT( std::filesystem::file_size( output_file.value() ), 0u );
+    EXPECT_GT( std::filesystem::file_size( output_file.value() ), 0u );
     std::filesystem::remove( output_file.value() );
 }
 
@@ -292,7 +294,7 @@ TEST( UnitTest, HttpsLiveStream_SegmentCapture ) {
 	ntk::https_live_stream live_stream( four, ssl_keys_log );
 	for ( std::size_t i = 0; i < packet_data.size(); ++i ) {
 		auto feed_result = live_stream.feed( packet_data[ i ] );
-		ASSERT_TRUE( feed_result ) << feed_result.error() << std::endl;
+		EXPECT_TRUE( feed_result ) << feed_result.error() << std::endl;
 	}
 }
 
@@ -307,7 +309,7 @@ TEST( UnitTest, HttpsLiveStream_SegmentCapture_ClientHelloPopulated ) {
 	const std::size_t read_to = 7 /* client hello */;
 	for ( std::size_t i = 0; i < read_to; ++i ) {
 		auto feed_result = live_stream.feed( packet_data[ i ] );
-		ASSERT_TRUE( feed_result ) << feed_result.error() << std::endl;
+		EXPECT_TRUE( feed_result ) << feed_result.error() << std::endl;
 	}
 	auto client_hello_populated = ntk::tls_live_stream_friend_helper::client_hello_populated( live_stream );
 	ASSERT_TRUE( client_hello_populated );
@@ -324,7 +326,7 @@ TEST( UnitTest, HttpsLiveStream_SegmentCapture_ServerHelloPopulated_HasSecrets )
 	const std::size_t read_to = 9 /* server hello */;
 	for ( std::size_t i = 0; i < read_to; ++i ) {
 		auto feed_result = live_stream.feed( packet_data[ i ] );
-		ASSERT_TRUE( feed_result ) << feed_result.error() << std::endl;
+		EXPECT_TRUE( feed_result ) << feed_result.error() << std::endl;
 	}
-	ASSERT_TRUE( live_stream.has_secrets() );
+	EXPECT_TRUE( live_stream.has_secrets() );
 }

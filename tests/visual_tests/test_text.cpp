@@ -6,11 +6,14 @@
 #include <test_constants.hpp>
 
 TEST( VisualTest, Text ) {
-    auto http_payload = ntk::get_tcp_payload( test::http_response_packet );
-    auto maybe_split_http_message = ntk::split_http_payload( http_payload );
-    ASSERT_TRUE( maybe_split_http_message );
-    auto split_http_message = *maybe_split_http_message;
-    auto http_content = split_http_message.body; 
+    auto payload_result = ntk::get_tcp_payload( test::http_response_packet );
+    ASSERT_TRUE( payload_result ) << payload_result.error() << std::endl;
+    ASSERT_TRUE( payload_result.value() ) << "TCP Payload is empty";
+    auto& payload = *payload_result.value();
+    auto split_result = ntk::split_http_payload( payload );
+    ASSERT_TRUE( split_result ) <<  split_result.error() << std::endl;
+    auto& split_http_message = *split_result;
+    auto& http_content = split_http_message.body; 
     EXPECT_FALSE( http_content.empty() );
     auto dechunked_http_content = ntk::decode_single_chunk( http_content ); 
     std::string http_content_string( dechunked_http_content.begin(), dechunked_http_content.end() );

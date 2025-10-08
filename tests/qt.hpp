@@ -67,7 +67,6 @@ namespace test {
     }
 
     inline void show_mp4_in_qt_window( const std::vector<uint8_t>& mp4_data ) {
-
         int argc = 0;
         char** argv = nullptr;
         QApplication app( argc, argv );
@@ -115,6 +114,57 @@ namespace test {
         app.exec();
 
         QFile::remove( temp_file_path ); 
+    }
+
+    inline void show_ts_in_qt_window(const QString& ts_file_path) {
+        int argc = 0;
+        char** argv = nullptr;
+        QApplication app(argc, argv);
+
+        QFileInfo fi(ts_file_path);
+        if (!fi.exists()) {
+            QLabel label("The provided TS file does not exist.");
+            label.setWindowTitle("TS Viewer - Error");
+            label.resize(400, 100);
+            label.show();
+            QTimer::singleShot(3000, &app, &QApplication::quit);
+            app.exec();
+            return;
+        }
+
+        QWidget window;
+        QVBoxLayout* layout = new QVBoxLayout(&window);
+
+        // Make video_widget a child of the window
+        QVideoWidget* video_widget = new QVideoWidget(&window);
+        layout->addWidget(video_widget);
+
+        // Make player a child of the window so it will be deleted automatically
+        QMediaPlayer* player = new QMediaPlayer(&window);
+        player->setVideoOutput(video_widget);
+
+        window.setLayout(layout);
+        window.setWindowTitle("TS Viewer");
+        window.resize(640, 480);
+
+        // Use absolute path
+        QString absolutePath = fi.absoluteFilePath();
+        qDebug() << "Playing TS file at absolute path:" << absolutePath;
+        player->setMedia(QUrl::fromLocalFile(absolutePath));
+
+        player->play();
+        window.show();
+
+        QObject::connect(player, &QMediaPlayer::mediaStatusChanged, [&](QMediaPlayer::MediaStatus status) {
+            if (status == QMediaPlayer::EndOfMedia || status == QMediaPlayer::InvalidMedia) {
+                app.quit();
+            }
+        });
+
+        // Safety quit in case the file is too long
+        QTimer::singleShot(300000, &app, &QApplication::quit);
+
+        app.exec();
     }
 
 } // test

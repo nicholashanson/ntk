@@ -5,7 +5,6 @@
 TEST( IntegrationTest, RingBuffer_PushAndPop ) {
     ntk::ring_buffer<int,4> buf;
     EXPECT_TRUE( buf.push( 10 ) );
-
     int val;
     EXPECT_TRUE( buf.pop( val ) );
     EXPECT_EQ( val, 10 );
@@ -16,7 +15,6 @@ TEST( IntegrationTest, RingBuffer_FIFOOrder ) {
     buf.push( 1 ); 
     buf.push( 2 ); 
     buf.push( 3 );
-
     int val;
     buf.pop( val ); EXPECT_EQ( val, 1 );
     buf.pop( val ); EXPECT_EQ( val, 2 );
@@ -28,7 +26,6 @@ TEST( IntegrationTest, RingBuffer_WrapAround ) {
     buf.push( 1 );
     buf.push( 2 );
     buf.push( 3 );
-
     int val;
     buf.pop( val ); EXPECT_EQ( val, 1 );
     buf.push( 4 ); 

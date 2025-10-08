@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <span>
-
 #include <tcp.hpp>
 #include <io.hpp>
 #include <spmc_queue.hpp>

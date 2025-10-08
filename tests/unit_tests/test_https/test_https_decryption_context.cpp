@@ -53,7 +53,7 @@ TEST( UnitTest, HttpsDecryptionContext_IncompleteRequestResponse_Complete ) {
 	auto& four = four_result.value();
 	std::string ssl_keys_log = "sslkeys.log";
 	ntk::https_decryption_context ctx( four, ssl_keys_log );
-	std::size_t read_packets_to = 97 /* last part of last record of tnird http response */;
+	std::size_t read_packets_to = 97 /* last part of last record of third http response */;
 	for ( std::size_t i = 0; i < read_packets_to; ++i ) {
 		ctx.feed( packet_data[ i ] );
 	}
