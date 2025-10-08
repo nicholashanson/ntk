@@ -172,14 +172,22 @@ namespace ntk {
     };
 
     enum named_group : uint16_t {
+        ffdhe2048 = 0x0100,
+        ffdhe3072 = 0x0101,
         secp256r1 = 0x0017,
-        x25519    = 0x001d
+        secp384r1 = 0x0018,
+        secp521r1 = 0x0019,
+        x25519    = 0x001d,
     };
 
     namespace look_up {
 
-        constexpr std::array<named_group,2/* entires in enum named_group */> named_groups = {
+        constexpr std::array<named_group,6/* entires in enum named_group */> named_groups = {
+            named_group::ffdhe2048,
+            named_group::ffdhe3072,
             named_group::secp256r1,
+            named_group::secp384r1,
+            named_group::secp521r1,
             named_group::x25519
         };
 
@@ -188,11 +196,31 @@ namespace ntk {
     inline auto get_tls_named_group = make_lookup( look_up::named_groups );
 
     inline std::map<named_group,std::string> named_group_names = {
+        { named_group::ffdhe2048, "ffdhe2048" },
+        { named_group::ffdhe3072, "ffdhe3072" },
         { named_group::secp256r1, "secp256r1" },
-        { named_group::x25519,       "x25519" }   
+        { named_group::secp384r1, "secp384r1" },
+        { named_group::secp521r1, "secp521r1" },
+        { named_group::x25519,       "x25519" }
+    };
+
+    constexpr std::array<named_group,2> default_key_share_groups {
+        named_group::secp256r1,
+        named_group::x25519
+    };
+
+    constexpr std::array<named_group,6> defualt_supported_groups {
+        named_group::ffdhe2048,
+        named_group::ffdhe3072,
+        named_group::secp256r1,
+        named_group::secp384r1,
+        named_group::secp521r1,
+        named_group::x25519
     };
 
     std::expected<std::vector<key_share_entry>,std::string> parse_key_share_entries( std::span<const uint8_t> key_share_entries_bytes );
+
+    std::expected<std::vector<named_group>,std::string> parse_supported_groups( std::span<const uint8_t> supported_groups_bytes );
 
     // =============
     //  TLS Version 

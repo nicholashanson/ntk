@@ -479,6 +479,24 @@ namespace ntk {
         return algorithms;
     }
 
+    // ========================
+    //  Parse Supported Groups 
+    // ========================
+
+    std::expected<std::vector<named_group>,std::string> parse_supported_groups( std::span<const uint8_t> supported_groups_bytes ) {
+        supported_groups_bytes = supported_groups_bytes.subspan( 2 );
+        std::vector<named_group> groups;
+        while ( !supported_groups_bytes.empty() ) {
+            auto group_opt = get_tls_named_group( read_uint16_be( supported_groups_bytes, 0 ) );
+            if ( !group_opt ) {
+                return std::unexpected( "Unsupported TLS Named Group" );
+            }
+            groups.push_back( group_opt.value() ); 
+            supported_groups_bytes = supported_groups_bytes.subspan( 2 );
+        }
+        return groups;
+    }
+
     // =========================
     //  Parse Key Share Entries 
     // =========================
