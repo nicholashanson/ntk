@@ -36,10 +36,7 @@ TEST( IntegrationTest, ExtractCertificate ) {
                                                     second_records, 
                                                     session_keys );
     std::vector<uint8_t> certificate_payload( decrypted_records[ 0 ].payload.begin() + 10, decrypted_records[ 0 ].payload.end() );
-    ntk::print_vector( certificate_payload );
-    std::cout << std::endl;
     auto certificate_bytes = ntk::extract_certificate( certificate_payload );
-    ntk::print_vector( certificate_bytes );
 }
 
 TEST( IntegrationTest, ExtractCertificate_Segment ) {
@@ -59,7 +56,6 @@ TEST( IntegrationTest, ExtractCertificate_Segment ) {
     auto client_hello_result = ntk::get_client_hello_from_ethernet_frame( client_hello_packet );
     ASSERT_TRUE( client_hello_result ) << client_hello_result.error() << std::endl;
     auto& client_hello = client_hello_result.value();
-    ntk::print_client_hello( client_hello );
     auto session_keys = ntk::get_tls_secrets( "../server/session_keys.log" );
     auto decrypted_record = ntk::decrypt_record( client_hello.random, 
                                                  server_hello.random, 
