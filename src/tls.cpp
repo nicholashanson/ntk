@@ -2,6 +2,24 @@
 
 namespace ntk {
 
+    // =========================
+    //  Generate 32 Byte Random 
+    // =========================
+
+    std::array<uint8_t,32> generate_32_byte_random() {
+        std::array<uint8_t,32> random_bytes;
+        RAND_bytes( random_bytes.data(), random_bytes.size() );
+        return random_bytes;
+    }
+
+    // =====================
+    //  Generate Session ID 
+    // =====================
+
+    std::array<uint8_t,32> generate_session_id() {
+        return generate_32_byte_random();
+    }
+
     // =====================
     //  Generate TLS Random 
     // =====================
@@ -17,9 +35,7 @@ namespace ntk {
 
     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     std::array<uint8_t,32> generate_tls_random() {
-        std::array<uint8_t,32> random_bytes;
-        RAND_bytes( random_bytes.data(), random_bytes.size() );
-        return random_bytes;
+        return generate_32_byte_random();
     }
 
     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2618,6 +2634,182 @@ namespace ntk {
 
     std::map<uint64_t,tls_record> tls_decryption_context_friend_helper::get_decrypted_records( const tls_decryption_context& t ) {
         return t.m_decrypted_records;
+    }
+
+    // ====================
+    //  Load Client Config
+    // ====================
+
+    std::string load_client_config() {
+        std::ifstream file( "client_config.json" );
+        if ( !file ) {
+            generate_default_client_config();
+            file.open("client_config.json");
+            if ( !file.is_open() ) {
+                throw std::runtime_error( "Failed to open client_config.json after generating default config" );
+            }
+        }
+        std::ostringstream buffer;
+        buffer << file.rdbuf(); 
+        return buffer.str();
+    }
+
+    // ================================
+    //  Generate Default Client Config
+    // ================================
+
+    std::string generate_default_client_config() {
+        std::string config = "{\n";
+        auto append_list = [&]( const std::string& name,
+                                const auto& items,
+                                const auto& name_map,
+                                int depth ) {
+            auto indent = std::string( depth, '\t' );
+            auto subindent = std::string( depth + 1, '\t' );
+            config += indent + "\"" + name + "\": [\n";
+            for ( std::size_t i = 0; i < items.size(); ++i ) {
+                auto it = name_map.find( items[ i ] );
+                if ( it != name_map.end() ) {
+                    config += subindent + "\"" + it->second + "\"";
+                    if ( i + 1 < items.size() ) {
+                        config += ",";
+                    }
+                    config += "\n";
+                }
+            }
+            config += indent + "]";
+        };
+        auto append_boolean = [&]( const std::string& name,
+                                   bool val,
+                                   int depth ) {
+            auto indent = std::string( depth, '\t' );
+            config += indent + "\"" + name + "\": ";
+            config += ( val ? "true" : "false" );
+            config += ",";
+            config += "\n";
+        };
+        append_list( "cipher_suites", default_cipher_suites, tls_cipher_suite_names, 1 );
+        config += ",\n";
+        config += "\t\"extensions\": {\n";
+        append_boolean( "renegotiation_info", true, 2 );
+        append_list( "signature_algorithms", default_signature_algorithms, signature_algorithm_names, 2 );
+        config += ",\n";
+        append_list( "key_share", default_key_share_groups, named_group_names, 2 );
+        config += ",\n";
+        append_list( "supported_groups", default_supported_groups, named_group_names, 2 );
+        config += ",\n";
+        append_list( "supported_versions", default_supported_versions, tls_version_names, 2 );
+        config += "\n\t}\n}\n";
+        output_to_file( config, "client_config.json" );
+        return config;
+    }
+
+    // ===============
+    //  Extract Array
+    // ===============
+
+    std::expected<std::vector<std::string>,std::string> extract_array( const std::string& config, const std::string& array_name ) {
+        std::vector<std::string> cipher_suites;
+        std::string pattern_string = "\"" + array_name + "\"\\s*:\\s*\\[([\\s\\S]*?)\\]";
+        std::regex array_pattern( pattern_string );
+        std::smatch match;
+        if ( !std::regex_search( config, match, array_pattern ) ) {
+            return std::unexpected( "Cipher Suites not found in Client Config File" );
+        }
+        std::string array_content = match[ 1 ].str();
+        std::regex value_pattern( R"re("([^"]+)")re" );
+        for ( std::sregex_iterator it( array_content.begin(), array_content.end(), value_pattern ); it != std::sregex_iterator(); ++it ) {
+            cipher_suites.push_back( ( *it )[ 1 ].str() );
+        }
+        return cipher_suites;
+    }
+
+    // =================
+    //  Extract Boolean
+    // =================
+
+    std::expected<bool,std::string> extract_boolean( const std::string& config, const std::string& var_name ) {
+        std::string pattern_string = "\"" + var_name + "\"\\s*:\\s*(true|false)";
+        std::regex bool_pattern( pattern_string );
+        std::smatch match;
+        if ( !std::regex_search( config, match, bool_pattern ) ) {
+            return std::unexpected( var_name + " not found in Config" );
+        }
+        std::string value_str = match[ 1 ].str();
+        if ( value_str == "true" ) {
+            return true;
+        } else if ( value_str == "false" ) {
+            return false;
+        } else {
+            return std::unexpected( "Invalid Boolean Value for " + var_name );
+        }
+    }
+
+    // =======================
+    //  Generate Client Hello
+    // =======================
+
+    std::expected<std::vector<uint8_t>,std::string> generate_client_hello( const std::string& config ) {
+        auto version_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_version::tls_1_2 ) );
+        std::vector<uint8_t> client_hello_bytes;
+        client_hello_bytes.insert( client_hello_bytes.end(), version_bytes.begin(), version_bytes.end() );
+
+        auto random = generate_tls_random( static_cast<tls_version>( read_uint16_be( client_hello_bytes, 0 ) ) );
+        client_hello_bytes.insert( client_hello_bytes.end(), random.begin(), random.end() );
+
+        auto session_id_len = get_big_endian_byte_encoding<uint8_t,1>( static_cast<uint8_t>( 32 ) );
+        client_hello_bytes.insert( client_hello_bytes.end(), session_id_len.begin(), session_id_len.end() );
+
+        auto session_id = generate_session_id();
+        client_hello_bytes.insert( client_hello_bytes.end(), session_id.begin(), session_id.end() );
+
+        auto cipher_suites_result = extract_array( config, "cipher_suites" );
+        if ( !cipher_suites_result ) {
+            return std::unexpected( cipher_suites_result.error() );
+        }
+        auto& cipher_suites = cipher_suites_result.value();
+        auto ciphter_suites_len_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( cipher_suites.size() ) * 2 /* bytes per cipher suite */ );
+        client_hello_bytes.insert( client_hello_bytes.end(), ciphter_suites_len_bytes.begin(), ciphter_suites_len_bytes.end() );
+        for ( auto& c : cipher_suites ) {
+            for ( auto& [ cipher_suite, cipher_suite_name ] : tls_cipher_suite_names ) {
+                if ( c == cipher_suite_name ) {
+                    auto c_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( cipher_suite ) );
+                    client_hello_bytes.insert( client_hello_bytes.end(), c_bytes.begin(), c_bytes.end() );
+                }
+            }
+        }
+        for ( auto& [ extension_type, extension_type_name ] : tls_extension_type_names ) {
+            if ( extension_type == tls_extension_type::renegotiation_info ) {
+                auto result = extract_boolean( config, "renegotiation_info" );
+                if ( !result ) {
+                    return std::unexpected( result.error() );
+                }
+                auto& val = result.value();
+                if ( val ) {
+                    auto ext_code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::renegotiation_info ) );
+                    client_hello_bytes.insert( client_hello_bytes.end(), ext_code.begin(), ext_code.end() );
+                    client_hello_bytes.push_back( static_cast<uint8_t>( 0x00 ) );
+                }
+            }
+            auto result = extract_array( config, extension_type_name );
+            if ( !result ) {
+                continue;
+            }
+            auto& map_variant = tls_extension_map.at( extension_type );
+            auto& extension_strings = result.value();
+            std::visit( [&]( auto&& map ) {
+                using MapType = std::decay_t<decltype( map )>;
+                for ( auto& [ extension, extension_name ] : map ) {
+                    for ( auto& s: extension_strings ) {
+                        if ( s == extension_name ) {
+                            auto bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension ) );
+                            client_hello_bytes.insert( client_hello_bytes.end(), bytes.begin(), bytes.end() );
+                        }
+                    }
+                }
+            }, map_variant );
+        }
+        return client_hello_bytes;
     }
  
 } // namespace ntk

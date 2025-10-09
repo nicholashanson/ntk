@@ -14,6 +14,7 @@
 #include <iostream>
 #include <map>
 #include <ranges>
+#include <regex>
 #include <span>
 #include <string>
 #include <sstream>
@@ -59,20 +60,20 @@ namespace ntk {
     };
 
     static const std::unordered_map<tls_extension_type,std::string> tls_extension_type_names = {
-        { tls_extension_type::application_layer_protocol_negotiation, "Application Layer Protocol Negotiation" },
-        { tls_extension_type::delegated_credential,                                     "Delegated Credential" },
-        { tls_extension_type::ec_point_formats,                                             "EC Point Formats" },
-        { tls_extension_type::extended_main_secret,                                     "Extended Main Secret" },
-        { tls_extension_type::pre_shared_key,                                                 "Pre-Shared Key" },
-        { tls_extension_type::psk_key_exchange_modes,                                 "PSK Key-Exchange Modes" },
-        { tls_extension_type::renegotiation_info,                                         "Renegotiation Info" },
-        { tls_extension_type::server_name,                                                       "Server Name" },
-        { tls_extension_type::signature_algorithms,                                     "Signature Algorithms" },
-        { tls_extension_type::status_request,                                                 "Status Request" },
-        { tls_extension_type::supported_groups,                                             "Supported Groups" },
-        { tls_extension_type::supported_versions,                                         "Supported Versions" },
-        { tls_extension_type::key_share,                                                           "Key Share" },
-        { tls_extension_type::record_size_limit,                                            "Record Size Limit"}
+        { tls_extension_type::application_layer_protocol_negotiation,   "alpn" },
+        { tls_extension_type::delegated_credential,     "delegated_credential" },
+        { tls_extension_type::ec_point_formats,             "ec_point_formats" },
+        { tls_extension_type::extended_main_secret,     "extended_main_secret" },
+        { tls_extension_type::pre_shared_key,                 "pre_shared_key" },
+        { tls_extension_type::psk_key_exchange_modes, "psk_key_exchange_modes" },
+        { tls_extension_type::renegotiation_info,         "renegotiation_info" },
+        { tls_extension_type::server_name,                       "server_name" },
+        { tls_extension_type::signature_algorithms,     "signature_algorithms" },
+        { tls_extension_type::status_request,                 "status_request" },
+        { tls_extension_type::supported_groups,             "supported_groups" },
+        { tls_extension_type::supported_versions,         "supported_versions" },
+        { tls_extension_type::key_share,                           "key_share" },
+        { tls_extension_type::record_size_limit,            "record_size_limit"}
     };
 
     constexpr std::array<tls_extension_type,14> default_tls_extensions = {
@@ -94,22 +95,22 @@ namespace ntk {
 
     namespace look_up {
 
-        constexpr std::array<tls_extension_type,14/* entries in enum tls_extension_type */> tls_extensions = {
-            tls_extension_type::application_layer_protocol_negotiation,
-            tls_extension_type::delegated_credential,
-            tls_extension_type::ec_point_formats,
-            tls_extension_type::extended_main_secret,
-            tls_extension_type::pre_shared_key,
-            tls_extension_type::psk_key_exchange_modes,
-            tls_extension_type::renegotiation_info,
-            tls_extension_type::server_name,
-            tls_extension_type::status_request,
-            tls_extension_type::signature_algorithms,
-            tls_extension_type::supported_groups,
-            tls_extension_type::supported_versions,
-            tls_extension_type::key_share,
-            tls_extension_type::record_size_limit
-        };
+    constexpr std::array<tls_extension_type,14/* entries in enum tls_extension_type */> tls_extensions = {
+        tls_extension_type::application_layer_protocol_negotiation,
+        tls_extension_type::delegated_credential,
+        tls_extension_type::ec_point_formats,
+        tls_extension_type::extended_main_secret,
+        tls_extension_type::pre_shared_key,
+        tls_extension_type::psk_key_exchange_modes,
+        tls_extension_type::renegotiation_info,
+        tls_extension_type::server_name,
+        tls_extension_type::status_request,
+        tls_extension_type::signature_algorithms,
+        tls_extension_type::supported_groups,
+        tls_extension_type::supported_versions,
+        tls_extension_type::key_share,
+        tls_extension_type::record_size_limit
+    };
 
     } // namespace look_up
 
@@ -135,25 +136,25 @@ namespace ntk {
 
     namespace look_up {
 
-        constexpr std::array<signature_algorithm,11/* entires in enum named_group */> signature_algorithms = {
-            signature_algorithm::ecdsa_sha1,
-            signature_algorithm::ecdsa_secp256r1_sha256,
-            signature_algorithm::ecdsa_secp384r1_sha384,
-            signature_algorithm::ecdsa_secp521r1_sha512,
-            signature_algorithm::rsa_pss_rsae_sha256,
-            signature_algorithm::rsa_pss_rsae_sha384,
-            signature_algorithm::rsa_pss_rsae_sha512,
-            signature_algorithm::rsa_pkcs1_sha256,
-            signature_algorithm::rsa_pkcs1_sha384,
-            signature_algorithm::rsa_pkcs1_sha512,
-            signature_algorithm::rsa_pkcs1_sha1 
-        };
+    constexpr std::array<signature_algorithm,11/* entires in enum named_group */> signature_algorithms = {
+        signature_algorithm::ecdsa_sha1,
+        signature_algorithm::ecdsa_secp256r1_sha256,
+        signature_algorithm::ecdsa_secp384r1_sha384,
+        signature_algorithm::ecdsa_secp521r1_sha512,
+        signature_algorithm::rsa_pss_rsae_sha256,
+        signature_algorithm::rsa_pss_rsae_sha384,
+        signature_algorithm::rsa_pss_rsae_sha512,
+        signature_algorithm::rsa_pkcs1_sha256,
+        signature_algorithm::rsa_pkcs1_sha384,
+        signature_algorithm::rsa_pkcs1_sha512,
+        signature_algorithm::rsa_pkcs1_sha1 
+    };
 
     } // namespace look_up
 
     inline auto get_tls_signature_algorithm = make_lookup( look_up::signature_algorithms );
 
-    inline std::map<signature_algorithm,std::string> signature_algorithm_names = {
+    inline std::unordered_map<signature_algorithm,std::string> signature_algorithm_names = {
         { signature_algorithm::ecdsa_sha1,                         "ecdsa_sha1" },
         { signature_algorithm::ecdsa_secp256r1_sha256, "ecdsa_secp256r1_sha256" },
         { signature_algorithm::ecdsa_secp384r1_sha384, "ecdsa_secp384r1_sha384" },
@@ -187,7 +188,6 @@ namespace ntk {
         signature_algorithm::rsa_pkcs1_sha512,
         signature_algorithm::rsa_pkcs1_sha1  
     };
-
 
     std::expected<std::vector<signature_algorithm>,std::string> parse_signature_algorithms( std::span<const uint8_t> signature_algorithms_bytes );
 
@@ -224,20 +224,20 @@ namespace ntk {
 
     namespace look_up {
 
-        constexpr std::array<named_group,6/* entires in enum named_group */> named_groups = {
-            named_group::ffdhe2048,
-            named_group::ffdhe3072,
-            named_group::secp256r1,
-            named_group::secp384r1,
-            named_group::secp521r1,
-            named_group::x25519
-        };
+    constexpr std::array<named_group,6/* entires in enum named_group */> named_groups = {
+        named_group::ffdhe2048,
+        named_group::ffdhe3072,
+        named_group::secp256r1,
+        named_group::secp384r1,
+        named_group::secp521r1,
+        named_group::x25519
+    };
 
     } // namespace look_up
 
     inline auto get_tls_named_group = make_lookup( look_up::named_groups );
 
-    inline std::map<named_group,std::string> named_group_names = {
+    inline std::unordered_map<named_group,std::string> named_group_names = {
         { named_group::ffdhe2048, "ffdhe2048" },
         { named_group::ffdhe3072, "ffdhe3072" },
         { named_group::secp256r1, "secp256r1" },
@@ -297,6 +297,11 @@ namespace ntk {
 
     } // namespace look_up
 
+    constexpr std::array<tls_version,2> default_supported_versions = { 
+        tls_version::tls_1_2,
+        tls_version::tls_1_3
+    };
+
     inline auto get_tls_version = make_lookup( look_up::tls_versions );
 
     std::expected<std::vector<tls_version>,std::string> parse_supported_versions( std::span<const uint8_t> supported_versions_bytes );
@@ -347,31 +352,72 @@ namespace ntk {
 
     namespace look_up {
 
-        constexpr std::array<cipher_suite,17> cipher_suites = {
-            cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA,                  
-            cipher_suite::TLS_RSA_WITH_AES_256_CBC_SHA,                  
-            cipher_suite::TLS_RSA_WITH_AES_128_GCM_SHA256,               
-            cipher_suite::TLS_RSA_WITH_AES_256_GCM_SHA384,               
-            cipher_suite::TLS_AES_128_GCM_SHA256,                        
-            cipher_suite::TLS_AES_256_GCM_SHA384,                        
-            cipher_suite::TLS_CHACHA20_POLY1305_SHA256,                  
-            cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,       
-            cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,          
-            cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,          
-            cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,            
-            cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,            
-            cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,       
-            cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,         
-            cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,         
-            cipher_suite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,   
-            cipher_suite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 
-        };
+    constexpr std::array<cipher_suite,17> cipher_suites = {
+        cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA,                  
+        cipher_suite::TLS_RSA_WITH_AES_256_CBC_SHA,                  
+        cipher_suite::TLS_RSA_WITH_AES_128_GCM_SHA256,               
+        cipher_suite::TLS_RSA_WITH_AES_256_GCM_SHA384,               
+        cipher_suite::TLS_AES_128_GCM_SHA256,                        
+        cipher_suite::TLS_AES_256_GCM_SHA384,                        
+        cipher_suite::TLS_CHACHA20_POLY1305_SHA256,                  
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,       
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,          
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,          
+        cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,            
+        cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,            
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,       
+        cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,         
+        cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,         
+        cipher_suite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,   
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 
+    };
 
     } // namespace look_up
 
+    constexpr std::array<cipher_suite,17> default_cipher_suites = {
+        cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA,                  
+        cipher_suite::TLS_RSA_WITH_AES_256_CBC_SHA,                  
+        cipher_suite::TLS_RSA_WITH_AES_128_GCM_SHA256,               
+        cipher_suite::TLS_RSA_WITH_AES_256_GCM_SHA384,               
+        cipher_suite::TLS_AES_128_GCM_SHA256,                        
+        cipher_suite::TLS_AES_256_GCM_SHA384,                        
+        cipher_suite::TLS_CHACHA20_POLY1305_SHA256,                  
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,       
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,          
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,          
+        cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,            
+        cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,            
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,       
+        cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,         
+        cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,         
+        cipher_suite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,   
+        cipher_suite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 
+    };
 
     inline auto get_cipher_suite = make_lookup( look_up::cipher_suites );
 
+    template <typename T>
+    auto make_variant_map(const std::unordered_map<T, std::string>& m) {
+        return std::variant<
+            std::unordered_map<signature_algorithm, std::string>,
+            std::unordered_map<named_group, std::string>,
+            std::unordered_map<tls_version, std::string>
+        >(m);
+    }
+
+    const std::unordered_map<tls_extension_type,
+        std::variant<
+            std::unordered_map<signature_algorithm, std::string>,
+            std::unordered_map<named_group, std::string>,
+            std::unordered_map<tls_version, std::string>
+        >
+    > tls_extension_map = {
+        { tls_extension_type::supported_groups,   make_variant_map(named_group_names) },
+        { tls_extension_type::supported_versions, make_variant_map(tls_version_names) },
+        { tls_extension_type::signature_algorithms, make_variant_map(signature_algorithm_names) },
+        { tls_extension_type::key_share, make_variant_map(named_group_names) }
+    };
+    
     // ==================
     //  TLS Content Type 
     // ==================
@@ -988,6 +1034,14 @@ namespace ntk {
     // ===============
 
     uint32_t get_timestamp();
+
+    std::string load_client_config();
+
+    std::string generate_default_client_config();
+
+    std::expected<std::vector<std::string>,std::string> extract_array( const std::string& config, const std::string& array_name );
+
+    std::expected<std::vector<uint8_t>,std::string> generate_client_hello( const std::string& config );
 
 } // namespace ntk
 
