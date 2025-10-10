@@ -27,6 +27,7 @@
 #include <openssl/kdf.h>
 #include <openssl/rand.h>
 
+#include <crypto.hpp>
 #include <tcp.hpp>
 #include <utils.hpp>
 
@@ -417,7 +418,7 @@ namespace ntk {
         { tls_extension_type::signature_algorithms, make_variant_map(signature_algorithm_names) },
         { tls_extension_type::key_share, make_variant_map(named_group_names) }
     };
-    
+
     // ==================
     //  TLS Content Type 
     // ==================
@@ -1041,7 +1042,12 @@ namespace ntk {
 
     std::expected<std::vector<std::string>,std::string> extract_array( const std::string& config, const std::string& array_name );
 
-    std::expected<std::vector<uint8_t>,std::string> generate_client_hello( const std::string& config );
+    struct client_hello_result {
+        std::vector<uint8_t> client_hello;
+        std::optional<x25519_key_pair> x25519;
+    };
+
+    std::expected<client_hello_result,std::string> generate_client_hello( const std::string& config );
 
 } // namespace ntk
 

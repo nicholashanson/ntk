@@ -61,8 +61,9 @@ namespace ntk {
 
     std::string string_to_hex( const std::vector<uint8_t>& data ) {
         std::ostringstream oss;
-        for ( auto byte : data )
+        for ( auto byte : data ) {
             oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << int( byte );
+        }
         return oss.str();
     }
 
@@ -2688,10 +2689,20 @@ namespace ntk {
             config += ",";
             config += "\n";
         };
+        auto append_integer = [&]( const std::string& name,
+                                   int val,
+                                   int depth ) {
+            auto indent = std::string( depth, '\t' );
+            config += indent + "\"" + name + "\": ";
+            config += std::to_string( val );
+            config += ",";
+            config += "\n";
+        };
         append_list( "cipher_suites", default_cipher_suites, tls_cipher_suite_names, 1 );
         config += ",\n";
         config += "\t\"extensions\": {\n";
         append_boolean( "renegotiation_info", true, 2 );
+        append_integer( "record_size_limit", 16385, 2 );
         append_list( "signature_algorithms", default_signature_algorithms, signature_algorithm_names, 2 );
         config += ",\n";
         append_list( "key_share", default_key_share_groups, named_group_names, 2 );
@@ -2745,23 +2756,44 @@ namespace ntk {
         }
     }
 
+    // =================
+    //  Extract Integer
+    // =================
+
+    std::expected<int,std::string> extract_integer( const std::string& config, const std::string& var_name ) {
+        std::string pattern_string = "\"" + var_name + "\"\\s*:\\s*(-?\\d+)";
+        std::regex int_pattern( pattern_string );
+        std::smatch match;
+        if ( !std::regex_search( config, match, int_pattern ) ) {
+            return std::unexpected( var_name + " not found in Config" );
+        }
+        try {
+            int value = std::stoi( match[ 1 ].str() );
+            return value;
+        } catch ( const std::exception& e ) {
+            return std::unexpected( "Invalid integer value for " + var_name + ": " + e.what() );
+        }
+    }
+
     // =======================
     //  Generate Client Hello
     // =======================
 
-    std::expected<std::vector<uint8_t>,std::string> generate_client_hello( const std::string& config ) {
-        auto version_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_version::tls_1_2 ) );
-        std::vector<uint8_t> client_hello_bytes;
-        client_hello_bytes.insert( client_hello_bytes.end(), version_bytes.begin(), version_bytes.end() );
+    std::expected<client_hello_result,std::string> generate_client_hello( const std::string& config ) {
+        client_hello_result c_hello_result;    
 
-        auto random = generate_tls_random( static_cast<tls_version>( read_uint16_be( client_hello_bytes, 0 ) ) );
-        client_hello_bytes.insert( client_hello_bytes.end(), random.begin(), random.end() );
+        auto version_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_version::tls_1_2 ) );
+
+        c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), version_bytes.begin(), version_bytes.end() );
+
+        auto random = generate_tls_random( static_cast<tls_version>( read_uint16_be( c_hello_result.client_hello, 0 ) ) );
+        c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), random.begin(), random.end() );
 
         auto session_id_len = get_big_endian_byte_encoding<uint8_t,1>( static_cast<uint8_t>( 32 ) );
-        client_hello_bytes.insert( client_hello_bytes.end(), session_id_len.begin(), session_id_len.end() );
+        c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), session_id_len.begin(), session_id_len.end() );
 
         auto session_id = generate_session_id();
-        client_hello_bytes.insert( client_hello_bytes.end(), session_id.begin(), session_id.end() );
+        c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), session_id.begin(), session_id.end() );
 
         auto cipher_suites_result = extract_array( config, "cipher_suites" );
         if ( !cipher_suites_result ) {
@@ -2769,12 +2801,12 @@ namespace ntk {
         }
         auto& cipher_suites = cipher_suites_result.value();
         auto ciphter_suites_len_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( cipher_suites.size() ) * 2 /* bytes per cipher suite */ );
-        client_hello_bytes.insert( client_hello_bytes.end(), ciphter_suites_len_bytes.begin(), ciphter_suites_len_bytes.end() );
+        c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), ciphter_suites_len_bytes.begin(), ciphter_suites_len_bytes.end() );
         for ( auto& c : cipher_suites ) {
             for ( auto& [ cipher_suite, cipher_suite_name ] : tls_cipher_suite_names ) {
                 if ( c == cipher_suite_name ) {
                     auto c_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( cipher_suite ) );
-                    client_hello_bytes.insert( client_hello_bytes.end(), c_bytes.begin(), c_bytes.end() );
+                    c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), c_bytes.begin(), c_bytes.end() );
                 }
             }
         }
@@ -2787,14 +2819,28 @@ namespace ntk {
                 auto& val = result.value();
                 if ( val ) {
                     auto ext_code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::renegotiation_info ) );
-                    client_hello_bytes.insert( client_hello_bytes.end(), ext_code.begin(), ext_code.end() );
-                    client_hello_bytes.push_back( static_cast<uint8_t>( 0x00 ) );
+                    c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), ext_code.begin(), ext_code.end() );
+                    c_hello_result.client_hello.push_back( static_cast<uint8_t>( 0x00 ) );
                 }
+            }
+            if ( extension_type == tls_extension_type::record_size_limit ) {
+                auto result = extract_integer( config, "record_size_limit" );
+                if ( !result ) {
+                    return std::unexpected( result.error() );
+                }                    
+                auto& val = result.value();
+                auto ext_code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::renegotiation_info ) );
+                c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), ext_code.begin(), ext_code.end() );
+                auto integer_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( val ) );
+                c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), integer_bytes.begin(), integer_bytes.end() );
             }
             auto result = extract_array( config, extension_type_name );
             if ( !result ) {
                 continue;
             }
+
+            std::optional<std::string> key_pair_error;
+
             auto& map_variant = tls_extension_map.at( extension_type );
             auto& extension_strings = result.value();
             std::visit( [&]( auto&& map ) {
@@ -2803,13 +2849,29 @@ namespace ntk {
                     for ( auto& s: extension_strings ) {
                         if ( s == extension_name ) {
                             auto bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension ) );
-                            client_hello_bytes.insert( client_hello_bytes.end(), bytes.begin(), bytes.end() );
+                            c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), bytes.begin(), bytes.end() );
+                            if constexpr ( std::is_same_v<typename MapType::key_type,named_group> ) {
+                                if ( extension_type == tls_extension_type::key_share && extension == named_group::x25519 ) {
+                                    auto result = generate_x25519_key_pair();
+                                    if ( !result ) {
+                                        key_pair_error = result.error();
+                                        return;
+                                    }
+                                    c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), result->public_key.begin(), result->public_key.end() );
+                                    c_hello_result.x25519 = std::move( result.value() );
+                                } else if ( extension_type == tls_extension_type::key_share && extension == named_group::secp256r1 ) {
+                                
+                                }
+                            }
                         }
                     }
                 }
             }, map_variant );
+            if ( key_pair_error ) {
+                return std::unexpected( key_pair_error.value() );
+            }
         }
-        return client_hello_bytes;
+        return c_hello_result;
     }
  
 } // namespace ntk
