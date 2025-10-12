@@ -29,4 +29,5 @@ TEST( UnitTest, GetClientHelloInfo_GenerateClientHello ) {
     auto& extensions = info.extensions.value();
     ASSERT_TRUE( extensions.supported_groups );
     EXPECT_EQ( extensions.supported_groups.value().size(), 6 );
+    EXPECT_EQ( info.cipher_suites.size(), 17 );
 }

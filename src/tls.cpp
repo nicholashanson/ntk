@@ -2655,63 +2655,96 @@ namespace ntk {
         return buffer.str();
     }
 
+    // ===============
+    //  Generate List
+    // ===============
+
+    std::string generate_list( const std::string& name, const auto& items, const auto& name_map, int depth ) {
+        std::string config;
+        auto indent = std::string( depth, '\t' );
+        auto subindent = std::string( depth + 1, '\t' );
+        config += indent + "\"" + name + "\": [\n";
+        for ( std::size_t i = 0; i < items.size(); ++i ) {
+            auto it = name_map.find( items[ i ] );
+            if ( it != name_map.end() ) {
+                config += subindent + "\"" + it->second + "\"";
+                if ( i + 1 < items.size() ) {
+                    config += ",";
+                }
+                config += "\n";
+            }
+        }
+        config += indent + "]";
+        return config;
+    }
+
+    // ==================
+    //  Generate Boolean
+    // ==================
+
+    std::string generate_boolean( const std::string& name, bool val, int depth ) {
+        std::string config;
+        auto indent = std::string( depth, '\t' );
+        config += indent + "\"" + name + "\": ";
+        config += ( val ? "true" : "false" );
+        config += ",";
+        config += "\n";
+        return config;
+    }
+
+    // ==================
+    //  Generate Integer
+    // ==================
+    
+    std::string generate_integer( const std::string& name, int val, int depth ) {
+        std::string config;
+        auto indent = std::string( depth, '\t' );
+        config += indent + "\"" + name + "\": ";
+        config += std::to_string( val );
+        config += ",";
+        config += "\n";
+        return config;
+    }
+
     // ================================
     //  Generate Default Client Config
     // ================================
 
     std::string generate_default_client_config() {
         std::string config = "{\n";
-        auto append_list = [&]( const std::string& name,
-                                const auto& items,
-                                const auto& name_map,
-                                int depth ) {
-            auto indent = std::string( depth, '\t' );
-            auto subindent = std::string( depth + 1, '\t' );
-            config += indent + "\"" + name + "\": [\n";
-            for ( std::size_t i = 0; i < items.size(); ++i ) {
-                auto it = name_map.find( items[ i ] );
-                if ( it != name_map.end() ) {
-                    config += subindent + "\"" + it->second + "\"";
-                    if ( i + 1 < items.size() ) {
-                        config += ",";
-                    }
-                    config += "\n";
-                }
-            }
-            config += indent + "]";
-        };
-        auto append_boolean = [&]( const std::string& name,
-                                   bool val,
-                                   int depth ) {
-            auto indent = std::string( depth, '\t' );
-            config += indent + "\"" + name + "\": ";
-            config += ( val ? "true" : "false" );
-            config += ",";
-            config += "\n";
-        };
-        auto append_integer = [&]( const std::string& name,
-                                   int val,
-                                   int depth ) {
-            auto indent = std::string( depth, '\t' );
-            config += indent + "\"" + name + "\": ";
-            config += std::to_string( val );
-            config += ",";
-            config += "\n";
-        };
-        append_list( "cipher_suites", default_cipher_suites, tls_cipher_suite_names, 1 );
+        config += generate_list( "cipher_suites", default_cipher_suites, tls_cipher_suite_names, 1 );
         config += ",\n";
         config += "\t\"extensions\": {\n";
-        append_boolean( "renegotiation_info", true, 2 );
-        append_integer( "record_size_limit", 16385, 2 );
-        append_list( "signature_algorithms", default_signature_algorithms, signature_algorithm_names, 2 );
+        config += generate_boolean( "renegotiation_info", true, 2 );
+        config += generate_integer( "record_size_limit", 16385, 2 );
+        config += generate_list( "signature_algorithms", default_signature_algorithms, signature_algorithm_names, 2 );
         config += ",\n";
-        append_list( "key_share", default_key_share_groups, named_group_names, 2 );
+        config += generate_list( "key_share", default_key_share_groups, named_group_names, 2 );
         config += ",\n";
-        append_list( "supported_groups", default_supported_groups, named_group_names, 2 );
+        config += generate_list( "supported_groups", default_supported_groups, named_group_names, 2 );
         config += ",\n";
-        append_list( "supported_versions", default_supported_versions, tls_version_names, 2 );
+        config += generate_list( "supported_versions", default_supported_versions, tls_version_names, 2 );
         config += "\n\t}\n}\n";
         output_to_file( config, "client_config.json" );
+        return config;
+    }
+
+    // ================================
+    //  Generate Default Server Config
+    // ================================
+
+    std::string generate_default_server_config() {
+        std::string config = "{\n";
+        config += generate_boolean( "respect_client_cipher_suite_preference", true, 1 );
+        config += generate_boolean( "respect_client_key_share_preference", true, 1 );
+        config += generate_list( "cipher_suites", default_cipher_suites, tls_cipher_suite_names, 1 );
+        config += ",\n";
+        config += generate_list( "supported_versions", default_supported_versions, tls_version_names, 1 );
+        config += ",\n";
+        config += generate_list( "key_share", default_key_share_groups, named_group_names, 1 );
+        config += "\n";
+        config += "}\n";
+        output_to_file( config, "server_config.json" );
         return config;
     }
 

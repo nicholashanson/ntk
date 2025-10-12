@@ -65,4 +65,5 @@ TEST( IntegrationTest, ExtractCertificate_Segment ) {
                                                  session_keys,
                                                  "SERVER_HANDSHAKE_TRAFFIC_SECRET",
                                                  1 );
+    ntk::print_server_hello( server_hello );
 }

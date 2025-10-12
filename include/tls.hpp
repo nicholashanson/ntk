@@ -398,12 +398,12 @@ namespace ntk {
     inline auto get_cipher_suite = make_lookup( look_up::cipher_suites );
 
     template <typename T>
-    auto make_variant_map(const std::unordered_map<T, std::string>& m) {
+    auto make_variant_map( const std::unordered_map<T, std::string>& m ) {
         return std::variant<
-            std::unordered_map<signature_algorithm, std::string>,
-            std::unordered_map<named_group, std::string>,
-            std::unordered_map<tls_version, std::string>
-        >(m);
+            std::unordered_map<signature_algorithm,std::string>,
+            std::unordered_map<named_group,std::string>,
+            std::unordered_map<tls_version,std::string>
+        >( m );
     }
 
     const std::unordered_map<tls_extension_type,
@@ -413,10 +413,10 @@ namespace ntk {
             std::unordered_map<tls_version, std::string>
         >
     > tls_extension_map = {
-        { tls_extension_type::supported_groups,   make_variant_map(named_group_names) },
-        { tls_extension_type::supported_versions, make_variant_map(tls_version_names) },
-        { tls_extension_type::signature_algorithms, make_variant_map(signature_algorithm_names) },
-        { tls_extension_type::key_share, make_variant_map(named_group_names) }
+        { tls_extension_type::supported_groups,             make_variant_map( named_group_names ) },
+        { tls_extension_type::supported_versions,           make_variant_map( tls_version_names ) },
+        { tls_extension_type::signature_algorithms, make_variant_map( signature_algorithm_names ) },
+        { tls_extension_type::key_share,                      make_variant_map(named_group_names) }
     };
 
     // ==================
@@ -448,6 +448,20 @@ namespace ntk {
         { tls_content_type::alert, "Alert" },
         { tls_content_type::handshake, "Handshake" },
         { tls_content_type::application_data, "Application Data" }
+    };
+
+    // =============
+    //  TLS Context 
+    // =============
+
+    struct tls_context {
+        std::optional<std::vector<uint8_t>> peer_public_key;
+        std::optional<std::vector<uint8_t>> host_public_key; 
+        std::optional<std::vector<uint8_t>> host_private_ley;
+        std::optional<named_group> negotiated_key_share;
+        std::optional<signature_algorithm> negotiatioed_signature_algorithm;
+        tls_version negotiated_version;
+        cipher_suite negotiated_cipher_suite;
     };
 
     // =============
@@ -819,7 +833,7 @@ namespace ntk {
     struct tls_certificate {};
 
     // ===============
-    //  TLS Handshake 
+    //  TLS Handshake signature_algorithms
     // ===============
 
     struct tls_handshake {
@@ -983,6 +997,15 @@ namespace ntk {
             log_file_trimmer& operator=( const log_file_trimmer& ) = delete;
             void start();
             void stop();
+    struct tls_context {
+        std::optional<std::vector<uint8_t>> peer_public_key;
+        std::optional<std::vector<uint8_t>> host_public_key; 
+        std::optional<std::vector<uint8_t>> host_private_ley;
+        std::optional<named_group> negotiated_key_share;
+        std::optional<signature_algorithm> negotiatioed_signature_algorithm;
+        tls_version negotiated_version;
+        cipher_suite negotiated_cipher_suite;
+    };
         private:
             void run();
             std::string m_log_file;
@@ -1040,7 +1063,11 @@ namespace ntk {
 
     std::string generate_default_client_config();
 
+    std::string generate_default_server_config();
+
     std::expected<std::vector<std::string>,std::string> extract_array( const std::string& config, const std::string& array_name );
+
+    std::expected<bool,std::string> extract_boolean( const std::string& config, const std::string& var_name );
 
     struct client_hello_result {
         std::vector<uint8_t> client_hello;
