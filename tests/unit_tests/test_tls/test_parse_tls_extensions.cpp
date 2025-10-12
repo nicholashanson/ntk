@@ -18,3 +18,15 @@ TEST( UnitTest, ParseTlsExtensions ) {
     EXPECT_EQ( extensions[ 0 ].value.size(), 0 );
     EXPECT_EQ( extensions[ 1 ].value.size(), 1 );
 }
+
+TEST( UnitTest, ParseTlsExtensions_GenerateClientHello ) {
+    ntk::generate_default_client_config();
+    auto config = ntk::load_client_config();
+    auto generate_result = ntk::generate_client_hello( config );
+    ASSERT_TRUE( generate_result ) << generate_result.error() << std::endl;
+    auto& generated_client_hello = generate_result.value();
+    auto parse_result = ntk::parse_client_hello( generated_client_hello.client_hello );
+    ASSERT_TRUE( parse_result ) << parse_result.error() << std::endl;
+    auto extensions_result = ntk::parse_tls_extensions( parse_result.value().extensions );
+    ASSERT_TRUE( extensions_result ) << extensions_result.error() << std::endl;
+}

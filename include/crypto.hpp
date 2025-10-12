@@ -6,7 +6,9 @@
 #include <stdexcept>
 #include <vector>
 
+#include <openssl/ec.h>
 #include <openssl/evp.h>
+#include <openssl/obj_mac.h>
 
 namespace ntk {
 
@@ -15,10 +17,22 @@ namespace ntk {
         std::array<uint8_t,32> public_key;
     };
 
+    struct secp256r1_key_pair {
+        std::array<uint8_t,32> private_key;
+        std::array<uint8_t,65> public_key; 
+    };
+
 	std::expected<x25519_key_pair,std::string> generate_x25519_key_pair();
 
 	std::expected<std::vector<uint8_t>,std::string> derive_x25519_shared_secret( const std::array<uint8_t,32>& private_key,
                                                                                  const std::array<uint8_t,32>& peer_public_key );
+
+    std::expected<secp256r1_key_pair,std::string> generate_secp256r1_key_pair();
+
+    std::expected<std::vector<uint8_t>,std::string>
+    derive_secp256r1_shared_secret( const std::array<uint8_t,32>& private_key,
+                                    const std::array<uint8_t,65>& peer_public_key);
+
 } // namespace ntk
 
 #endif // CRYPTO_HPP

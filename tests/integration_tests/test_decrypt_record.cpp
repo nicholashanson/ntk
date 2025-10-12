@@ -7,6 +7,7 @@
 #include <test_constants.hpp>
 
 TEST( IntegrationTest, DecryptRecord_TlsApplicationData_Client ) {
+    ntk::generate_default_client_config();
     auto packet_data = ntk::read_packets_from_file( test::packet_data_files[ "tls_handshake" ] );
     ASSERT_FALSE( packet_data.empty() );
     auto& client_hello_packet = packet_data[ 3 ];

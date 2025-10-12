@@ -1045,6 +1045,7 @@ namespace ntk {
     struct client_hello_result {
         std::vector<uint8_t> client_hello;
         std::optional<x25519_key_pair> x25519;
+        std::optional<secp256r1_key_pair> secp256r1;
     };
 
     std::expected<client_hello_result,std::string> generate_client_hello( const std::string& config );

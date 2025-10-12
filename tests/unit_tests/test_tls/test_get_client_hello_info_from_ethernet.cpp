@@ -15,3 +15,18 @@ TEST( UnitTest, GetClientHelloInfo ) {
     auto& info = parse_result.value();
     EXPECT_EQ( info.extensions, test_constants::c_hello_extensions );
 }
+
+TEST( UnitTest, GetClientHelloInfo_GenerateClientHello ) {
+    ntk::generate_default_client_config();
+    auto config = ntk::load_client_config();
+    auto client_hello_result = ntk::generate_client_hello( config );
+    ASSERT_TRUE( client_hello_result ) << client_hello_result.error() << std::endl;
+    auto& client_hello = client_hello_result.value().client_hello;
+    auto info_result = ntk::get_client_hello_info( client_hello );
+    ASSERT_TRUE( info_result ) << info_result.error() << std::endl;
+    auto& info = info_result.value();
+    ASSERT_TRUE( info.extensions );
+    auto& extensions = info.extensions.value();
+    ASSERT_TRUE( extensions.supported_groups );
+    EXPECT_EQ( extensions.supported_groups.value().size(), 6 );
+}

@@ -789,7 +789,7 @@ namespace ntk {
         }
         const uint16_t record_payload_len = read_uint16_be( raw_tls_record, record_header_offset::payload_len );
         if ( raw_tls_record.size() < constants::record_header_len + record_payload_len ) {
-            return std::unexpected( "TLS Record Payload length exceeds buffer size" );
+            return std::unexpected( "TLS Record Payload length exceeds Buffer Size" );
         }
         std::vector<uint8_t> payload( raw_tls_record.begin() + constants::record_header_len, 
                                       raw_tls_record.begin() + constants::record_header_len + record_payload_len );
@@ -2775,6 +2775,45 @@ namespace ntk {
         }
     }
 
+    // ===================================
+    //  Generate Renegotiation Info Bytes
+    // ===================================
+
+    std::expected<std::vector<uint8_t>,std::string> generate_renegotiation_info_bytes( const std::string& config ) {
+        std::vector<uint8_t> bytes;
+        auto result = extract_boolean( config, "renegotiation_info" );
+        if ( !result ) {
+            return std::unexpected( result.error() );
+        }
+        auto& val = result.value();
+        if ( val ) {
+            auto ext_code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::renegotiation_info ) );
+            bytes.insert( bytes.end(), ext_code.begin(), ext_code.end() );
+            bytes.insert( bytes.end(), { 0x00, 0x01 } );
+            bytes.push_back( static_cast<uint8_t>( 0x00 ) );
+        }
+        return bytes;
+    }
+
+    // ==================================
+    //  Generate Record Size Limit Bytes
+    // ==================================
+
+    std::expected<std::vector<uint8_t>,std::string> generate_record_size_limit_bytes( const std::string& config ) {
+        std::vector<uint8_t> bytes;
+        auto result = extract_integer( config, "record_size_limit" );
+        if ( !result ) {
+            return std::unexpected( result.error() );
+        }                    
+        auto& val = result.value();
+        auto ext_code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::record_size_limit ) );
+        bytes.insert( bytes.end(), ext_code.begin(), ext_code.end() );
+        auto integer_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( val ) );
+        bytes.insert( bytes.end(), { 0x00, 0x02 } );
+        bytes.insert( bytes.end(), integer_bytes.begin(), integer_bytes.end() );
+        return bytes;
+    }
+
     // =======================
     //  Generate Client Hello
     // =======================
@@ -2783,7 +2822,6 @@ namespace ntk {
         client_hello_result c_hello_result;    
 
         auto version_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_version::tls_1_2 ) );
-
         c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), version_bytes.begin(), version_bytes.end() );
 
         auto random = generate_tls_random( static_cast<tls_version>( read_uint16_be( c_hello_result.client_hello, 0 ) ) );
@@ -2810,29 +2848,26 @@ namespace ntk {
                 }
             }
         }
+        c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), { 0x01, 0x00 } );
+        std::vector<uint8_t> extensions;
         for ( auto& [ extension_type, extension_type_name ] : tls_extension_type_names ) {
             if ( extension_type == tls_extension_type::renegotiation_info ) {
-                auto result = extract_boolean( config, "renegotiation_info" );
+                auto result = generate_renegotiation_info_bytes( config );
                 if ( !result ) {
                     return std::unexpected( result.error() );
                 }
-                auto& val = result.value();
-                if ( val ) {
-                    auto ext_code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::renegotiation_info ) );
-                    c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), ext_code.begin(), ext_code.end() );
-                    c_hello_result.client_hello.push_back( static_cast<uint8_t>( 0x00 ) );
-                }
+                auto& bytes = result.value();
+                extensions.insert( extensions.end(), bytes.begin(), bytes.end() );
+                continue;
             }
             if ( extension_type == tls_extension_type::record_size_limit ) {
-                auto result = extract_integer( config, "record_size_limit" );
+                auto result = generate_record_size_limit_bytes( config );
                 if ( !result ) {
                     return std::unexpected( result.error() );
-                }                    
-                auto& val = result.value();
-                auto ext_code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::renegotiation_info ) );
-                c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), ext_code.begin(), ext_code.end() );
-                auto integer_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( val ) );
-                c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), integer_bytes.begin(), integer_bytes.end() );
+                }
+                auto& bytes = result.value();
+                extensions.insert( extensions.end(), bytes.begin(), bytes.end() );
+                continue;
             }
             auto result = extract_array( config, extension_type_name );
             if ( !result ) {
@@ -2843,34 +2878,74 @@ namespace ntk {
 
             auto& map_variant = tls_extension_map.at( extension_type );
             auto& extension_strings = result.value();
+            std::vector<uint8_t> extension_v;
+            auto bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension_type ) );
+            extensions.insert( extensions.end(), bytes.begin(), bytes.end() );
             std::visit( [&]( auto&& map ) {
                 using MapType = std::decay_t<decltype( map )>;
                 for ( auto& [ extension, extension_name ] : map ) {
                     for ( auto& s: extension_strings ) {
                         if ( s == extension_name ) {
-                            auto bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension ) );
-                            c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), bytes.begin(), bytes.end() );
                             if constexpr ( std::is_same_v<typename MapType::key_type,named_group> ) {
                                 if ( extension_type == tls_extension_type::key_share && extension == named_group::x25519 ) {
+                                    extension_v.insert( extension_v.end(), { 0x00, 0x69 } );
                                     auto result = generate_x25519_key_pair();
                                     if ( !result ) {
                                         key_pair_error = result.error();
                                         return;
                                     }
-                                    c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), result->public_key.begin(), result->public_key.end() );
+                                    auto named_group_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( named_group::x25519 ) );
+                                    extension_v.insert( extension_v.end(), named_group_bytes.begin(), named_group_bytes.end() );
+                                    auto len_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( 32 ) );
+                                    extension_v.insert( extension_v.end(), len_bytes.begin(), len_bytes.end() );
+                                    extension_v.insert( extension_v.end(), result->public_key.begin(), result->public_key.end() );
                                     c_hello_result.x25519 = std::move( result.value() );
                                 } else if ( extension_type == tls_extension_type::key_share && extension == named_group::secp256r1 ) {
-                                
+                                    auto result = generate_secp256r1_key_pair();
+                                    if ( !result ) {
+                                        key_pair_error = result.error();
+                                        return;
+                                    }
+                                    auto named_group_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( named_group::secp256r1 ) );
+                                    extension_v.insert( extension_v.end(), named_group_bytes.begin(), named_group_bytes.end() );
+                                    auto len_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( 65 ) );
+                                    extension_v.insert( extension_v.end(), len_bytes.begin(), len_bytes.end() );
+                                    extension_v.insert( extension_v.end(), result->public_key.begin(), result->public_key.end() );
+                                    c_hello_result.secp256r1 = std::move( result.value() );                
+                                } else if ( extension_type == tls_extension_type::supported_groups ) {
+                                    auto code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension ) );
+                                    extension_v.insert( extension_v.end(), code.begin(), code.end() );
                                 }
+                            } else {
+                                auto code = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension ) );
+                                extension_v.insert( extension_v.end(), code.begin(), code.end() );
                             }
                         }
                     }
                 }
             }, map_variant );
+            if ( extension_type == tls_extension_type::supported_groups ) {
+                auto list_len = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension_v.size() ) );
+                auto len = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension_v.size() + 2 /* list len bytes */ ) );
+                extensions.insert( extensions.end(), len.begin(), len.end() );
+                extensions.insert( extensions.end(), list_len.begin(), list_len.end() );
+            } else if ( extension_type == tls_extension_type::supported_versions ) {
+                auto list_len = get_big_endian_byte_encoding<uint8_t,1>( static_cast<uint8_t>( extension_v.size() ) );
+                auto len = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension_v.size() + 1 /* list len bytes */ ) );
+                extensions.insert( extensions.end(), len.begin(), len.end() );
+                extensions.insert( extensions.end(), list_len.begin(), list_len.end() );
+            } else {
+                auto len = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extension_v.size() ) );
+                extensions.insert( extensions.end(), len.begin(), len.end() );
+            }
+            extensions.insert( extensions.end(), extension_v.begin(), extension_v.end() );
             if ( key_pair_error ) {
                 return std::unexpected( key_pair_error.value() );
             }
         }
+        auto extensions_len = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extensions.size() ) );
+        c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), extensions_len.begin(), extensions_len.end() );
+        c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), extensions.begin(), extensions.end() );
         return c_hello_result;
     }
  

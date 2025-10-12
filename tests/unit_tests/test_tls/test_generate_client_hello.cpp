@@ -1,12 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <io.hpp>
 #include <tls.hpp>
 
 TEST( UnitTest, GenerateClientHello ) {
+	ntk::generate_default_client_config();
 	auto config = ntk::load_client_config();
 	auto result = ntk::generate_client_hello( config );
 	ASSERT_TRUE( result ) << result.error() << std::endl;
 	auto& client_hello_result = result.value();
-	std::vector<uint8_t> expected{ 0x00, 0x22 };
-	EXPECT_EQ( client_hello_result.client_hello.size(), 184 ); 
+	EXPECT_EQ( client_hello_result.client_hello.size(), 282 ); 
 }
