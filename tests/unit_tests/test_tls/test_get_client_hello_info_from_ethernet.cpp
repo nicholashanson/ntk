@@ -30,4 +30,9 @@ TEST( UnitTest, GetClientHelloInfo_GenerateClientHello ) {
     ASSERT_TRUE( extensions.supported_groups );
     EXPECT_EQ( extensions.supported_groups.value().size(), 6 );
     EXPECT_EQ( info.cipher_suites.size(), 17 );
+    EXPECT_EQ( extensions.key_share_entries->size(), 2 );
+    EXPECT_EQ( static_cast<ntk::named_group>( extensions.key_share_entries->front().group ), ntk::named_group::x25519 );
+    EXPECT_EQ( extensions.key_share_entries->front().key_data.size(), 32 );
+    EXPECT_EQ( static_cast<ntk::named_group>( extensions.key_share_entries->back().group ), ntk::named_group::secp256r1 );
+    EXPECT_EQ( extensions.key_share_entries->back().key_data.size(), 65 );
 }

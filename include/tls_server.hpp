@@ -23,8 +23,11 @@ namespace ntk {
 
     struct server_hello_context {
         cipher_suite c_suite;
-        named_group key_share;
-        std::vector<uint8_t> peer_public_key;
+        tls_version version;
+        std::optional<named_group> key_share;
+        std::optional<std::vector<uint8_t>> peer_public_key;
+        std::optional<std::vector<uint8_t>> private_key;
+        std::optional<std::vector<uint8_t>> public_key;
     };
 
     std::expected<int,std::string> create_server_socket();
@@ -37,6 +40,8 @@ namespace ntk {
 
     std::expected<server_hello_context,std::string> get_server_hello_context( const client_hello_info&, const tls_server_config& server_config );
 
-     std::expected<tls_server_config,std::string> get_server_config();
+    std::expected<tls_server_config,std::string> get_server_config();
+
+    std::expected<std::vector<uint8_t>,std::string> generate_server_hello( const server_hello_context& context );
 
 } // namespace ntk

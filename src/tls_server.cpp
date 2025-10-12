@@ -162,6 +162,18 @@ namespace ntk {
                 } 
             }
         }
+        auto supported_versions = extract_array( config, "supported_versions" );
+        if ( !supported_versions ) {
+            return std::unexpected( supported_versions.error() );
+        }
+        auto& supported_v = supported_versions.value();
+        for ( auto& [ v, v_name ] : tls_version_names ) {
+            for ( auto& version : supported_v ) {
+                if ( version == v_name ) {
+                    server_config.supported_versions.push_back( v );
+                }
+            }
+        }
         return server_config;
     }
 
@@ -216,7 +228,55 @@ namespace ntk {
                 }    
             }
         }
+        if ( context.key_share ) {
+            if ( context.key_share == named_group::x25519 ) {
+                auto result = generate_x25519_key_pair();
+                if ( !result ) {
+                    return std::unexpected( result.error() );
+                }
+                auto& key_pair = result.value();
+                context.private_key = { key_pair.private_key.begin(), key_pair.private_key.end() };
+                context.public_key = { key_pair.public_key.begin(), key_pair.public_key.end() };
+            } else if ( context.key_share == named_group::secp256r1 ) {
+                auto result = generate_secp256r1_key_pair();
+                if ( !result ) {
+                    return std::unexpected( result.error() );
+                }
+                auto& key_pair = result.value();
+                context.private_key = { key_pair.private_key.begin(), key_pair.private_key.end() };
+                context.public_key = { key_pair.public_key.begin(), key_pair.public_key.end() };
+            }
+        }
+        if ( c_hello.extensions && c_hello.extensions->supported_versions ) {
+            for ( auto& v :  c_hello.extensions->supported_versions.value() ) {
+                if ( std::any_of( server_config.supported_versions.begin(),
+                                  server_config.supported_versions.end(),
+                                  [&]( auto& version) { return version == v; } ) ) {
+                    context.version = v;
+                }
+            }
+        }
         return context;
     }
 
+    // =======================
+    //  Generate Server Hello
+    // =======================
+
+    std::expected<std::vector<uint8_t>,std::string> generate_server_hello( const server_hello_context& context ) {
+        std::vector<uint8_t> server_hello_bytes;
+        auto version_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( context.version ) );
+        server_hello_bytes.insert( server_hello_bytes.end(), version_bytes.begin(), version_bytes.end() );
+        auto random_bytes = generate_tls_random( context.version );
+        server_hello_bytes.insert( server_hello_bytes.end(), random_bytes.begin(), random_bytes.end() );
+        server_hello_bytes.push_back( static_cast<uint8_t>( 0x00 ) );
+        auto cipher_suite_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( context.c_suite ) );
+        server_hello_bytes.insert( server_hello_bytes.end(), cipher_suite_bytes.begin(), cipher_suite_bytes.end() );
+        server_hello_bytes.push_back( static_cast<uint8_t>( 0x00 ) );
+        server_hello_bytes.insert( server_hello_bytes.end(), { 0x00, 0x00 } );
+        return server_hello_bytes;
+    }
+
 } // namespace ntk
+
+

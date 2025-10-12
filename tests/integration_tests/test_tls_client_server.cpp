@@ -17,4 +17,6 @@ TEST( IntegrationTest, GetServerHelloContext ) {
 	auto& server_hello_context = server_hello_context_result.value();
 	EXPECT_EQ( info_result.value().cipher_suites.size(), 17 );
 	EXPECT_EQ( server_hello_context.c_suite, info_result.value().cipher_suites.front() );
+	ASSERT_TRUE( server_hello_context.key_share );
+	EXPECT_EQ( server_hello_context.key_share.value(), ntk::named_group::x25519 );
 }
