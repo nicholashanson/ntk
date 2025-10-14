@@ -49,8 +49,8 @@ TEST( UnitTest, ParseClientHello ) {
 
 TEST( UnitTest, ParseClientHello_GenerateClientHello ) {
     ntk::generate_default_client_config();
-    auto config = ntk::load_client_config();
-    auto generate_result = ntk::generate_client_hello( config );
+    auto config_result = ntk::load_client_config();
+    auto generate_result = ntk::generate_client_hello( config_result.value() );
     ASSERT_TRUE( generate_result ) << generate_result.error() << std::endl;
     auto parse_result = ntk::parse_client_hello( generate_result.value().client_hello );
     ASSERT_TRUE( parse_result ) << parse_result.error() << std::endl;

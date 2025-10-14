@@ -293,15 +293,20 @@ namespace ntk {
             return std::unexpected( "Failed to parse Client Hello: " + client_hello_result.error() );
         }
         auto& client_hello = client_hello_result.value();
+        return get_client_hello_info( client_hello );
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<client_hello_info,std::string> get_client_hello_info( const client_hello& c_hello ) {
         client_hello_info info;
-        info.session_id = std::move( client_hello.session_id );
-        info.random = std::move( client_hello.random );
-        auto cipher_suites_result = parse_cipher_suites( client_hello.cipher_suites );
+        info.session_id = std::move( c_hello.session_id );
+        info.random = std::move( c_hello.random );
+        auto cipher_suites_result = parse_cipher_suites( c_hello.cipher_suites );
         if ( !cipher_suites_result ) {
             return std::unexpected( "Failed to parse Client Hello Cipher Suites: " + cipher_suites_result.error() );
         }  
         info.cipher_suites = std::move( cipher_suites_result.value() );
-        auto extensions_result = parse_tls_extensions( client_hello.extensions );
+        auto extensions_result = parse_tls_extensions( c_hello.extensions );
         if ( !extensions_result ) {
             return std::unexpected( "Falied to parse Client Hello Extensions: " + extensions_result.error() );
         }
@@ -392,6 +397,106 @@ namespace ntk {
             }
         }
         return c_hello_exts;
+    }
+
+    // =======================================
+    //  Parse Server Hello Supported Versions 
+    // =======================================
+
+    std::expected<tls_version,std::string> parse_server_hello_supported_versions( std::span<const uint8_t> supported_versions_bytes ) {
+        if ( supported_versions_bytes.size() < 2 ) {
+            return std::unexpected( "Supprted Versions Bytes too short for TLS Version" );
+        }
+        return static_cast<tls_version>( read_uint16_be( supported_versions_bytes, 0 ) );
+    } 
+
+    // ==============================
+    //  Parse Server Hello Key Share 
+    // ==============================
+
+    std::expected<key_share_entry,std::string> parse_server_hello_key_share( std::span<const uint8_t> key_share_bytes ) {
+        if ( key_share_bytes.empty() ) {
+            return std::unexpected( "Key Share Bytes is empty" );
+        }
+        key_share_entry ks_e;
+        if ( key_share_bytes.size() < 2 ) {
+            return std::unexpected( "Key Share Bytes too shrot for Named Group Field" );
+        }
+        ks_e.group = static_cast<named_group>( read_uint16_be( key_share_bytes, 0 ) );
+        if ( key_share_bytes.size() < 4 ) {
+            return std::unexpected( "Key Share Bytes too short for Key Length Field" );
+        }
+        auto len = read_uint16_be( key_share_bytes, 2 );
+        if ( key_share_bytes.size() < 4 + len ) {
+            return std::unexpected( "Key Share Entry Key Field is truncated" );
+        }
+        ks_e.key_data = { key_share_bytes.begin() + 4, key_share_bytes.end() };
+        return ks_e;
+    }
+
+    // ===============================
+    //  Parse Server Hello Extensions 
+    // ===============================
+
+    std::expected<server_hello_extensions,std::string> parse_server_hello_extensions( std::span<const tls_extension> extensions ) {
+        server_hello_extensions s_hello_exts;
+        for ( const auto& ext : extensions ) {
+            if ( !ext.type ) {
+                continue;
+            }
+            switch ( ext.type.value() ) {
+                case tls_extension_type::supported_versions: {
+                    auto parse_result = parse_server_hello_supported_versions( ext.value );
+                    if ( !parse_result ) {
+                        return std::unexpected( parse_result.error() );
+                    }
+                    s_hello_exts.supported_versions = parse_result.value();
+                    break;
+                }
+                case tls_extension_type::key_share: {
+                    auto parse_result = parse_server_hello_key_share( ext.value );
+                    if ( !parse_result ) {
+                        return std::unexpected( parse_result.error() ); 
+                    }
+                    s_hello_exts.key_share = std::move( parse_result.value() );
+                }  
+                default:
+                    break;
+            }
+        }
+        return s_hello_exts;
+    }
+
+    // =======================
+    //  Get Server Hello Info 
+    // =======================
+
+    std::expected<server_hello_info,std::string> get_server_hello_info( std::span<const uint8_t> server_hello_bytes ) {
+        auto parse_result = parse_server_hello( server_hello_bytes );
+        if ( !parse_result ) {
+            return std::unexpected( parse_result.error() );
+        }
+        auto& server_hello = parse_result.value();
+        return get_server_hello_info( server_hello );
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<server_hello_info,std::string> get_server_hello_info( const server_hello& s_hello ) {
+        server_hello_info info;
+        info.version = s_hello.server_version;
+        info.random = std::move( s_hello.random );
+        info.session_id = std::move( s_hello.session_id );
+        info.c_suite = static_cast<cipher_suite>( s_hello.cipher_suite );
+        auto extensions_result = parse_tls_extensions( s_hello.extensions );
+        if ( !extensions_result ) {
+            return std::unexpected( extensions_result.error() );
+        }
+        auto server_extensions_reuslt = parse_server_hello_extensions( extensions_result.value() );
+        if ( !server_extensions_reuslt ) {
+            return std::unexpected( server_extensions_reuslt.error() );
+        }
+        info.extensions = std::move( server_extensions_reuslt.value() );
+        return info; 
     }
 
     // ====================
@@ -559,9 +664,9 @@ namespace ntk {
         return parse_server_hello( server_hello_bytes ); 
     }
 
-    // ==================
+    // ======================
     //  Parse TLS Extensions 
-    // ==================
+    // ======================
 
     std::expected<std::vector<tls_extension>,std::string> parse_tls_extensions( std::span<const uint8_t> extensions_bytes ) {
         std::vector<tls_extension> extensions;
@@ -1419,8 +1524,13 @@ namespace ntk {
                                const secrets& session_keys,
                                const std::string& secret_label,
                                uint64_t seq_num ) {
+        auto secret = get_traffic_secret( session_keys, client_random, secret_label );
+        return encrypt_record( record, static_cast<cipher_suite>( cipher_suite_id ), secret, seq_num );
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, std::vector<uint8_t>& secret, uint64_t seq_num ) {
         constexpr std::size_t tag_length = 16;
-        const cipher_suite suite = static_cast<cipher_suite>( cipher_suite_id );
         const EVP_MD* hash_fn = nullptr;
         const EVP_CIPHER* cipher = nullptr;
         std::size_t key_len = 0;
@@ -1450,8 +1560,7 @@ namespace ntk {
             default:
                 throw std::runtime_error( "Unsupported cipher suite" );
         }
-        auto secret = get_traffic_secret( session_keys, client_random, secret_label );
-        if (suite == cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA) {
+        if ( suite == cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA ) {
             auto key_block = derive_tls_key_iv_mac( secret, hash_fn, key_len, 16, 20 );
             auto cipher_text = encrypt_aes_cbc( key_block, seq_num, record.content_type,
                                                 record.version, record.payload, cipher );
@@ -1459,11 +1568,22 @@ namespace ntk {
         }
         auto key_material = derive_tls_key_iv( secret, hash_fn, key_len, 12 );
         std::vector<uint8_t> plain_text = record.payload;
+        plain_text.push_back( static_cast<uint8_t>( record.content_type ) );
         auto nonce = build_tls13_nonce( key_material.iv, seq_num );
         std::size_t expected_cipher_len = plain_text.size() + tag_length;
         auto aad = build_tls13_aad( record.content_type, record.version, static_cast<uint16_t>( expected_cipher_len ) );
         auto cipher_text_with_tag = encrypt_aes_gcm( key_material.key, nonce, aad, plain_text, cipher );
         return { record.content_type, record.version, cipher_text_with_tag };
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>> secret,
+                               uint64_t seq_num ) {
+        std::vector<uint8_t> secret_vec;
+        std::visit( [&]( auto&& arr ) {
+            secret_vec.assign(arr.begin(), arr.end());
+        }, secret );
+        return encrypt_record( record, suite, secret_vec, seq_num );
     }
 
     // =====================
@@ -2167,6 +2287,9 @@ namespace ntk {
 
     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     std::expected<tls_record,std::string> get_tls_record_from_payload( std::span<const uint8_t> payload ) {
+        if ( payload.empty() ) {
+            return std::unexpected( "TLS Payload is empty" );
+        }
         auto result = split_tls_records( payload );
         if ( result.has_value() ) {
             auto [ records, offset_reached ] = result.value();
@@ -2641,13 +2764,13 @@ namespace ntk {
     //  Load Client Config
     // ====================
 
-    std::string load_client_config() {
+    std::expected<std::string,std::string> load_client_config() {
         std::ifstream file( "client_config.json" );
         if ( !file ) {
             generate_default_client_config();
-            file.open("client_config.json");
+            file.open( "client_config.json" );
             if ( !file.is_open() ) {
-                throw std::runtime_error( "Failed to open client_config.json after generating default config" );
+                return std::unexpected( "Failed to open client_config.json after generating default config" );
             }
         }
         std::ostringstream buffer;
@@ -2980,6 +3103,298 @@ namespace ntk {
         c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), extensions_len.begin(), extensions_len.end() );
         c_hello_result.client_hello.insert( c_hello_result.client_hello.end(), extensions.begin(), extensions.end() );
         return c_hello_result;
+    }
+
+    // =============================
+    //  Calculate Transcript Digest
+    // =============================
+
+    std::expected<std::vector<uint8_t>,std::string> calculate_transcript_digest( std::span<const uint8_t> client_hello_bytes, 
+                                                                                 std::span<const uint8_t> server_hello_bytes ) {
+        std::vector<uint8_t> transcript;
+        transcript.reserve( client_hello_bytes.size() + server_hello_bytes.size() );
+        transcript.insert( transcript.end(), client_hello_bytes.begin(), client_hello_bytes.end() );
+        transcript.insert( transcript.end(), server_hello_bytes.begin(), server_hello_bytes.end() );
+        auto result = caluclate_digest( transcript );
+        if ( !result ) {
+            return std::unexpected( "Failed to Calculate Transcript Digest: " + result.error() );
+        }
+        return result.value();
+    }
+
+    // ================
+    //  Derive Secrets
+    // ================
+
+    std::expected<std::variant<sha_256_secrets,sha_384_secrets>,std::string> derive_tls_secrets( const tls_context& context,
+                                                                                                 std::span<const uint8_t> client_hello_bytes,
+                                                                                                 std::span<const uint8_t> server_hello_bytes ) {
+        std::variant<sha_256_secrets,sha_384_secrets> secrets;
+        auto digest_result = calculate_transcript_digest( client_hello_bytes, server_hello_bytes );
+        if ( !digest_result ) {
+            return std::unexpected( digest_result.error() );
+        } 
+        auto& transcript_digest = digest_result.value();
+        if ( !context.negotiated_key_share ) {
+            return std::unexpected( "Key Share is undefined in the TLS Context" );
+        }
+        std::vector<uint8_t> shared_secret;
+        if ( context.negotiated_key_share == named_group::x25519 ) {
+            std::array<uint8_t,32> peer_public_key;
+            std::copy( context.peer_public_key->begin(), context.peer_public_key->end(), peer_public_key.begin() );
+            std::array<uint8_t,32> private_key;
+            std::copy( context.private_key->begin(), context.private_key->end(), private_key.begin() );
+            auto shared_secret_result = derive_x25519_shared_secret( private_key, peer_public_key );
+            if ( !shared_secret_result ) {
+                return std::unexpected( shared_secret_result.error() );
+            }
+            shared_secret = shared_secret_result.value();
+        } else {
+            std::array<uint8_t,65> peer_public_key;
+            std::copy( context.peer_public_key->begin(), context.peer_public_key->end(), peer_public_key.begin() );
+            std::array<uint8_t,32> private_key;
+            std::copy( context.private_key->begin(), context.private_key->end(), private_key.begin() );
+            auto shared_secret_result = derive_secp256r1_shared_secret( private_key, peer_public_key );
+            if ( !shared_secret_result ) {
+                return std::unexpected( shared_secret_result.error() );
+            }
+            shared_secret = shared_secret_result.value();
+        }
+
+        auto hash_func_result = select_hash_from_cipher( context.negotiated_cipher_suite );
+        if ( !hash_func_result ) {
+            return std::unexpected( hash_func_result.error() );
+        }
+        auto& hash_func = hash_func_result.value();
+        std::size_t hash_len = 0;
+        if ( hash_func == EVP_sha256() ) {
+            hash_len = 32;
+        } else {
+            hash_len = 48;
+        }
+
+        auto handshake_secret_result = hkdf_extract( shared_secret, {} );
+        if ( !handshake_secret_result ) {
+            return std::unexpected( handshake_secret_result.error() );
+        }
+        auto handshake_secret = handshake_secret_result.value();
+
+        auto client_hs_secret = hkdf_expand_label( handshake_secret, "c hs traffic", transcript_digest, hash_len, hash_func );
+        auto server_hs_secret = hkdf_expand_label( handshake_secret, "s hs traffic", transcript_digest, hash_len, hash_func );
+        auto client_ts0 = hkdf_expand_label( handshake_secret, "c ap traffic", transcript_digest, hash_len, hash_func );
+        auto server_ts0 = hkdf_expand_label( handshake_secret, "s ap traffic", transcript_digest, hash_len, hash_func );
+        auto exporter_secret = hkdf_expand_label( handshake_secret, "exp master", transcript_digest, hash_len, hash_func );
+
+        if ( hash_func == EVP_sha256() ) {
+            sha_256_secrets s{};
+            std::copy( client_hs_secret.begin(), client_hs_secret.end(), s.client_handshake_traffic_secret.begin() );
+            std::copy( server_hs_secret.begin(), server_hs_secret.end(), s.server_handshake_traffic_secret.begin() );
+            std::copy( client_ts0.begin(), client_ts0.end(), s.client_traffic_secret_0.begin() );
+            std::copy( server_ts0.begin(), server_ts0.end(), s.server_traffic_secret_0.begin() );
+            std::copy( exporter_secret.begin(), exporter_secret.end(), s.exporter_secret.begin() );
+            secrets = s;
+        } else { 
+            sha_384_secrets s{};
+            std::copy( client_hs_secret.begin(), client_hs_secret.end(), s.client_handshake_traffic_secret.begin() );
+            std::copy( server_hs_secret.begin(), server_hs_secret.end(), s.server_handshake_traffic_secret.begin() );
+            std::copy( client_ts0.begin(), client_ts0.end(), s.client_traffic_secret_0.begin() );
+            std::copy( server_ts0.begin(), server_ts0.end(), s.server_traffic_secret_0.begin() );
+            std::copy( exporter_secret.begin(), exporter_secret.end(), s.exporter_secret.begin() );
+            secrets = s;
+        }
+
+        return secrets;
+    }
+
+    // =====================
+    //  Extract Hash Suffix
+    // =====================
+
+    std::expected<std::string,std::string> extract_hash_suffix( const cipher_suite c_suite ) {
+        auto cipher_name = tls_cipher_suite_names.at( c_suite );
+        auto pos = cipher_name.rfind( '_' );
+        if ( pos == std::string::npos || pos + 1 >= cipher_name.size() ) {
+            return std::unexpected( "Failed to Extract a Suffix" );
+        }
+        return cipher_name.substr( pos + 1 ); 
+    }
+
+    // =========================
+    //  Select Hash from Cipher
+    // =========================
+
+    std::expected<const EVP_MD*,std::string> select_hash_from_cipher( const cipher_suite c_suite ) {
+        auto suffix_result = extract_hash_suffix( c_suite );
+        if ( !suffix_result ) {
+            return std::unexpected( suffix_result.error() );
+        }
+        auto& hash_suffix = suffix_result.value();
+        if ( hash_suffix == "SHA256" ) {
+            return EVP_sha256();
+        } else if ( hash_suffix == "SHA384" ) {
+            return EVP_sha384();
+        } else {
+            return std::unexpected( "Unrecognized Cipher Suite" );
+        }
+    }
+
+    // ======================
+    //  Construct TLS Record
+    // ======================
+
+    std::expected<std::vector<uint8_t>,std::string> construct_tls_application_data_record( std::span<const uint8_t> payload ) {
+        return construct_tls_record( payload, tls_content_type::application_data, tls_version::tls_1_2 );
+    }
+
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> convert_to_tls_application_data_records( const cipher_suite c_suite,
+                                                                                                          std::span<const uint8_t> payload, 
+                                                                                                          std::size_t max_size ) {
+        std::size_t cbc_overhead = 20 /* HMAC */ +  16 /* padding */;
+        std::size_t cbc_record_size = max_size - cbc_overhead; 
+        std::size_t aes_overhead = 16 /* tag */ + 1 /* record type indicator */;
+        std::size_t aes_record_size = max_size - aes_overhead;
+
+        std::size_t record_size{};
+
+        if ( c_suite == cipher_suite::TLS_AES_128_GCM_SHA256 ) {
+            record_size = aes_record_size;
+        }
+        while ( !payload.empty() ) {
+            std::vector<uint8_t> record_payload;
+            if ( payload.size() < record_size ) {
+                record_payload = { payload.begin(), payload.end() };
+                payload = payload.subspan( 0, 0 );
+            } else {
+                record_payload.insert( record_payload.end(), payload.begin(), payload.begin() + record_size );
+                payload = payload.subspan( record_size );
+            }
+            auto record_to_encrypt = tls_record{ tls_content_type::application_data, tls_version::tls_1_2, std::move( record_payload ) };
+            //auto encrypted_record = encrypt_record( );  
+        }
+    }
+
+    // ===============================
+    //  Construct Server Hello Record
+    // ===============================
+
+    std::expected<std::vector<uint8_t>,std::string> construct_server_hello_record( std::span<const uint8_t> bytes,
+                                                                                   const tls_version version ) {
+        return construct_handshake_message_record( bytes, version, tls_handshake_type::server_hello );
+    }
+
+    // ===============================
+    //  Construct Client Hello Record
+    // ===============================
+
+    std::expected<std::vector<uint8_t>,std::string> construct_client_hello_record( std::span<const uint8_t> bytes,
+                                                                                   const tls_version version ) {
+        return construct_handshake_message_record( bytes, version, tls_handshake_type::client_hello );
+    }
+
+    // ====================================
+    //  Construct Handshake Message Record
+    // ====================================
+
+    std::expected<std::vector<uint8_t>,std::string> construct_handshake_message_record( std::span<const uint8_t> bytes,
+                                                                                        const tls_version version,
+                                                                                        const tls_handshake_type type ) {
+        std::vector<uint8_t> payload;
+        payload.push_back( static_cast<uint8_t>( type ) );
+        auto payload_len_bytes = to_uint24_bytes( static_cast<uint32_t>( bytes.size() ) );
+        payload.insert( payload.end(), payload_len_bytes.begin(), payload_len_bytes.end() );
+        return construct_tls_record( payload, tls_content_type::handshake, version );
+    }
+
+    // ======================
+    //  Construct TLS Record
+    // ======================
+
+    std::expected<std::vector<uint8_t>,std::string> construct_tls_record( std::span<const uint8_t> payload,
+                                                                          const tls_content_type content_type,
+                                                                          const tls_version version ) {
+        std::vector<uint8_t> bytes;
+        bytes.push_back( static_cast<uint8_t>( content_type ) );
+        auto version_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( version ) );
+        bytes.insert( bytes.end(), version_bytes.begin(), version_bytes.end() );
+        auto payload_size_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( payload.size() ) );
+        bytes.insert( bytes.end(), payload_size_bytes.begin(), payload_size_bytes.end() );
+        bytes.insert( bytes.end(), payload.begin(), payload.end() );
+        return bytes;
+    }
+
+    // ========================
+    //  Get Client TLS Context
+    // ========================
+
+    std::expected<tls_context,std::string> get_client_tls_context( const client_hello_result& c_hello_result, std::span<const uint8_t> server_hello_bytes ) {
+        tls_context context;
+        auto s_hello_info_result = get_server_hello_info( server_hello_bytes );
+        if ( !s_hello_info_result ) {
+            return std::unexpected( s_hello_info_result.error() );
+        }
+        auto s_hello_info = s_hello_info_result.value();
+        if ( c_hello_result.x25519 ) {
+            context.public_key = { c_hello_result.x25519->public_key.begin(), c_hello_result.x25519->public_key.end() };
+            context.private_key = { c_hello_result.x25519->private_key.begin(), c_hello_result.x25519->private_key.end() };
+        } else if ( c_hello_result.secp256r1 ) {
+            context.public_key = { c_hello_result.secp256r1->public_key.begin(), c_hello_result.secp256r1->public_key.end() };
+            context.private_key = { c_hello_result.secp256r1->private_key.begin(), c_hello_result.secp256r1->private_key.end() };
+        }
+        if ( !s_hello_info.extensions->supported_versions ) {
+            return std::unexpected( "Negotiated Version is not defined in Server Hello Info" );
+        }
+        context.negotiated_version = s_hello_info.extensions->supported_versions.value();
+        context.negotiated_cipher_suite = s_hello_info.c_suite;
+        if ( s_hello_info.extensions->key_share ) {
+            context.negotiated_key_share = static_cast<named_group>( s_hello_info.extensions->key_share->group );
+            context.peer_public_key = { s_hello_info.extensions->key_share->key_data.begin(),
+                                        s_hello_info.extensions->key_share->key_data.end() };
+        }
+        auto secrets_result = derive_tls_secrets( context, c_hello_result.client_hello, server_hello_bytes );
+        if ( !secrets_result ) {
+            return std::unexpected( "Failed to Derive Secrets: " + secrets_result.error() );
+        }
+        context.secrets = std::move( secrets_result.value() );
+        return context;
+    }
+
+    // ========================
+    //  Get Server TLS Context
+    // ========================
+
+    std::expected<tls_context,std::string> get_server_tls_context( const server_hello_result s_hello_result, const std::span<uint8_t> client_hello_bytes ) {
+        tls_context context;
+        auto c_hello_info_result = get_client_hello_info( client_hello_bytes );
+        if ( !c_hello_info_result ) {
+            return std::unexpected( c_hello_info_result.error() );
+        }
+        auto& c_hello_info = c_hello_info_result.value();
+        auto s_hello_info_result = get_server_hello_info( s_hello_result.server_hello );
+        if ( !s_hello_info_result ) {
+            return std::unexpected( s_hello_info_result.error() );
+        }
+        auto& s_hello_info = s_hello_info_result.value();
+        if ( s_hello_result.public_key ) {
+            context.public_key = s_hello_result.public_key.value();
+        }
+        if ( s_hello_result.private_key ) {
+            context.private_key = s_hello_result.private_key.value();
+        }
+        context.negotiated_version = s_hello_info.extensions->supported_versions.value();
+        context.negotiated_cipher_suite = s_hello_info.c_suite;
+        if ( s_hello_info.extensions->key_share ) {
+            context.negotiated_key_share = static_cast<named_group>( s_hello_info.extensions->key_share->group );
+            auto it = std::find_if( c_hello_info.extensions->key_share_entries->begin(),
+                                    c_hello_info.extensions->key_share_entries->end(),
+                                    [&]( auto& key_share_entry ) { return static_cast<named_group>( key_share_entry.group ) == context.negotiated_key_share; } );
+            context.peer_public_key = { it->key_data.begin(), it->key_data.end() };
+        }
+        auto secrets_result = derive_tls_secrets( context, client_hello_bytes, s_hello_result.server_hello );
+        if ( !secrets_result ) {
+            return std::unexpected( "Failed to Derive Secrets: " + secrets_result.error() );
+        }
+        context.secrets = std::move( secrets_result.value() );
+        return context;
     }
  
 } // namespace ntk

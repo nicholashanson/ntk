@@ -376,12 +376,12 @@ namespace ntk {
     } // namespace look_up
 
     constexpr std::array<cipher_suite,17> default_cipher_suites = {
+        cipher_suite::TLS_AES_128_GCM_SHA256,                        
+        cipher_suite::TLS_AES_256_GCM_SHA384,
         cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA,                  
         cipher_suite::TLS_RSA_WITH_AES_256_CBC_SHA,                  
         cipher_suite::TLS_RSA_WITH_AES_128_GCM_SHA256,               
-        cipher_suite::TLS_RSA_WITH_AES_256_GCM_SHA384,               
-        cipher_suite::TLS_AES_128_GCM_SHA256,                        
-        cipher_suite::TLS_AES_256_GCM_SHA384,                        
+        cipher_suite::TLS_RSA_WITH_AES_256_GCM_SHA384,                                       
         cipher_suite::TLS_CHACHA20_POLY1305_SHA256,                  
         cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,       
         cipher_suite::TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,          
@@ -448,20 +448,6 @@ namespace ntk {
         { tls_content_type::alert, "Alert" },
         { tls_content_type::handshake, "Handshake" },
         { tls_content_type::application_data, "Application Data" }
-    };
-
-    // =============
-    //  TLS Context 
-    // =============
-
-    struct tls_context {
-        std::optional<std::vector<uint8_t>> peer_public_key;
-        std::optional<std::vector<uint8_t>> host_public_key; 
-        std::optional<std::vector<uint8_t>> host_private_ley;
-        std::optional<named_group> negotiated_key_share;
-        std::optional<signature_algorithm> negotiatioed_signature_algorithm;
-        tls_version negotiated_version;
-        cipher_suite negotiated_cipher_suite;
     };
 
     // =============
@@ -616,12 +602,25 @@ namespace ntk {
         }
     };
 
+    struct server_hello_extensions {
+        std::optional<key_share_entry> key_share;
+        std::optional<tls_version> supported_versions;
+    };
+
     struct client_hello_info {
         tls_version client_version;
         std::array<uint8_t,32> random;
         std::vector<uint8_t> session_id;
         std::vector<cipher_suite> cipher_suites;
         std::optional<client_hello_extensions> extensions;
+    };
+
+    struct server_hello_info {
+        tls_version version;
+        std::array<uint8_t,32> random;
+        std::vector<uint8_t> session_id;
+        cipher_suite c_suite;
+        std::optional<server_hello_extensions> extensions;
     };
 
     std::expected<client_hello,std::string> parse_client_hello( const std::span<const uint8_t> client_hello_bytes );
@@ -647,6 +646,8 @@ namespace ntk {
     bool is_client_hello( const tls_record& record );
 
     std::expected<client_hello_info,std::string> get_client_hello_info( std::span<const uint8_t> client_hello_bytes );
+
+    std::expected<client_hello_info,std::string> get_client_hello_info( const client_hello& c_hello );
 
     std::expected<client_hello_info,std::string> get_client_hello_info_from_ethernet( std::span<const uint8_t> packet );
 
@@ -682,6 +683,8 @@ namespace ntk {
 
     std::expected<std::vector<uint8_t>,std::string> extract_tls_session_id( const std::span<const uint8_t> handshake_message_bytes );
 
+    std::expected<server_hello_extensions,std::string> parse_server_hello_extensions( std::span<const tls_extension> extensions );
+
     std::expected<void,std::string> get_server_hello_extensions( const std::span<const uint8_t>& server_hello_bytes, server_hello s_hello,
                                                                  const std::size_t extensions_len_pos );
 
@@ -691,6 +694,10 @@ namespace ntk {
 
     std::expected<std::vector<uint8_t>,std::string> extract_handshake_message_extensions( const std::span<const uint8_t> handshake_message_bytes,
                                                                                           const std::size_t extensions_len_pos );
+
+    std::expected<server_hello_info,std::string> get_server_hello_info( const server_hello& s_hello );
+
+    std::expected<key_share_entry,std::string> parse_server_hello_key_share( std::span<const uint8_t> key_share_bytes );
 
     std::expected<bool,std::string> is_server_hello( const unsigned char* packet );
 
@@ -814,6 +821,11 @@ namespace ntk {
                                const tls_record& record,
                                const secrets& session_keys,
                                const std::string& secret_label,
+                               uint64_t seq_num );
+    
+    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, std::vector<uint8_t>& secret, uint64_t seq_num );
+
+    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>> secret,
                                uint64_t seq_num );
 
     std::vector<uint8_t> build_tls13_nonce( const std::vector<uint8_t>& base_iv, uint64_t seq_num );
@@ -997,15 +1009,6 @@ namespace ntk {
             log_file_trimmer& operator=( const log_file_trimmer& ) = delete;
             void start();
             void stop();
-    struct tls_context {
-        std::optional<std::vector<uint8_t>> peer_public_key;
-        std::optional<std::vector<uint8_t>> host_public_key; 
-        std::optional<std::vector<uint8_t>> host_private_ley;
-        std::optional<named_group> negotiated_key_share;
-        std::optional<signature_algorithm> negotiatioed_signature_algorithm;
-        tls_version negotiated_version;
-        cipher_suite negotiated_cipher_suite;
-    };
         private:
             void run();
             std::string m_log_file;
@@ -1059,7 +1062,7 @@ namespace ntk {
 
     uint32_t get_timestamp();
 
-    std::string load_client_config();
+    std::expected<std::string,std::string> load_client_config();
 
     std::string generate_default_client_config();
 
@@ -1075,8 +1078,103 @@ namespace ntk {
         std::optional<secp256r1_key_pair> secp256r1;
     };
 
+    struct server_hello_result {
+        std::vector<uint8_t> server_hello;
+        std::optional<named_group> key_share;
+        std::optional<std::vector<uint8_t>> public_key;
+        std::optional<std::vector<uint8_t>> private_key;
+    };
+
+    struct sha_256_secrets {
+        std::array<uint8_t,32> client_handshake_traffic_secret;
+        std::array<uint8_t,32> server_handshake_traffic_secret;
+        std::array<uint8_t,32> client_traffic_secret_0;
+        std::array<uint8_t,32> server_traffic_secret_0;
+        std::array<uint8_t,32> exporter_secret;  
+
+        bool operator==( const sha_256_secrets& other ) const {
+            return client_handshake_traffic_secret == other.client_handshake_traffic_secret &&
+                   server_handshake_traffic_secret == other.server_handshake_traffic_secret &&
+                   client_traffic_secret_0 == other.client_traffic_secret_0 &&
+                   server_traffic_secret_0 == other.server_traffic_secret_0 &&
+                   exporter_secret == other.exporter_secret;
+        }
+    };
+
+    struct sha_384_secrets {
+        std::array<uint8_t,48> client_handshake_traffic_secret;
+        std::array<uint8_t,48> server_handshake_traffic_secret;
+        std::array<uint8_t,48> client_traffic_secret_0;
+        std::array<uint8_t,48> server_traffic_secret_0;
+        std::array<uint8_t,48> exporter_secret;
+
+        bool operator==( const sha_384_secrets& other ) const {
+            return client_handshake_traffic_secret == other.client_handshake_traffic_secret &&
+                   server_handshake_traffic_secret == other.server_handshake_traffic_secret &&
+                   client_traffic_secret_0 == other.client_traffic_secret_0 &&
+                   server_traffic_secret_0 == other.server_traffic_secret_0 &&
+                   exporter_secret == other.exporter_secret;
+        }
+    };
+
+    // =============
+    //  TLS Context 
+    // =============
+
+    struct tls_context {
+        std::optional<std::vector<uint8_t>> peer_public_key;
+        std::optional<std::vector<uint8_t>> public_key; 
+        std::optional<std::vector<uint8_t>> private_key;
+        std::optional<named_group> negotiated_key_share;
+        std::optional<signature_algorithm> negotiatioed_signature_algorithm;
+        tls_version negotiated_version;
+        cipher_suite negotiated_cipher_suite;
+        std::variant<sha_256_secrets,sha_384_secrets> secrets;
+        std::vector<uint8_t> client_hello_bytes;
+        std::vector<uint8_t> server_hello_bytes;
+    };
+
+    std::expected<tls_context,std::string> get_tls_context( const server_hello_info& s_hello_info );
+
     std::expected<client_hello_result,std::string> generate_client_hello( const std::string& config );
+
+    std::expected<std::vector<uint8_t>,std::string> calculate_transcript_digest( std::span<const uint8_t> client_hello_bytes, 
+                                                                                 std::span<const uint8_t> server_hello_bytes );
+
+    std::expected<std::variant<sha_256_secrets,sha_384_secrets>,std::string> derive_tls_secrets( const tls_context& context, 
+                                                                                                 std::span<const uint8_t> client_hello_bytes,
+                                                                                                 std::span<const uint8_t> server_hello_bytes );
+
+    std::expected<std::string,std::string> extract_hash_suffix( const cipher_suite c_suite );
+
+    std::expected<const EVP_MD*,std::string> select_hash_from_cipher( const cipher_suite c_suite );
+
+    std::expected<std::vector<uint8_t>,std::string> construct_tls_application_data_record( std::span<const uint8_t> payload );
+
+    std::expected<std::vector<uint8_t>,std::string> 
+    construct_server_hello_record( std::span<const uint8_t> bytes,
+                                   const tls_version version = tls_version::tls_1_2 );
+
+    std::expected<std::vector<uint8_t>,std::string> 
+    construct_client_hello_record( std::span<const uint8_t> bytes,
+                                   const tls_version version = tls_version::tls_1_2 );
+
+    std::expected<std::vector<uint8_t>,std::string> construct_handshake_message_record( std::span<const uint8_t> bytes,
+                                                                                        const tls_version version,
+                                                                                        const tls_handshake_type type );
+
+    std::expected<std::vector<uint8_t>,std::string> construct_tls_record( std::span<const uint8_t> payload,
+                                                                          const tls_content_type content_type,
+                                                                          const tls_version version );
+
+    std::expected<tls_context,std::string> get_client_tls_context( const client_hello_result& c_hello_result,
+                                                                   std::span<const uint8_t> server_hello_bytes );
+
+    std::expected<tls_context,std::string> get_server_tls_context( const server_hello_result s_hello_result, 
+                                                                   const std::span<uint8_t> client_hello_bytes );
 
 } // namespace ntk
 
 #endif
+
+
