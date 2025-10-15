@@ -119,8 +119,8 @@ namespace ntk {
                     auto records_result = ntk::convert_to_tls_application_data_records(
                         ntk::cipher_suite::TLS_AES_128_GCM_SHA256,
                         http_message,
-                        seq_num,
                         s.server_traffic_secret_0,
+                        seq_num,
                         16385
                     );
 
