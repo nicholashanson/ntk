@@ -679,6 +679,8 @@ namespace ntk {
 
     std::expected<server_hello,std::string> get_server_hello( const tls_record& record );
 
+    std::expected<std::vector<uint8_t>,std::string> get_server_hello_bytes( const tls_record& record );
+
     std::expected<uint16_t,std::string> get_server_hello_cipher_suite( const std::span<const uint8_t>& server_hello_bytes, const std::size_t cipher_suite_pos );
 
     std::expected<std::vector<uint8_t>,std::string> extract_tls_session_id( const std::span<const uint8_t> handshake_message_bytes );
@@ -823,9 +825,9 @@ namespace ntk {
                                const std::string& secret_label,
                                uint64_t seq_num );
     
-    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, std::vector<uint8_t>& secret, uint64_t seq_num );
+    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, const std::vector<uint8_t>& secret, uint64_t seq_num );
 
-    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>> secret,
+    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, const std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>>& secret,
                                uint64_t seq_num );
 
     std::vector<uint8_t> build_tls13_nonce( const std::vector<uint8_t>& base_iv, uint64_t seq_num );
@@ -1167,11 +1169,27 @@ namespace ntk {
                                                                           const tls_content_type content_type,
                                                                           const tls_version version );
 
+    std::expected<std::vector<uint8_t>,std::string> construct_tls_record( const tls_record& record );
+
     std::expected<tls_context,std::string> get_client_tls_context( const client_hello_result& c_hello_result,
                                                                    std::span<const uint8_t> server_hello_bytes );
 
     std::expected<tls_context,std::string> get_server_tls_context( const server_hello_result s_hello_result, 
                                                                    const std::span<uint8_t> client_hello_bytes );
+
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> convert_to_tls_application_data_records( 
+        const cipher_suite c_suite,
+        std::span<const uint8_t> payload, 
+        const std::vector<uint8_t>& secret,
+        uint64_t& seq_num,                                                                                                  
+        std::size_t max_size );
+
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> convert_to_tls_application_data_records( 
+        const cipher_suite c_suite,
+        std::span<const uint8_t> payload, 
+        const std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>>& secret,
+        uint64_t& seq_num,                                                                                                  
+        std::size_t max_size );
 
 } // namespace ntk
 

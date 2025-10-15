@@ -664,6 +664,11 @@ namespace ntk {
         return parse_server_hello( server_hello_bytes ); 
     }
 
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::vector<uint8_t>,std::string> get_server_hello_bytes( const tls_record& record ) {
+        return std::vector<uint8_t>( record.payload.begin() + 4, record.payload.end() );
+    }
+
     // ======================
     //  Parse TLS Extensions 
     // ======================
@@ -1529,7 +1534,7 @@ namespace ntk {
     }
 
     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, std::vector<uint8_t>& secret, uint64_t seq_num ) {
+    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, const std::vector<uint8_t>& secret, uint64_t seq_num ) {
         constexpr std::size_t tag_length = 16;
         const EVP_MD* hash_fn = nullptr;
         const EVP_CIPHER* cipher = nullptr;
@@ -1577,7 +1582,7 @@ namespace ntk {
     }
 
     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>> secret,
+    tls_record encrypt_record( const tls_record& record, const cipher_suite& suite, const std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>>& secret,
                                uint64_t seq_num ) {
         std::vector<uint8_t> secret_vec;
         std::visit( [&]( auto&& arr ) {
@@ -3246,16 +3251,23 @@ namespace ntk {
         return construct_tls_record( payload, tls_content_type::application_data, tls_version::tls_1_2 );
     }
 
-    std::expected<std::vector<std::vector<uint8_t>>,std::string> convert_to_tls_application_data_records( const cipher_suite c_suite,
-                                                                                                          std::span<const uint8_t> payload, 
-                                                                                                          std::size_t max_size ) {
+    // =========================================
+    //  Convert to TLS Application Data Records
+    // =========================================
+
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> convert_to_tls_application_data_records( 
+        const cipher_suite c_suite,
+        std::span<const uint8_t> payload, 
+        const std::vector<uint8_t>& secret,
+        uint64_t& seq_num,                                                                                                  
+        std::size_t max_size ) 
+    {
+        std::vector<std::vector<uint8_t>> records;
         std::size_t cbc_overhead = 20 /* HMAC */ +  16 /* padding */;
         std::size_t cbc_record_size = max_size - cbc_overhead; 
         std::size_t aes_overhead = 16 /* tag */ + 1 /* record type indicator */;
         std::size_t aes_record_size = max_size - aes_overhead;
-
         std::size_t record_size{};
-
         if ( c_suite == cipher_suite::TLS_AES_128_GCM_SHA256 ) {
             record_size = aes_record_size;
         }
@@ -3269,8 +3281,29 @@ namespace ntk {
                 payload = payload.subspan( record_size );
             }
             auto record_to_encrypt = tls_record{ tls_content_type::application_data, tls_version::tls_1_2, std::move( record_payload ) };
-            //auto encrypted_record = encrypt_record( );  
+            auto encrypted_record = encrypt_record( record_to_encrypt, c_suite, secret, seq_num );
+            auto construct_result = construct_tls_record( encrypted_record );
+            if ( !construct_result ) {
+                return std::unexpected( "Failed to Construct TLS Record: " + construct_result.error() );
+            }
+            records.push_back( std::move( construct_result.value() ) );
         }
+        return records;
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::vector<std::vector<uint8_t>>,std::string> convert_to_tls_application_data_records( 
+        const cipher_suite c_suite,
+        std::span<const uint8_t> payload, 
+        const std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>>& secret,
+        uint64_t& seq_num,                                                                                                  
+        std::size_t max_size ) 
+    {
+        std::vector<uint8_t> secret_vec;
+        std::visit( [&]( auto&& arr ) {
+            secret_vec.assign(arr.begin(), arr.end());
+        }, secret );
+        return convert_to_tls_application_data_records( c_suite, payload, secret_vec, seq_num, max_size );
     }
 
     // ===============================
@@ -3320,6 +3353,11 @@ namespace ntk {
         bytes.insert( bytes.end(), payload_size_bytes.begin(), payload_size_bytes.end() );
         bytes.insert( bytes.end(), payload.begin(), payload.end() );
         return bytes;
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::vector<uint8_t>,std::string> construct_tls_record( const tls_record& record ) {
+        return construct_tls_record( record.payload, record.content_type, record.version );
     }
 
     // ========================
