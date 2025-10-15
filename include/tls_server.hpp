@@ -30,6 +30,20 @@ namespace ntk {
         std::optional<std::vector<uint8_t>> public_key;
     };
 
+    enum class server_state {
+        waiting_for_client_hello,
+        sent_server_hello,
+        handshake_complete,
+        waiting_for_http_request
+    };
+
+    struct client_connection {
+        int fd;
+        server_state state = server_state::waiting_for_client_hello;
+        server_hello_context s_hello_ctx;
+        tls_context tls_ctx;
+    };
+
     std::expected<int,std::string> create_server_socket();
 
     std::expected<void,std::string> bind_socket( int sock_fd, uint16_t port );
@@ -42,6 +56,12 @@ namespace ntk {
 
     std::expected<tls_server_config,std::string> get_server_config();
 
-    std::expected<std::vector<uint8_t>,std::string> generate_server_hello( const server_hello_context& context );
+    std::expected<server_hello_result,std::string> generate_server_hello( const server_hello_context& context );
+
+    std::expected<std::vector<uint8_t>,std::string> generate_supported_versions_extension_bytes( const server_hello_context& context );
+
+    std::expected<std::vector<uint8_t>,std::string> generate_key_share_extension_bytes( const server_hello_context& context );
+
+    std::expected<server_hello_result,std::string> generate_server_hello( std::span<const uint8_t> client_hello_bytes );
 
 } // namespace ntk

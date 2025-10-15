@@ -46,18 +46,94 @@ namespace ntk {
     // ===============
 
     void handle_client( int client_fd ) {
-        std::vector<uint8_t> buffer( 1024, '\0' );  
-        ssize_t n = read( client_fd, buffer.data(), buffer.size() );
-        if ( n > 0 ) {
-            buffer.resize( n );           
-            auto client_hello_result = parse_client_hello( buffer );
-            if ( !client_hello_result ) {
-                std::cout << client_hello_result.error() << std::endl;
-                return;
+        client_connection conn{ client_fd, server_state::waiting_for_client_hello, {}, {} };
+        std::vector<uint8_t> buffer; 
+        while ( true ) { 
+            std::vector<uint8_t> temp( 4096 );
+            ssize_t n = read( client_fd, temp.data(), temp.size() );
+            if ( n <= 0 ) {
+                break;
             }
-            auto& client_hello = client_hello_result.value();
-            ntk::print_client_hello( client_hello );
-            write( client_fd, buffer.data(), buffer.size() ); 
+            buffer.insert( buffer.end(), temp.begin(), temp.begin() + n ); 
+
+            if ( conn.state == server_state::waiting_for_client_hello ) {
+                auto client_hello_result = parse_client_hello( buffer );
+                if ( !client_hello_result ) {
+                    std::cout << client_hello_result.error() << std::endl;
+                    return;
+                }
+                auto& client_hello = client_hello_result.value();
+                ntk::print_client_hello( client_hello );
+                auto server_hello_result = generate_server_hello( buffer );
+                if ( !server_hello_result ) {
+                    std::cout << server_hello_result.error() << std::endl;
+                    return;
+                }
+                auto ctx_result = get_server_tls_context( server_hello_result.value(), buffer );
+                if ( !ctx_result ) {
+                    std::cout << ctx_result.error() << std::endl;
+                }
+                conn.tls_ctx = ctx_result.value();
+                auto parse_result = ntk::parse_server_hello( server_hello_result.value().server_hello );
+                if ( !parse_result ) {
+                    std::cout << parse_result.error() << std::endl;
+                    return;
+                }
+                auto record_result = construct_server_hello_record( server_hello_result.value().server_hello );
+                if ( !record_result ) {
+                    std::cout << record_result.error() << std::endl;
+                    return;
+                }
+                auto& server_hello_record = record_result.value();
+                ntk::print_server_hello( parse_result.value() );
+                write( client_fd, server_hello_record.data(), server_hello_record.size() );
+                print_tls_secrets( conn.tls_ctx.secrets );
+                conn.state = server_state::sent_server_hello;
+                std::cout << "Server Hello sent.\n";
+                buffer.clear();
+            } else if ( conn.state == server_state::sent_server_hello ) {
+                std::cout << "Buffer size: " << buffer.size() << std::endl;
+                auto record_result = get_tls_record_from_payload( buffer );
+                if ( !record_result ) {
+                    break;
+                }
+                auto& record = record_result.value();
+                print_tls_record( record );
+                buffer.clear();
+
+                auto read_result = ntk::read_from_file( "http_response.txt" );
+                if ( !read_result ) {
+                    std::cout << record_result.error() << std::endl;
+                }
+                auto& http_message = read_result.value();
+                auto ts_read_result = ntk::read_from_file( "../assets/segment.ts" );
+                if ( !ts_read_result ) {
+                    std::cout << ts_read_result.error() << std::endl;
+                }
+                auto& ts = ts_read_result.value();
+                http_message.insert( http_message.end(), ts.begin(), ts.end() );
+                uint64_t seq_num{};
+                
+
+                std::visit([&](auto& s) {
+                    auto records_result = ntk::convert_to_tls_application_data_records(
+                        ntk::cipher_suite::TLS_AES_128_GCM_SHA256,
+                        http_message,
+                        seq_num,
+                        s.server_traffic_secret_0,
+                        16385
+                    );
+
+                    if (!records_result) {
+                        std::cout << "Failed: " << records_result.error() << std::endl;
+                        return;
+                    }
+
+                    for (const auto& record : records_result.value()) {
+                        write(client_fd, record.data(), record.size());
+                    }
+                }, conn.tls_ctx.secrets);
+            }
         }
         close( client_fd );
     }
@@ -259,11 +335,70 @@ namespace ntk {
         return context;
     }
 
+    // =============================================
+    //  Generate Supported Versions Extension Bytes
+    // =============================================
+
+    std::expected<std::vector<uint8_t>,std::string> generate_supported_versions_extension_bytes( const server_hello_context& context ) {
+        std::vector<uint8_t> bytes;
+        auto extension_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::supported_versions ) );
+        bytes.insert( bytes.end(), extension_bytes.begin(), extension_bytes.end() );
+        bytes.insert( bytes.end(), { 0x00, 0x02 } );
+        auto version_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( context.version ) );
+        bytes.insert( bytes.end(), version_bytes.begin(), version_bytes.end() );
+        return bytes;
+    }
+
+    // ====================================
+    //  Generate Key Share Extension Bytes
+    // ====================================
+
+    std::expected<std::vector<uint8_t>,std::string> generate_key_share_extension_bytes( const server_hello_context& context ) {
+        std::vector<uint8_t> bytes;
+        auto extension_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( tls_extension_type::key_share ) );
+        bytes.insert( bytes.end(), extension_bytes.begin(), extension_bytes.end() );
+        if ( !context.public_key ) {
+            return std::unexpected( "Public Key in Server Hello Context is undefined" );
+        }
+        auto total_len = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( context.public_key->size() + 2 + 2 ) );
+        bytes.insert( bytes.end(), total_len.begin(), total_len.end() );
+        if ( !context.key_share ) {
+            return std::unexpected( "Key Share in Server Hello Context is undefined" );
+        }
+        auto group_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( context.key_share.value() ) );
+        bytes.insert( bytes.end(), group_bytes.begin(), group_bytes.end() );
+        auto key_len = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( context.public_key->size() ) );
+        bytes.insert( bytes.end(), key_len.begin(), key_len.end() );
+        bytes.insert( bytes.end(), context.public_key->begin(), context.public_key->end() );
+        return bytes;
+    }
+
+    // =======================================
+    //  Generate Server Hello Extension Bytes
+    // =======================================
+
+    std::expected<std::vector<uint8_t>,std::string> generate_server_hello_extension_bytes( const server_hello_context& context ) {
+        std::vector<uint8_t> extensions_bytes;
+        auto version_result = generate_supported_versions_extension_bytes( context );
+        if ( !version_result ) {
+            return std::unexpected( version_result.error() );
+        }
+        auto& version_extension_bytes = version_result.value();
+        extensions_bytes.insert( extensions_bytes.end(), version_extension_bytes.begin(), version_extension_bytes.end() );
+        auto key_share_result = generate_key_share_extension_bytes( context );
+        if ( !key_share_result ) {
+            return std::unexpected( key_share_result.error() );
+        }
+        auto& key_share_bytes = key_share_result.value();
+        extensions_bytes.insert( extensions_bytes.end(), key_share_bytes.begin(), key_share_bytes.end() );
+        return extensions_bytes; 
+    }
+
     // =======================
     //  Generate Server Hello
     // =======================
 
-    std::expected<std::vector<uint8_t>,std::string> generate_server_hello( const server_hello_context& context ) {
+    std::expected<server_hello_result,std::string> generate_server_hello( const server_hello_context& context ) {
         std::vector<uint8_t> server_hello_bytes;
         auto version_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( context.version ) );
         server_hello_bytes.insert( server_hello_bytes.end(), version_bytes.begin(), version_bytes.end() );
@@ -273,8 +408,38 @@ namespace ntk {
         auto cipher_suite_bytes = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( context.c_suite ) );
         server_hello_bytes.insert( server_hello_bytes.end(), cipher_suite_bytes.begin(), cipher_suite_bytes.end() );
         server_hello_bytes.push_back( static_cast<uint8_t>( 0x00 ) );
-        server_hello_bytes.insert( server_hello_bytes.end(), { 0x00, 0x00 } );
-        return server_hello_bytes;
+
+        auto extensions_result = generate_server_hello_extension_bytes( context );
+        if ( !extensions_result ) {
+            return std::unexpected( extensions_result.error() ) ;
+        }    
+        auto& extensions_bytes = extensions_result.value();
+        auto extensions_len = get_big_endian_byte_encoding<uint16_t,2>( static_cast<uint16_t>( extensions_bytes.size() ) );
+        server_hello_bytes.insert( server_hello_bytes.end(), extensions_len.begin(), extensions_len.end() );
+        server_hello_bytes.insert( server_hello_bytes.end(), extensions_bytes.begin(), extensions_bytes.end() );
+        auto key_share = context.key_share;
+        auto public_key = context.public_key;
+        auto private_key = context.private_key;
+        return server_hello_result{ std::move( server_hello_bytes ), key_share, std::move( context.public_key ), std::move( context.private_key ) };
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<server_hello_result,std::string> generate_server_hello( std::span<const uint8_t> client_hello_bytes ) {
+        auto info_result = get_client_hello_info( client_hello_bytes );
+        if ( !info_result ) {
+            return std::unexpected( info_result.error() );
+        }
+        auto& c_hello_info = info_result.value();
+        auto config_result = get_server_config();
+        if ( !config_result ) {
+            return std::unexpected( config_result.error() );
+        }
+        auto& config = config_result.value();
+        auto context_result = get_server_hello_context( c_hello_info, config );
+        if ( !context_result ) {
+            return std::unexpected( context_result.error() );
+        }
+        return generate_server_hello( context_result.value() );
     }
 
 } // namespace ntk
