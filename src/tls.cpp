@@ -1471,7 +1471,22 @@ namespace ntk {
                                const secrets& session_keys,
                                const std::string& secret_label,
                                uint64_t seq_num ) {
-        const cipher_suite suite = static_cast<cipher_suite>( cipher_suite_id );
+        auto secret = get_traffic_secret( session_keys, client_random, secret_label );
+        return decrypt_record( record, static_cast<cipher_suite>( cipher_suite_id), secret, seq_num );
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    tls_record decrypt_record( const tls_record& record, const cipher_suite c_suite, const std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>>& secret,
+                               uint64_t seq_num ) {
+        std::vector<uint8_t> secret_vec;
+        std::visit( [&]( auto&& arr ) {
+            secret_vec.assign(arr.begin(), arr.end());
+        }, secret );
+        return decrypt_record( record, c_suite, secret_vec, seq_num );
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    tls_record decrypt_record( const tls_record& record, const cipher_suite& suite, const std::vector<uint8_t>& secret, uint64_t seq_num ) {
         const EVP_MD* hash_fn = nullptr;
         const EVP_CIPHER* cipher = nullptr;
         std::size_t key_len = 0;
@@ -1501,7 +1516,6 @@ namespace ntk {
             default:
                 throw std::runtime_error( "Unsupported cipher suite" );
         }
-        auto secret = get_traffic_secret( session_keys, client_random, secret_label );
         if ( suite == cipher_suite::TLS_RSA_WITH_AES_128_CBC_SHA ) {
             auto key_block = derive_tls_key_iv_mac( secret, hash_fn, key_len, 16, 20 ); 
             auto decrypted_payload = decrypt_aes_cbc( key_block.key, key_block.iv, record.payload, cipher );
@@ -1515,6 +1529,21 @@ namespace ntk {
             auto decrypted_payload = decrypt_aes_gcm( key_material.key, nonce, aad, record.payload, cipher );
             return { record.content_type, record.version, decrypted_payload };
         }
+    }
+
+    // ========================
+    //  Decrypt Server Traffic 
+    // ========================
+
+    tls_record decrypt_server_traffic( const tls_record& record, tls_context& context ) {
+        std::vector<uint8_t> secret_vec;
+        std::visit( [&]( auto&& secrets ) {
+            secret_vec.assign( secrets.server_traffic_secret_0.begin(), secrets.server_traffic_secret_0.end() );
+        }, context.secrets );
+        return decrypt_record( record, 
+                               context.negotiated_cipher_suite, 
+                               secret_vec,
+                               context.server_traffic_seq_num );
     }
 
     // ================
@@ -2281,10 +2310,10 @@ namespace ntk {
     std::expected<tls_record,std::string> get_tls_record_from_ethernet( std::span<const uint8_t> packet ) {
         auto payload_result = get_tcp_payload( packet );
         if ( !payload_result ) {
-            return std::unexpected( payload_result.error() );
+            return std::unexpected( "Get TLS Record From Ethernet -> " + payload_result.error() );
         }
         if ( !payload_result.value() ) {
-            return std::unexpected( "TCP Payload is empty" );
+            return std::unexpected( "Get TLS Record From Ethernet: TCP Payload is empty" );
         }
         auto payload = *payload_result.value();
         return get_tls_record_from_payload( payload );
@@ -2293,7 +2322,7 @@ namespace ntk {
     // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     std::expected<tls_record,std::string> get_tls_record_from_payload( std::span<const uint8_t> payload ) {
         if ( payload.empty() ) {
-            return std::unexpected( "TLS Payload is empty" );
+            return std::unexpected( "Get TLS Record From Payload: TLS Payload is empty" );
         }
         auto result = split_tls_records( payload );
         if ( result.has_value() ) {
@@ -2302,7 +2331,7 @@ namespace ntk {
             if ( records.size() != 1 || offset_reached != payload.size() ) std::unexpected( "Packet does not contain a single complete record" );
             return records[ 0 ];
         } else {
-            return std::unexpected( result.error() );
+            return std::unexpected( "Get TLS Record From Ethernet -> " + result.error() );
         }
     }
 
@@ -3335,6 +3364,7 @@ namespace ntk {
         payload.push_back( static_cast<uint8_t>( type ) );
         auto payload_len_bytes = to_uint24_bytes( static_cast<uint32_t>( bytes.size() ) );
         payload.insert( payload.end(), payload_len_bytes.begin(), payload_len_bytes.end() );
+        payload.insert( payload.end(), bytes.begin(), bytes.end() );
         return construct_tls_record( payload, tls_content_type::handshake, version );
     }
 
@@ -3368,7 +3398,7 @@ namespace ntk {
         tls_context context;
         auto s_hello_info_result = get_server_hello_info( server_hello_bytes );
         if ( !s_hello_info_result ) {
-            return std::unexpected( s_hello_info_result.error() );
+            return std::unexpected( "Get Clinet TLS Context: Failed to Get Server Hello Info -> " + s_hello_info_result.error() );
         }
         auto s_hello_info = s_hello_info_result.value();
         if ( c_hello_result.x25519 ) {
@@ -3379,7 +3409,7 @@ namespace ntk {
             context.private_key = { c_hello_result.secp256r1->private_key.begin(), c_hello_result.secp256r1->private_key.end() };
         }
         if ( !s_hello_info.extensions->supported_versions ) {
-            return std::unexpected( "Negotiated Version is not defined in Server Hello Info" );
+            return std::unexpected( "Get Client TLS Context: Negotiated Version is not defined in Server Hello Info" );
         }
         context.negotiated_version = s_hello_info.extensions->supported_versions.value();
         context.negotiated_cipher_suite = s_hello_info.c_suite;
@@ -3390,7 +3420,7 @@ namespace ntk {
         }
         auto secrets_result = derive_tls_secrets( context, c_hello_result.client_hello, server_hello_bytes );
         if ( !secrets_result ) {
-            return std::unexpected( "Failed to Derive Secrets: " + secrets_result.error() );
+            return std::unexpected( "Get Client TLS Context: Failed to Derive Secrets -> " + secrets_result.error() );
         }
         context.secrets = std::move( secrets_result.value() );
         return context;

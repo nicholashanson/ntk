@@ -699,6 +699,8 @@ namespace ntk {
 
     std::expected<server_hello_info,std::string> get_server_hello_info( const server_hello& s_hello );
 
+    std::expected<server_hello_info,std::string> get_server_hello_info( std::span<const uint8_t> server_hello_bytes );
+
     std::expected<key_share_entry,std::string> parse_server_hello_key_share( std::span<const uint8_t> key_share_bytes );
 
     std::expected<bool,std::string> is_server_hello( const unsigned char* packet );
@@ -815,6 +817,11 @@ namespace ntk {
                                const secrets& session_keys,
                                const std::string& secret_label,
                                uint64_t seq_num );
+
+    tls_record decrypt_record( const tls_record& record, const cipher_suite c_suite, const std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>>& secret,
+                               uint64_t seq_num );
+
+    tls_record decrypt_record( const tls_record& record, const cipher_suite& suite, const std::vector<uint8_t>& secret, uint64_t seq_num );
 
     tls_record encrypt_record( const std::array<uint8_t,32>& client_random,
                                const std::array<uint8_t,32>& server_random,
@@ -1134,6 +1141,7 @@ namespace ntk {
         std::variant<sha_256_secrets,sha_384_secrets> secrets;
         std::vector<uint8_t> client_hello_bytes;
         std::vector<uint8_t> server_hello_bytes;
+        uint64_t server_traffic_seq_num = 0;
     };
 
     std::expected<tls_context,std::string> get_tls_context( const server_hello_info& s_hello_info );
@@ -1190,6 +1198,8 @@ namespace ntk {
         const std::variant<std::array<uint8_t,32>,std::array<uint8_t,48>>& secret,
         uint64_t& seq_num,                                                                                                  
         std::size_t max_size );
+
+    tls_record decrypt_server_traffic( const tls_record& record, tls_context& context );
 
 } // namespace ntk
 
