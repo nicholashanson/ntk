@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <array>
 #include <concepts>
+#include <expected>
+#include <fstream>
 #include <iomanip>
 #include <optional>
 #include <span>
@@ -211,6 +213,14 @@ namespace ntk {
     }
 
     std::string bytes_to_hex_string( std::span<const uint8_t> bytes );
+
+    void output_to_file( const std::string& content, const std::string& filename );
+
+    std::expected<std::vector<uint8_t>,std::string> hex_string_to_bytes( const std::string& hex );
+
+    std::array<uint8_t,3> to_uint24_bytes( uint32_t value );
+
+    std::expected<std::vector<uint8_t>,std::string> read_from_file( const std::string& path );
 
 } // namespace ntk
 
