@@ -35,10 +35,26 @@ namespace ntk {
     // ==============
 
     void print_vector( std::span<const uint8_t> data ) {
-        for ( auto byte : data ) {
-            std::cout << std::hex << std::setw( 2 ) << std::setfill( '0' ) << ( static_cast<int>( byte ) & 0xff ) << " ";
+        char buf[ 4 ];
+        for ( auto b : data ) {
+            std::snprintf( buf, sizeof( buf ), "%02X ", b );
+            std::cout << buf;
         }
-        std::cout << std::dec << std::endl;
+        std::cout << '\n';    
+    }
+
+    // ===================
+    //  Get Vector String
+    // ===================
+
+    std::string get_vector_string( std::span<const uint8_t> data ) {
+        std::ostringstream os;
+        char buf[ 4 ];
+        for ( auto b : data ) {
+            std::snprintf( buf, sizeof( buf ), "%02X ", b );
+            os << buf; 
+        }
+        return os.str();
     }
 
     // ====================
@@ -77,7 +93,7 @@ namespace ntk {
         }
     }
 
-    // ================
+    // ================ joe rogan
     //  Parse Hex Line
     // ================
     
@@ -144,7 +160,7 @@ namespace ntk {
     void print_tcp_option( const tcp_option& opt, std::ostream& os ) {
         os << "    Option[" << static_cast<int>( opt.type )
            << "]: Type: " << static_cast<int>( opt.type ) << ", Data: [";
-        for ( size_t i = 0; i < opt.option.size(); ++i ) {
+        for ( std::size_t i = 0; i < opt.option.size(); ++i ) {
             os << std::hex << std::setw( 2 ) << std::setfill( '0' )
                << static_cast<int>( opt.option[ i ] );
             if ( i != opt.option.size() - 1 )
@@ -250,51 +266,53 @@ namespace ntk {
         if ( extensions.renegotiation_info ) {
             print_field( "Renegotiation Info:", extensions.renegotiation_info.value() );
         }
-        os << std::left << std::setw( label_width ) << "Supported Groups:";
         if ( extensions.supported_groups ) {
+            os << std::left << std::setw( label_width ) << "Supported Groups:";
             for ( std::size_t i = 0; i < extensions.supported_groups.value().size(); ++i ) {
                 if ( i != 0 ) {
                     os << std::setw( label_width ) << " ";
                 }
-                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << named_group_names.at( extensions.supported_groups.value()[ i ] ) << std::dec;
+                os << std::hex << std::setw( 4 ) << std::setfill( ' ' ) << named_group_names.at( extensions.supported_groups.value()[ i ] ) << std::dec;
                 os << "\n";
             }
         }
-        os << std::left << std::setw( label_width ) << "Supported Groups:";
         if ( extensions.supported_versions ) {
+            os << std::left << std::setw( label_width ) << "Supported Versions:";
             for ( std::size_t i = 0; i < extensions.supported_versions.value().size(); ++i ) {
                 if ( i != 0 ) {
                     os << std::setw( label_width ) << " ";
                 }
-                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << tls_version_names.at( extensions.supported_versions.value()[ i ] ) << std::dec;
+                os << std::hex << std::setw( 4 ) << std::setfill( ' ' ) << tls_version_names.at( extensions.supported_versions.value()[ i ] ) << std::dec;
                 os << "\n";
             }
         }
         if ( extensions.signature_algorithms ) {
+            os << std::left << std::setw( label_width ) << "Signature Algorithms:";
             for ( std::size_t i = 0; i < extensions.signature_algorithms.value().size(); ++i ) {
                 if ( i != 0 ) {
                     os << std::setw( label_width ) << " ";
                 }
-                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << signature_algorithm_names.at( extensions.signature_algorithms.value()[ i ] ) << std::dec;
+                os << std::hex << std::setw( 4 ) << std::setfill( ' ' ) << signature_algorithm_names.at( extensions.signature_algorithms.value()[ i ] ) << std::dec;
                 os << "\n";
             }
         }
         if ( extensions.alpn ) {
+            os << std::left << std::setw( label_width ) << "ALPN:";
             for ( std::size_t i = 0; i < extensions.alpn.value().size(); ++i ) {
                 if ( i != 0 ) {
                     os << std::setw( label_width ) << " ";
                 }
-                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << extensions.alpn.value()[ i ] << std::dec;
+                os << extensions.alpn.value()[ i ];
                 os << "\n";
             }
         }
-
         if ( extensions.key_share_entries ) {
+            os << std::left << std::setw( label_width ) << "Key Share:";
             for ( std::size_t i = 0; i < extensions.key_share_entries.value().size(); ++i ) {
                 if ( i != 0 ) {
                     os << std::setw( label_width ) << " ";
                 }
-                os << std::hex << std::setw( 4 ) << std::setfill( '0' ) << named_group_names.at( static_cast<named_group>( extensions.key_share_entries.value()[ i ].group ) ) << std::dec;
+                os << std::hex << std::setw( 4 ) << std::setfill( ' ' ) << named_group_names.at( static_cast<named_group>( extensions.key_share_entries.value()[ i ].group ) ) << std::dec;
                 os << "\n";
             }
         }
@@ -305,7 +323,7 @@ namespace ntk {
     //  Print Client Hello
     // ====================
 
-    void print_client_hello( const client_hello& c_hello, std::ostream& os ) {
+    void print_client_hello( const client_hello& c_hello, std::ostream& os, const char* text_color ) {
         const int label_width = 26;
 
         auto print_field = [&]( const std::string& label, auto value ) {
@@ -314,9 +332,14 @@ namespace ntk {
 
         os << std::dec << std::setfill( ' ' );
         os << "===== CLIENT HELLO BEGIN =====\n";
-        print_field("Session ID:", session_id_to_hex( c_hello.session_id ) );
-        print_field("Client Version:", tls_version_names.at( c_hello.client_version ) );
-        print_field("Client Random:", client_random_to_hex( c_hello.random ) );
+
+        if ( text_color ) {
+            os << text_color;
+        }
+
+        print_field( "Session ID:", session_id_to_hex( c_hello.session_id ) );
+        print_field( "Client Version:", tls_version_names.at( c_hello.client_version ) );
+        print_field( "Client Random:", client_random_to_hex( c_hello.random ) );
         os << std::left << std::setw( label_width ) << "Cipher-Suites:";
         for ( std::size_t i = 0; i + 1 < c_hello.cipher_suites.size(); i += 2 ) {
             uint16_t val = ( static_cast<uint16_t>( c_hello.cipher_suites[ i ] ) << 8 ) |
@@ -335,10 +358,19 @@ namespace ntk {
         }
         auto parse_result = parse_tls_extensions( c_hello.extensions );
         if ( !parse_result ) {
-            std::cout << parse_result.error() << std::endl;
+            os << parse_result.error() << std::endl;
             return;
         }
-        print_tls_extensions( parse_result.value() );
+        auto extensions_result = parse_client_hello_extensions( parse_result.value() );
+        if ( !extensions_result ) {
+            os << extensions_result.error() << std::endl;
+        }
+        os << extensions_result.value();
+
+        if ( text_color ) {
+            os << colors::reset;
+        }
+
         os << "===== CLIENT HELLO END =====\n\n";
     }
 
@@ -346,7 +378,7 @@ namespace ntk {
     //  Print Server Hello
     // ====================
 
-    void print_server_hello( const server_hello& s_hello, std::ostream& os ) {
+    void print_server_hello( const server_hello& s_hello, std::ostream& os, const char* text_color ) {
         const int label_width = 26;
 
         auto print_field = [&]( const std::string& label, auto value ) {
@@ -355,9 +387,34 @@ namespace ntk {
 
         os << std::dec << std::setfill( ' ' );
         os << "===== SERVER HELLO BEGIN =====\n";
+
+        if ( text_color ) {
+            os << text_color;
+        }
+
         print_field( "Server Random:", client_random_to_hex( s_hello.random ) );
         print_field( "TLS Version:", tls_version_names.at( s_hello.server_version ) );
         print_field( "Cipher Suite:", tls_cipher_suite_names.at( static_cast<cipher_suite>( s_hello.cipher_suite ) ) );
+        auto extensions_result = parse_tls_extensions( s_hello.extensions );
+        if ( !extensions_result ) {
+            os << extensions_result.error() << std::endl;
+        }
+        auto server_extensions_result = parse_server_hello_extensions( extensions_result.value() );
+        if ( !server_extensions_result ) {
+            os << server_extensions_result.error() << std::endl;
+        }
+        auto& server_extensions = server_extensions_result.value();
+        print_field( "Supported Versions:", tls_version_names.at( server_extensions.supported_versions.value() ) );
+        print_field( "Key Share:", named_group_names.at( static_cast<named_group>( server_extensions.key_share.value().group ) ) );
+        os << std::left << std::setw( label_width ) << ' ';
+        print_vector( std::span{ server_extensions.key_share.value().key_data.data(), 16 } );
+        os << std::left << std::setw( label_width ) << ' ';
+        print_vector( std::span{ server_extensions.key_share.value().key_data.data() + 16, 16 } );
+
+        if ( text_color ) {
+            os << colors::reset;
+        }
+        
         os << "===== SERVER HELLO END =====\n\n";
     } 
 
@@ -445,22 +502,35 @@ namespace ntk {
     //  Print TLS Record
     // ==================
 
-    void print_tls_record( const tls_record& record ) {
+    void print_tls_record( const tls_record& record, std::ostream& os, const char* text_color ) {
         const int label_width = 26;
 
         auto print_field = [&]( const std::string& label, auto value ) {
-            std::cout << std::left << std::setw( label_width ) << label << value << "\n";
+            os << std::left << std::setw( label_width ) << label << value << "\n";
         };
 
-        std::cout << std::dec << std::setfill( ' ' );
-        std::cout << "===== TLS RECORD BEGIN =====\n";
+        os << std::dec << std::setfill( ' ' );
+        os << "===== TLS RECORD BEGIN =====\n";
+
+        if ( text_color ) {
+            os << text_color;
+        }
+
         print_field( "Content Type:", tls_content_type_names.at( record.content_type ) );
         print_field( "Version:", tls_version_names.at( record.version ) );
+        print_field( "Payload:", record.payload.size() ); 
         if ( is_http_response( record.payload ) ) {
-            print_http_response( record.payload );
+            print_http_response( record.payload, os );
+        } else if ( is_http_request( record.payload ) ) {
+            print_http_request( record.payload, os );
         } else {
             print_vector( record.payload );
         }
+
+        if ( text_color ) {
+            os << colors::reset;
+        }
+
         std::cout << "===== TLS RECORD END =====\n\n";
     }
 
@@ -503,6 +573,7 @@ namespace ntk {
             } else {
                 os << tls_extension_type_names.at( ext.type.value() );
             }
+            /*
             if ( ext.type == tls_extension_type::record_size_limit ) {
                 std::cout << ' ' << read_uint16_be( ext.value, 0 );
             }
@@ -515,12 +586,15 @@ namespace ntk {
                 }
                 print_key_share_entries( parse_result.value(), os );
             }
-            if ( ext.type == tls_extension_type::key_share ) {
-                ntk::print_vector( ext.value );
-            }
+            */
+            ntk::print_vector( ext.value );
             os << "\n";
         }
     }
+
+    // =========================
+    //  Print Key Share Entries
+    // =========================
 
     void print_key_share_entries( std::span<const key_share_entry> key_share_entries, std::ostream& os ) {
         const int label_width = 26;
@@ -565,12 +639,14 @@ namespace ntk {
         os << "===== HTTP REQUEST END =====\n\n";
     }
 
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     void print_http_request( std::span<const uint8_t> payload, std::ostream& os ) {
         auto parse_result = get_http_request( payload );
         if ( !parse_result ) {
+            os << parse_result.error() << std::endl;
             return;
         } 
-        print_http_request( parse_result.value() );
+        print_http_request( parse_result.value(), os );
     }
 
     // =====================
@@ -596,10 +672,12 @@ namespace ntk {
         os << "===== HTTP RESPONSE END =====\n\n";
     };
 
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     void print_http_response( std::span<const uint8_t> payload, std::ostream& os ) {
         auto parse_result = get_http_response( payload );
         if ( !parse_result ) {
-            std::cout << parse_result.error() << std::endl;
+            os << parse_result.error() << std::endl;
+            return;
         }
         print_http_response( parse_result.value(), os );
     }
@@ -703,10 +781,7 @@ namespace ntk {
         std::cout << object_identifier_names.at( dotted_string ) << " (" << dotted_string << ')' << std::endl;
     }
 
-    // ======================
-    //  Print Tbs Extensions
-    // ======================
-
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     void print_tbs_extensions( std::span<extension> extensions ) {
         for ( auto& extension : extensions ) {
             print_tbs_extension( extension );
@@ -747,6 +822,117 @@ namespace ntk {
         }
         std::cout << object_identifier_names.at( parameters_result.value() ) << std::endl;
         std::cout << "Key: " << bytes_to_hex_string( public_key_info.key ) << std::endl;
+    }
+
+    // ===========================
+    //  Cipher Suite : Operator<<
+    // ===========================
+
+    std::ostream& operator<<( std::ostream& os, const cipher_suite c ) {
+        os << tls_cipher_suite_names.at( c ) << std::endl;
+        return os;
+    }
+
+    // ==============
+    //  Array to Hex
+    // ==============
+
+    std::string array_to_hex( const auto& arr ) {
+        std::vector<uint8_t> vec( arr.begin(), arr.end() );
+        return string_to_hex( vec );
+    }
+
+    // ===================
+    //  Print TLS Secrets
+    // ===================
+
+    void print_tls_secrets( const std::variant<sha_256_secrets,sha_384_secrets>& secrets, std::ostream& os ) {
+        const int label_width = 40;
+
+        auto print_field = [&]( const std::string& label, const auto& value ) {
+            os << std::left << std::setw( label_width ) << label << array_to_hex( value ) << "\n";
+        };
+
+        os << std::dec << std::setfill( ' ' );
+        os << "===== TLS SECRETS BEGIN =====\n";
+        std::visit([&](auto&& s) {
+            print_field( "Client Handshake Traffic Secret:", s.client_handshake_traffic_secret );
+            print_field( "Server Handshake Traffic Secret:", s.server_handshake_traffic_secret );
+            print_field( "Client Traffic Secret 0:", s.client_traffic_secret_0 );
+            print_field( "Server Traffic Secret 0:", s.server_traffic_secret_0 );
+            print_field( "Exporter Secret:", s.exporter_secret );
+        }, secrets);
+        os << "===== TLS SECRETS END =====\n\n";
+    }
+
+    // =====================
+    //  Print Client Config
+    // =====================
+
+    void print_client_config( const std::string& config, std::ostream& os ) {
+        os << "===== CLIENT CONFIG BEGIN =====\n";
+        os << colors::green << config << colors::reset << std::endl;
+        os << "===== CLIENT CONFIG END =====\n\n";
+    }
+
+    // =====================
+    //  Print Server Config
+    // =====================
+
+    void print_server_config( const std::string& config, std::ostream& os) {
+        os << "===== SERVER CONFIG BEGIN =====\n";
+        os << colors::blue << config << colors::reset << std::endl;
+        os << "===== SERVER CONFIG END =====\n\n";
+    }
+
+    // ===================
+    //  Print TLS Context
+    // ===================
+
+    void print_tls_context( const tls_context& context, std::ostream& os, const char* text_color ) {
+        const int label_width = 40;
+
+        auto print_field = [&]( const std::string& label, auto value ) {
+            os << std::left << std::setw( label_width ) << label << value << "\n";
+        };
+
+        os << std::dec << std::setfill( ' ' );
+        os << "===== TLS CONTEXT BEGIN =====\n";
+
+        if ( text_color ) {
+            os << text_color;
+        }
+
+        auto peer_public_key = get_vector_string( context.peer_public_key.value() ); 
+        print_field( "Peer Public Key:", peer_public_key.substr( 0, 48 ) );
+        print_field( " ", peer_public_key.substr( 48, 96 ) );
+        auto public_key = get_vector_string( context.public_key.value() ); 
+        print_field( "Public Key:", public_key.substr( 0, 48) );
+        print_field( " ", public_key.substr( 48, 96 ) );
+        auto private_key = get_vector_string( context.private_key.value() ); 
+        print_field( "Private Key:", private_key.substr( 0, 48) );
+        print_field( " ", private_key.substr( 48, 96 ) );
+        print_field( "Negotiated Key Share:", named_group_names.at( context.negotiated_key_share.value() ) );
+        print_field( "Negotiated TLS Version:", tls_version_names.at( context.negotiated_version ) );
+        print_field( "Negotiated Cipher Suite:", tls_cipher_suite_names.at( context.negotiated_cipher_suite ) );
+        print_field( "Transcript Digest:", string_to_hex( context.transcript_digest ) );
+        print_field( "Client Handshake Traffic Seq Number:", context.client_handshake_traffic_seq_num );
+        print_field( "Server Handshake Traffic Seq Number:", context.server_handshake_traffic_seq_num );
+        print_field( "Server Traffic Seq Number:", context.client_traffic_seq_num );
+        print_field( "Server Traffic Seq Number:", context.server_traffic_seq_num );
+        std::visit( [&]( auto&& s ) {
+            print_field( "Client Handshake Traffic Secret:", array_to_hex( s.client_handshake_traffic_secret ) );
+            print_field( "Server Handshake Traffic Secret:", array_to_hex( s.server_handshake_traffic_secret ) );
+            print_field( "Client Traffic Secret 0:", array_to_hex( s.client_traffic_secret_0 ) );
+            print_field( "Server Traffic Secret 0:", array_to_hex( s.server_traffic_secret_0 ) );
+            print_field( "Exporter Secret:", array_to_hex( s.exporter_secret ) );
+        }, context.secrets );
+
+        if ( text_color ) {
+            os << colors::reset;
+        }
+
+        os << "===== TLS CONTEXT END =====\n\n";
     }
 
 } // namespace ntk

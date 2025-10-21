@@ -1139,8 +1139,10 @@ namespace ntk {
         tls_version negotiated_version;
         cipher_suite negotiated_cipher_suite;
         std::variant<sha_256_secrets,sha_384_secrets> secrets;
-        std::vector<uint8_t> client_hello_bytes;
-        std::vector<uint8_t> server_hello_bytes;
+        std::vector<uint8_t> transcript_digest;
+        uint64_t client_handshake_traffic_seq_num = 0;
+        uint64_t server_handshake_traffic_seq_num = 0;
+        uint64_t client_traffic_seq_num = 0;
         uint64_t server_traffic_seq_num = 0;
     };
 
@@ -1200,6 +1202,14 @@ namespace ntk {
         std::size_t max_size );
 
     tls_record decrypt_server_traffic( const tls_record& record, tls_context& context );
+
+
+    std::expected<std::variant<sha_256_secrets,sha_384_secrets>,std::string> derive_tls_secrets( const tls_context& context,
+                                                                                                 const std::vector<uint8_t>& transcript_digest );
+
+    std::expected<std::vector<uint8_t>,std::string> get_early_secret();
+
+    std::vector<uint8_t> get_hash_of_empty_input( const EVP_MD* hash_func );
 
 } // namespace ntk
 

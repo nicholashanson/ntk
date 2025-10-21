@@ -1047,10 +1047,9 @@ namespace ntk {
             for ( std::size_t i = 0; i < secret_hex.size(); i += 2 ) {
                 secret.push_back( std::stoi( secret_hex.substr( i, 2 ), nullptr, 16 ) );
             }
-
+            
             tls_secrets[ client_random_hex ][ label ] = secret;
         }
-
         return tls_secrets;
     }
 
@@ -3163,12 +3162,17 @@ namespace ntk {
     std::expected<std::variant<sha_256_secrets,sha_384_secrets>,std::string> derive_tls_secrets( const tls_context& context,
                                                                                                  std::span<const uint8_t> client_hello_bytes,
                                                                                                  std::span<const uint8_t> server_hello_bytes ) {
-        std::variant<sha_256_secrets,sha_384_secrets> secrets;
         auto digest_result = calculate_transcript_digest( client_hello_bytes, server_hello_bytes );
         if ( !digest_result ) {
             return std::unexpected( digest_result.error() );
         } 
-        auto& transcript_digest = digest_result.value();
+        return derive_tls_secrets( context, digest_result.value() );
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::variant<sha_256_secrets,sha_384_secrets>,std::string> derive_tls_secrets( const tls_context& context,
+                                                                                                 const std::vector<uint8_t>& transcript_digest ) {
+        std::variant<sha_256_secrets,sha_384_secrets> secrets;
         if ( !context.negotiated_key_share ) {
             return std::unexpected( "Key Share is undefined in the TLS Context" );
         }
@@ -3207,7 +3211,15 @@ namespace ntk {
             hash_len = 48;
         }
 
-        auto handshake_secret_result = hkdf_extract( shared_secret, {} );
+        auto early_secret_result = get_early_secret();
+        if ( !early_secret_result ) {
+            return std::unexpected( early_secret_result.error() );
+        }
+        auto& early_secret = early_secret_result.value();
+        auto empty_hash = get_hash_of_empty_input( hash_func );
+        auto derived_secret = hkdf_expand_label( early_secret, "derived", empty_hash, hash_len, hash_func );
+
+        auto handshake_secret_result = hkdf_extract( shared_secret, derived_secret );
         if ( !handshake_secret_result ) {
             return std::unexpected( handshake_secret_result.error() );
         }
@@ -3240,6 +3252,29 @@ namespace ntk {
         return secrets;
     }
 
+    // ==================
+    //  Get Early Secret
+    // ==================
+
+    std::expected<std::vector<uint8_t>,std::string> get_early_secret() {
+        return hkdf_extract( {}, {} );
+    }
+
+    // =========================
+    //  Get Hash of Empry Input
+    // =========================
+
+    std::vector<uint8_t> get_hash_of_empty_input( const EVP_MD* hash_func ) {
+        std::vector<uint8_t> hash( EVP_MD_size( hash_func ) );
+        EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+        EVP_DigestInit_ex( ctx, hash_func, nullptr );
+        unsigned int out_len = 0;
+        EVP_DigestFinal_ex( ctx, hash.data(), &out_len );
+        EVP_MD_CTX_free( ctx );
+        hash.resize( out_len );
+        return hash;
+    }
+ 
     // =====================
     //  Extract Hash Suffix
     // =====================
@@ -3316,6 +3351,7 @@ namespace ntk {
                 return std::unexpected( "Failed to Construct TLS Record: " + construct_result.error() );
             }
             records.push_back( std::move( construct_result.value() ) );
+            ++seq_num;
         }
         return records;
     }
