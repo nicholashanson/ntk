@@ -64,4 +64,6 @@ namespace ntk {
 
     std::expected<server_hello_result,std::string> generate_server_hello( std::span<const uint8_t> client_hello_bytes );
 
+    std::string load_server_config();
+
 } // namespace ntk

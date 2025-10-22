@@ -46,6 +46,19 @@ namespace ntk {
     // ===============
 
     void handle_client( int client_fd ) {
+        std::cout << "\033[2J\033[H";
+        generate_default_server_config();
+        generate_default_client_config();
+        auto client_config_result = load_client_config();
+        if ( !client_config_result ) {
+            std::cout << client_config_result.error() << std::endl;
+        }
+        print_client_config( client_config_result.value() );
+        std::cin.get();
+        std::cout << "\033[2J\033[H";
+        print_server_config( load_server_config() );
+        std::cin.get();
+        std::cout << "\033[2J\033[H";
         client_connection conn{ client_fd, server_state::waiting_for_client_hello, {}, {} };
         std::vector<uint8_t> buffer; 
         while ( true ) { 
@@ -63,7 +76,9 @@ namespace ntk {
                     return;
                 }
                 auto& client_hello = client_hello_result.value();
-                ntk::print_client_hello( client_hello );
+                ntk::print_client_hello( client_hello, std::cout, colors::green );
+                std::cin.get();
+                std::cout << "\033[2J\033[H";
                 auto server_hello_result = generate_server_hello( buffer );
                 if ( !server_hello_result ) {
                     std::cout << server_hello_result.error() << std::endl;
@@ -85,25 +100,29 @@ namespace ntk {
                     return;
                 }
                 auto& server_hello_record = record_result.value();
-                ntk::print_server_hello( parse_result.value() );
+                print_server_hello( parse_result.value(), std::cout, colors::blue );
+                std::cin.get();
+                std::cout << "\033[2J\033[H";
+                print_tls_context( conn.tls_ctx, std::cout, colors::blue );
+                std::cin.get();
+                std::cout << "\033[2J\033[H";
                 write( client_fd, server_hello_record.data(), server_hello_record.size() );
-                print_tls_secrets( conn.tls_ctx.secrets );
                 conn.state = server_state::sent_server_hello;
-                std::cout << "Server Hello sent.\n";
                 buffer.clear();
             } else if ( conn.state == server_state::sent_server_hello ) {
-                std::cout << "Buffer size: " << buffer.size() << std::endl;
                 auto record_result = get_tls_record_from_payload( buffer );
                 if ( !record_result ) {
-                    break;
+                    std::cout << record_result.error() << std::endl;
                 }
                 auto& record = record_result.value();
-                print_tls_record( record );
+                print_tls_record( record, std::cout, colors::green );
+                std::cin.get();
+                std::cout << "\033[2J\033[H";
                 buffer.clear();
 
                 auto read_result = ntk::read_from_file( "http_response.txt" );
                 if ( !read_result ) {
-                    std::cout << record_result.error() << std::endl;
+                    std::cout << read_result.error() << std::endl;
                 }
                 auto& http_message = read_result.value();
                 auto ts_read_result = ntk::read_from_file( "../assets/segment.ts" );
@@ -114,8 +133,7 @@ namespace ntk {
                 http_message.insert( http_message.end(), ts.begin(), ts.end() );
                 uint64_t seq_num{};
                 
-
-                std::visit([&](auto& s) {
+                std::visit( [&]( auto& s ) {
                     auto records_result = ntk::convert_to_tls_application_data_records(
                         ntk::cipher_suite::TLS_AES_128_GCM_SHA256,
                         http_message,
@@ -124,15 +142,35 @@ namespace ntk {
                         16385
                     );
 
-                    if (!records_result) {
+                    if ( !records_result ) {
                         std::cout << "Failed: " << records_result.error() << std::endl;
                         return;
                     }
 
-                    for (const auto& record : records_result.value()) {
-                        write(client_fd, record.data(), record.size());
+                    for ( const auto& record : records_result.value() ) {
+                        auto parse_result = get_tls_record_from_payload( record );
+                        if ( !parse_result ) {
+                            std::cout << parse_result.error() << std::endl;
+                        }
+                        auto& parsed_record = parse_result.value();
+                        print_tls_record( parsed_record, std::cout, colors::blue, true );
                     }
-                }, conn.tls_ctx.secrets);
+
+                    std::cin.get();
+                    std::cout << "\033[2J\033[H";
+                    
+                    for ( const auto& record : records_result.value() ) {
+                        std::size_t total_sent = 0;
+                        while (total_sent < record.size()) {
+                            ssize_t n = write(client_fd, record.data() + total_sent, record.size() - total_sent);
+                            if (n <= 0) {
+                                std::cout << "Write failed or connection closed" << std::endl;
+                                break;
+                            }
+                            total_sent += n;
+                        }
+                    }
+                }, conn.tls_ctx.secrets );
             }
         }
         close( client_fd );
@@ -324,11 +362,12 @@ namespace ntk {
             }
         }
         if ( c_hello.extensions && c_hello.extensions->supported_versions ) {
-            for ( auto& v :  c_hello.extensions->supported_versions.value() ) {
+            for ( auto& v : c_hello.extensions->supported_versions.value() ) {
                 if ( std::any_of( server_config.supported_versions.begin(),
                                   server_config.supported_versions.end(),
                                   [&]( auto& version) { return version == v; } ) ) {
                     context.version = v;
+                    break;
                 }
             }
         }
