@@ -299,8 +299,8 @@ namespace ntk {
     } // namespace look_up
 
     constexpr std::array<tls_version,2> default_supported_versions = { 
-        tls_version::tls_1_2,
-        tls_version::tls_1_3
+        tls_version::tls_1_3,
+        tls_version::tls_1_2
     };
 
     inline auto get_tls_version = make_lookup( look_up::tls_versions );
@@ -1053,7 +1053,7 @@ namespace ntk {
 
     std::string session_id_to_hex( const std::vector<uint8_t>& session_id );
 
-    std::string string_to_hex( const std::vector<uint8_t>& data );
+    std::string string_to_hex( std::span<const uint8_t> data );
 
     // =====================
     //  Generate TLS Random 

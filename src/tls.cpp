@@ -59,7 +59,7 @@ namespace ntk {
     //  String to Hex 
     // ===============
 
-    std::string string_to_hex( const std::vector<uint8_t>& data ) {
+    std::string string_to_hex( std::span<const uint8_t> data ) {
         std::ostringstream oss;
         for ( auto byte : data ) {
             oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << int( byte );
@@ -3454,11 +3454,17 @@ namespace ntk {
             context.peer_public_key = { s_hello_info.extensions->key_share->key_data.begin(),
                                         s_hello_info.extensions->key_share->key_data.end() };
         }
-        auto secrets_result = derive_tls_secrets( context, c_hello_result.client_hello, server_hello_bytes );
+        auto digest_result = calculate_transcript_digest( c_hello_result.client_hello, server_hello_bytes );
+        if ( !digest_result ) {
+            return std::unexpected( digest_result.error() );
+        }
+        auto& transcript_digest = digest_result.value();
+        auto secrets_result = derive_tls_secrets( context, transcript_digest );
         if ( !secrets_result ) {
             return std::unexpected( "Get Client TLS Context: Failed to Derive Secrets -> " + secrets_result.error() );
         }
         context.secrets = std::move( secrets_result.value() );
+        context.transcript_digest = std::move( transcript_digest );
         return context;
     }
 
@@ -3493,10 +3499,16 @@ namespace ntk {
                                     [&]( auto& key_share_entry ) { return static_cast<named_group>( key_share_entry.group ) == context.negotiated_key_share; } );
             context.peer_public_key = { it->key_data.begin(), it->key_data.end() };
         }
-        auto secrets_result = derive_tls_secrets( context, client_hello_bytes, s_hello_result.server_hello );
+        auto digest_result = calculate_transcript_digest( client_hello_bytes, s_hello_result.server_hello );
+        if ( !digest_result ) {
+            return std::unexpected( digest_result.error() );
+        } 
+        auto& transcript_digest = digest_result.value();
+        auto secrets_result = derive_tls_secrets( context, transcript_digest );
         if ( !secrets_result ) {
             return std::unexpected( "Failed to Derive Secrets: " + secrets_result.error() );
         }
+        context.transcript_digest = std::move( transcript_digest );
         context.secrets = std::move( secrets_result.value() );
         return context;
     }
