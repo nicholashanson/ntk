@@ -105,11 +105,55 @@ namespace ntk {
         file.seekg( 0, std::ios::beg );
 
         std::vector<uint8_t> buffer( static_cast<std::size_t>( size ) );
-        if (!file.read( reinterpret_cast<char*>( buffer.data() ), size ) ) {
+        if ( !file.read( reinterpret_cast<char*>( buffer.data() ), size ) ) {
             return std::unexpected( "Failed to read file: " + path );
         }
 
         return buffer;
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::vector<uint8_t>,std::string> read_from_file( const std::string& path, 
+                                                                    const std::size_t byte_from, 
+                                                                    const std::size_t byte_to ) {
+        std::ifstream file( path, std::ios::binary | std::ios::ate );
+        if ( !file ) {
+            return std::unexpected( "Failed to open file: " + path );
+        }
+        std::streamsize size = file.tellg();
+        if ( byte_from > byte_to ) {
+            return std::unexpected( "Start Line can not be less than End Line" );
+        }
+        if ( byte_to > static_cast<std::size_t>( size ) ) {
+            return std::unexpected( "End Line can not exceed the File Size" );
+        }
+        std::size_t bytes_to_read = byte_to - byte_from;
+        std::vector<uint8_t> result;
+        result.reserve( bytes_to_read );
+        file.seekg( byte_from );
+        const std::size_t chunk_size = 1024;
+        while ( bytes_to_read > 0 ) {
+            std::size_t read_size = std::min( chunk_size, bytes_to_read );
+            std::vector<uint8_t> buffer( read_size );
+            file.read( reinterpret_cast<char*>( buffer.data() ), read_size );
+            if ( !file ) {
+                return std::unexpected( "Error reading from File" );
+            }
+            result.insert( result.end(), buffer.begin(), buffer.end() );
+            bytes_to_read -= read_size;
+        }
+        return result;
+    }
+
+    // =============
+    //  Swap Endian
+    // =============
+
+    uint32_t swap_endian( uint32_t value ) {
+        return ( ( value & 0x000000ff ) << 24 ) |
+               ( ( value & 0x0000ff00 ) <<  8 ) |
+               ( ( value & 0x00ff0000 ) >>  8 ) |
+               ( ( value & 0xff000000 ) >> 24 );
     }
 
 } // namespace ntk

@@ -222,6 +222,11 @@ namespace ntk {
 
     std::expected<std::vector<uint8_t>,std::string> read_from_file( const std::string& path );
 
+    std::expected<std::vector<uint8_t>,std::string> read_from_file( const std::string& path, 
+                                                                    const std::size_t byte_from, 
+                                                                    const std::size_t byte_to );
+    uint32_t swap_endian( uint32_t value );
+
 } // namespace ntk
 
 #endif // UTILS_HPP
