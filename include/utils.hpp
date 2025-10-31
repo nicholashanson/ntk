@@ -227,6 +227,16 @@ namespace ntk {
                                                                     const std::size_t byte_to );
     uint32_t swap_endian( uint32_t value );
 
+    uint16_t swap_endian( uint16_t value );
+
+    template<typename Enum>
+    constexpr bool enum_compare_helper( Enum a, Enum b ) noexcept {
+        using u = std::underlying_type_t<Enum>;
+        const u v_a = static_cast<u>( a );
+        const u v_b = static_cast<u>( b );
+        return ( v_a == v_b ) || ( v_a == swap_endian( v_b ) );
+    }
+
 } // namespace ntk
 
 #endif // UTILS_HPP
