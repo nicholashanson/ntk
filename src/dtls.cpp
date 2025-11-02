@@ -19,6 +19,11 @@ namespace ntk {
             return std::unexpected( "Unrecognized DTLS Version in ClientHello" );
         }
         c_hello.version = version_result.value().value();
+        auto random_result = extract_handshake_message_random( client_hello_bytes );
+        if ( !random_result ) {
+            return std::unexpected( random_result.error() );
+        }
+        c_hello.random = std::move( random_result.value() );
         return c_hello;
 	}
 

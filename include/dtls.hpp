@@ -25,6 +25,7 @@ namespace ntk {
 
 	struct dtls_client_hello {
 		dtls_version version;
+		std::array<uint8_t,32> random;
 	};
 
 	std::expected<dtls_client_hello,std::string> parse_dtls_client_hello( std::span<const uint8_t> client_hello_bytes );
