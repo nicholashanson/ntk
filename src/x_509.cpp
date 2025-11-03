@@ -464,7 +464,7 @@ namespace ntk {
     	std::vector<tbs_rdn> t_rdns;
     	auto rdns_result = get_children_from_raw_bytes( rdn_bytes );
     	if ( !rdns_result ) {
-    		return std::unexpected( "Failed to Extract RDBs: " + rdns_result.error() );
+    		return std::unexpected( "Failed to Extract RDNs: " + rdns_result.error() );
     	}
     	auto& rdns = rdns_result.value();
     	for ( auto& rdn : rdns ) {
@@ -521,5 +521,85 @@ namespace ntk {
     	public_key_info.key = children.back();
     	return public_key_info;
     }
+
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<subject_public_key_info,std::string> get_subject_public_key_info_from_cert( std::span<const uint8_t> certificate_bytes ) {
+    	auto cert_result = get_tbs_certificate( certificate_bytes );
+    	if ( !cert_result ) {
+    		return std::unexpected( cert_result.error() );
+    	}
+    	return get_subject_public_key_info( cert_result.value().subject_public_key_info );
+    }
+
+    // ==========================
+    //  Extracct Tbs Certificate
+    // ==========================
+
+    std::expected<std::vector<uint8_t>,std::string> extract_tbs_certificate( std::span<const uint8_t> certificate_bytes ) {
+    	constexpr std::size_t tbs_certificate_offset = 4;
+    	auto len_result = parse_ans1_length( certificate_bytes.subspan( tbs_certificate_offset ) );
+    	if ( !len_result ) {
+    		return std::unexpected( len_result.error() );
+    	}
+    	auto tbs_certificate_len = len_result->header_len + len_result->node_len;
+    	return std::vector<uint8_t>( certificate_bytes.begin() + tbs_certificate_offset, 
+    		                         certificate_bytes.begin() + tbs_certificate_offset + tbs_certificate_len );
+    }
+
+    // ========================
+    //  Verify ECDSA Signature
+    // ========================
+
+    std::expected<bool,std::string> verify_ecdsa_signature( std::span<const uint8_t> tbs_bytes, const ecdsa_signature& sig, std::span<const uint8_t> pubkey_bytes ) {
+	    if ( pubkey_bytes.size() != 65 || pubkey_bytes[ 0 ] != 0x04 ) {
+	        return std::unexpected( "Public Key has the incorrect number of Bytes" );
+	    }
+	    bool valid = false;
+	    EC_KEY* key = EC_KEY_new_by_curve_name( NID_X9_62_prime256v1 );
+	    if ( !key ) { 
+	    	return false;
+	    }
+	    const EC_GROUP* group = EC_KEY_get0_group( key );
+	    EC_POINT* point = EC_POINT_new( group );
+	    if ( !point ) {
+	        EC_KEY_free( key );
+	        return false;
+	    }
+	    if ( 1 != EC_POINT_oct2point(group, point, pubkey_bytes.data(), pubkey_bytes.size(), nullptr) ) {
+	        EC_POINT_free( point );
+	        EC_KEY_free( key );
+	        return std::unexpected( "EC_POINT_oct2point failed" ); 
+	    }
+	    if ( 1 != EC_KEY_set_public_key( key, point ) ) {
+	        EC_POINT_free( point );
+	        EC_KEY_free( key );
+	        return std::unexpected( "EC_KEY_set_public_key failed" );
+	    }
+
+	    EC_POINT_free( point ); 
+	    uint8_t digest[ 32 ];
+	    SHA256( tbs_bytes.data(), tbs_bytes.size(), digest );
+	    BIGNUM* r = BN_bin2bn( sig.r.data(), sig.r.size(), nullptr );
+	    BIGNUM* s = BN_bin2bn( sig.s.data(), sig.s.size(), nullptr );
+	    if ( !r || !s ) {
+	        BN_free( r );
+	        BN_free( s );
+	        EC_KEY_free( key );
+	        return std::unexpected( "BN_bin2bn failed" );
+	    }
+	    ECDSA_SIG* ecdsa_sig = ECDSA_SIG_new();
+	    if ( !ecdsa_sig ) {
+	        BN_free( r );
+	        BN_free( s );
+	        EC_KEY_free( key );
+	        return false;
+	    }
+	    ECDSA_SIG_set0( ecdsa_sig, r, s );
+	    int rc = ECDSA_do_verify( digest, sizeof( digest ), ecdsa_sig, key );
+	    valid = ( rc == 1 );
+	    ECDSA_SIG_free( ecdsa_sig );
+	    EC_KEY_free( key );
+	    return valid;
+	}
 
 } // namespace ntk

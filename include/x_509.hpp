@@ -11,6 +11,13 @@
 #include <string>
 #include <vector>
 
+#include <openssl/bn.h>
+#include <openssl/ec.h>
+#include <openssl/ecdsa.h>
+#include <openssl/obj_mac.h>
+#include <openssl/objects.h>
+#include <openssl/sha.h>
+
 #include <utils.hpp>
 
 namespace ntk {
@@ -193,7 +200,13 @@ namespace ntk {
 
     std::expected<subject_public_key_info,std::string> get_subject_public_key_info( std::span<const uint8_t> public_key_bytes );
 
+    std::expected<subject_public_key_info,std::string> get_subject_public_key_info_from_cert( std::span<const uint8_t> certificate_bytes );
+
     std::expected<std::string,std::string> get_algorithm_identifier( std::span<const uint8_t> algorithm_bytes );
+
+    std::expected<std::vector<uint8_t>,std::string> extract_tbs_certificate( std::span<const uint8_t> certificate_bytes );
+
+    bool verify_ecdsa_signature( std::span<const uint8_t> tbs_bytes, const ecdsa_signature& sig, std::span<const uint8_t> pubkey_bytes );
 
 } // namespace ntk
 

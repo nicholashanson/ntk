@@ -298,12 +298,12 @@ namespace ntk {
 
     } // namespace look_up
 
+    inline auto get_tls_version = make_lookup( look_up::tls_versions );
+
     constexpr std::array<tls_version,2> default_supported_versions = { 
         tls_version::tls_1_3,
         tls_version::tls_1_2
     };
-
-    inline auto get_tls_version = make_lookup( look_up::tls_versions );
 
     std::expected<std::vector<tls_version>,std::string> parse_supported_versions( std::span<const uint8_t> supported_versions_bytes );
 
@@ -846,6 +846,8 @@ namespace ntk {
     // =============
 
     std::vector<uint8_t> extract_certificate( const std::vector<uint8_t>& handshake_payload );
+
+    std::expected<std::vector<uint8_t>,std::string> extract_certificate_( std::span<const uint8_t> certificate_bytes );
 
     // =================
     //  TLS Certificate 

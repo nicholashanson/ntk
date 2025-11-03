@@ -113,6 +113,7 @@ TEST( IntegrationTest, DecryptTlsData_LongStream ) {
         record.payload.pop_back();
     }
     ntk::http_response response = *ntk::get_http_response(  decrypted_server_records[ 2 ].payload  );
+    ntk::print_http_response( response );
     for ( std::size_t i = 3; i < decrypted_server_records.size(); ++i ) {
         response.body.insert( response.body.end(), decrypted_server_records[ i ].payload.begin(), decrypted_server_records[ i ].payload.end() );
     }

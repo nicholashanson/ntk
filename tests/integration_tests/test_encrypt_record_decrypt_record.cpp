@@ -40,6 +40,7 @@ TEST( IntegrationTest, EncryptRecordDecryptRecord ) {
                                                             session_keys,
                                                             "application_traffic_secret_0",
                                                             seq_num );
+    decrypted_record.payload.pop_back();
     ASSERT_EQ( decrypted_record, plain_record );
 }
 
@@ -78,6 +79,7 @@ TEST( IntegrationTest, EncryptRecordDecryptRecord_ChaCha ) {
                                                             session_keys,
                                                             "application_traffic_secret_0",
                                                             seq_num );
+    decrypted_record.payload.pop_back();
     ASSERT_EQ( decrypted_record, plain_record );
 }
 

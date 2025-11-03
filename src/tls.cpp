@@ -1640,6 +1640,17 @@ namespace ntk {
         return cert;
     }
 
+    // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    std::expected<std::vector<uint8_t>,std::string> extract_certificate_( std::span<const uint8_t> certificate_bytes ) {
+        uint32_t cert_len = ( certificate_bytes[ 0 ] << 16 ) |
+                            ( certificate_bytes[ 1 ] <<  8 ) |
+                              certificate_bytes[ 2 ];
+        if ( certificate_bytes.size() < 3 + cert_len ) {
+            return std::unexpected( "Buffer too short for Certificate" );
+        }
+        return std::vector<uint8_t>( certificate_bytes.begin() + 3, certificate_bytes.begin() + 3 + cert_len );
+    }
+
     // ====================
     //  Is Complete Record 
     // ====================

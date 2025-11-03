@@ -4,6 +4,7 @@
 #include <io.hpp>
 
 #include <test_constants.hpp>
+#include <test_certificates.hpp>
 
 TEST( UnitTest, GetTbsCertificate ) {
 	auto parse_result = ntk::get_tbs_certificate( test::tls_certificate );
@@ -17,4 +18,9 @@ TEST( UnitTest, GetTbsCertificate ) {
 	EXPECT_EQ( certificate.subject_public_key_info.size(), 89 );
 	ASSERT_TRUE( certificate.extensions );
 	EXPECT_EQ( certificate.extensions.value().size(), 597 );
+}
+
+TEST( UnitTest, GetTbsCertificate1 ) {
+	auto parse_result = ntk::get_tbs_certificate( test_constants::tls_certificate_1 );
+	ASSERT_TRUE( parse_result ) << parse_result.error() << std::endl;
 }

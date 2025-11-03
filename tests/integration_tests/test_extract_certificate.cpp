@@ -36,7 +36,20 @@ TEST( IntegrationTest, ExtractCertificate ) {
                                                     second_records, 
                                                     session_keys );
     std::vector<uint8_t> certificate_payload( decrypted_records[ 0 ].payload.begin() + 10, decrypted_records[ 0 ].payload.end() );
+    ntk::print_vector( certificate_payload );
     auto certificate_bytes = ntk::extract_certificate( certificate_payload );
+    std::cout << "certificate_bytes size: " << certificate_bytes.size() << std::endl;
+    std::cout << "certificate_payload size: " << certificate_payload.size() << std::endl;
+    ntk::print_vector( certificate_bytes );
+    std::span<uint8_t> second_certificate{ certificate_payload.begin() + 11 + certificate_bytes.size() + 2, certificate_payload.size() - 11 - certificate_bytes.size() - 2 };
+    ntk::print_vector( second_certificate );
+    auto second_certificate_result = ntk::extract_certificate_( second_certificate );
+    ASSERT_TRUE( second_certificate_result ) << second_certificate_result.error();
+    ntk::print_vector( second_certificate_result.value() );
+    std::span<const uint8_t> third_certificate{ second_certificate.begin() + 3 + second_certificate_result.value().size() + 2, 
+                                                second_certificate.size() - 3 - second_certificate_result.value().size() - 2 };
+    auto third_certificate_result = ntk::extract_certificate_( third_certificate );
+    ntk::print_vector( third_certificate_result.value() );
 }
 
 TEST( IntegrationTest, ExtractCertificate_Segment ) {
