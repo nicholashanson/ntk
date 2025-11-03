@@ -206,7 +206,7 @@ namespace ntk {
 
     std::expected<std::vector<uint8_t>,std::string> extract_tbs_certificate( std::span<const uint8_t> certificate_bytes );
 
-    bool verify_ecdsa_signature( std::span<const uint8_t> tbs_bytes, const ecdsa_signature& sig, std::span<const uint8_t> pubkey_bytes );
+    std::expected<bool,std::string> verify_ecdsa_signature( std::span<const uint8_t> tbs_bytes, const ecdsa_signature& sig, std::span<const uint8_t> pubkey_bytes );
 
 } // namespace ntk
 

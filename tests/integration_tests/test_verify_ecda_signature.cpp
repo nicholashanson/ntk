@@ -12,5 +12,7 @@ TEST( IntegrationTest, VerifyEcdaSignature ) {
 	ASSERT_TRUE( sig_result ) << sig_result.error();
 	auto pubkey_result = ntk::get_subject_public_key_info_from_cert( test_constants::tls_certificate_1 );
 	ASSERT_TRUE( pubkey_result ) << pubkey_result.error();
-	EXPECT_TRUE( ntk::verify_ecdsa_signature( tbs_result.value(), sig_result.value(), pubkey_result.value().key ) );
+	auto result = ntk::verify_ecdsa_signature( tbs_result.value(), sig_result.value(), pubkey_result.value().key );
+	ASSERT_TRUE( result ) << result.error();
+	EXPECT_TRUE( result.value() );
 }
